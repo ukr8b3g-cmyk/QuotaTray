@@ -1,0 +1,37 @@
+# Build
+bin/
+obj/
+dist/
+artifacts/
+TestResults/
+*.user
+*.suo
+.vs/
+
+# Local QuantaTrain data
+settings.json
+state.json
+history/
+logs/
+data/
+portable.flag
+
+# Codex/OpenAI credentials and local state
+.codex/
+auth.json
+
+# Signing
+*.pfx
+*.p12
+*.snk
+*.cer
+*.key
+
+# OS/editor
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/*.local.json
+
+# Local visual QA evidence
+design-qa.md

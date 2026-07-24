@@ -1,0 +1,169 @@
+handoff:
+  version: "1.0"
+  created_at: "2026-07-25"
+  status: "approved-design-for-implementation"
+
+product:
+  display_name: "QuantaTrain"
+  japanese_name: "クオンタトレイン"
+  executable_name: "QuantaTrain.exe"
+  repository_slug_suggestion: "quantatrain"
+  description: "Unofficial local usage monitor for OpenAI Codex"
+  affiliation_notice: "Unofficial; not affiliated with or endorsed by OpenAI."
+
+scope:
+  target_os:
+    required: "Windows 11 x64"
+    best_effort: "Supported Windows 10 x64 editions where .NET 10 and Codex CLI operate"
+  architectures:
+    required: ["win-x64"]
+    optional_after_validation: ["win-arm64"]
+    excluded: ["win-x86"]
+  release_channel: "GitHub Releases"
+
+technology:
+  language: "C#"
+  runtime: ".NET 10 LTS"
+  ui_framework: "Windows Forms"
+  webview: false
+  electron: false
+  native_http_listener: false
+  production_dependency_policy: "Prefer BCL; justify every added package"
+  storage:
+    settings: "JSON"
+    current_state: "JSON"
+    history: "monthly JSONL"
+    logs: "bounded local text logs with redaction"
+
+codex_integration:
+  dependency: "External official Codex CLI/App Server executable"
+  transport: "stdio JSONL"
+  websocket: false
+  experimental_api: false
+  initialize_client_name: "quantatrain"
+  methods_used:
+    - "account/read"
+    - "account/login/start"
+    - "account/login/completed"
+    - "account/updated"
+    - "account/rateLimits/read"
+    - "account/rateLimits/updated"
+  forbidden_methods:
+    - "account/rateLimitResetCredit/consume"
+  auth:
+    reuse_codex_cache: true
+    fallback: "Official ChatGPT browser flow"
+    direct_browser_cookie_read: false
+    direct_password_store_read: false
+    direct_auth_file_read: false
+
+refresh:
+  default_seconds: 60
+  choices_seconds: [60, 120, 300]
+  refresh_on_panel_open: true
+  stale_after_seconds: 90
+  non_overlapping_requests: true
+  failure_backoff_seconds: [60, 120, 300, 600, 900]
+
+ui_defaults:
+  startup_mode: "tray-only"
+  tray_left_click: "compact"
+  theme: "dark"
+  accent: "green"
+  opacity_percent: 100
+  always_on_top: false
+  lock_position: false
+  remember_position: false
+  snap_to_edge: false
+  keep_panel_open: false
+  compact_contents:
+    - "weekly remaining percent"
+    - "weekly progress bar"
+    - "next reset local date/time"
+    - "countdown"
+    - "last successful update and freshness"
+  detail_contents:
+    - "weekly quota"
+    - "reset-credit count and expirations when available"
+    - "recent reset history"
+    - "plan type when available"
+    - "connection state and last update"
+
+settings:
+  general:
+    - "launch at Windows startup"
+    - "startup display: tray-only / compact / detail"
+    - "refresh interval"
+    - "refresh when opened"
+  display:
+    - "theme: dark / light / system"
+    - "accent preset"
+    - "opacity slider 60-100%"
+    - "always on top"
+    - "lock position"
+    - "remember monitor and position"
+    - "snap to screen edge"
+    - "keep panel open"
+  language:
+    auto_detect: true
+    supported:
+      - "ja-JP"
+      - "en-US"
+      - "zh-Hans"
+      - "zh-Hant"
+      - "ko-KR"
+      - "de-DE"
+      - "fr-FR"
+      - "es-ES"
+      - "pt-BR"
+      - "ru-RU"
+  notifications:
+    - "remaining <= 30%"
+    - "remaining <= 10%"
+    - "scheduled reset detected"
+    - "unexpected reset candidate detected"
+    - "reset credit expiring"
+    - "persistent connection failure"
+  history:
+    default_retention_days: 365
+    export_formats: ["CSV", "JSON"]
+
+privacy:
+  telemetry: false
+  analytics: false
+  advertising: false
+  crash_upload: false
+  developer_backend: false
+  persisted_personal_identifiers: false
+  stored_locally:
+    - "settings"
+    - "window placement"
+    - "quota observations needed for history"
+    - "classified reset events"
+    - "bounded redacted diagnostics"
+
+release_assets:
+  required:
+    - "QuantaTrain-v<version>-win-x64-setup.exe"
+    - "QuantaTrain-v<version>-win-x64-portable.zip"
+    - "SHA256SUMS.txt"
+  optional:
+    - "QuantaTrain-v<version>-win-arm64-setup.exe"
+    - "QuantaTrain-v<version>-win-arm64-portable.zip"
+
+out_of_scope_v1:
+  - "Consuming reset credits"
+  - "Multiple ChatGPT account switching"
+  - "UI scraping"
+  - "Automatic update checks"
+  - "Developer telemetry"
+  - "Cloud synchronization"
+  - "Usage prediction or fabricated recovery rate"
+  - "macOS or Linux builds"
+
+github:
+  owner: "TBD_BY_USER"
+  repository: "TBD_BY_USER"
+  visibility: "TBD_BY_USER"
+  proposed_license: "MIT; confirm before publication"
+  push_requires_explicit_user_authorization: true

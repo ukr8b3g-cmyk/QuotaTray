@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/QuantaTrain.App/QuantaTrain.App.csproj" />
+    <Project Path="src/QuantaTrain.Core/QuantaTrain.Core.csproj" />
+    <Project Path="src/QuantaTrain.Infrastructure/QuantaTrain.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/QuantaTrain.App.Tests/QuantaTrain.App.Tests.csproj" />
+    <Project Path="tests/QuantaTrain.Core.Tests/QuantaTrain.Core.Tests.csproj" />
+    <Project Path="tests/QuantaTrain.FakeAppServer/QuantaTrain.FakeAppServer.csproj" />
+    <Project Path="tests/QuantaTrain.IntegrationTests/QuantaTrain.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

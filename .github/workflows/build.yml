@@ -1,0 +1,45 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+      - run: dotnet restore QuantaTrain.slnx
+      - run: dotnet build QuantaTrain.slnx -c Release --no-restore
+      - run: dotnet test QuantaTrain.slnx -c Release --no-build
+      - name: Forbidden runtime behavior check
+        shell: pwsh
+        run: |
+          $patterns = @(
+            'rateLimitResetCredit' + '/consume',
+            'auth' + '.json',
+            'HttpListener',
+            'WebView',
+            'CookieContainer'
+          )
+          foreach ($pattern in $patterns) {
+            $matches = Get-ChildItem -Recurse -File src |
+              Select-String -SimpleMatch $pattern
+            if ($matches) {
+              $matches | Out-Host
+              throw "Forbidden runtime pattern found: $pattern"
+            }
+          }

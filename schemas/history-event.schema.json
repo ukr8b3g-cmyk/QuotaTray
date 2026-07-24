@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/quantatrain/history-event.schema.json",
+  "title": "QuantaTrain history event",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "type",
+    "observedFromUtc",
+    "observedToUtc",
+    "classification",
+    "confidence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "type": {
+      "enum": [
+        "reset-event",
+        "state-change",
+        "checkpoint"
+      ]
+    },
+    "observedFromUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observedToUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "classification": {
+      "enum": [
+        "scheduled-reset",
+        "reset-credit-likely",
+        "unexpected-reset-candidate",
+        "limit-policy-change",
+        "uncertain-change",
+        "none"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "limitId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bucketRole": {
+      "enum": [
+        "primary",
+        "secondary",
+        "unknown"
+      ]
+    },
+    "windowDurationMins": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "before": {
+      "$ref": "#/$defs/state"
+    },
+    "after": {
+      "$ref": "#/$defs/state"
+    },
+    "reasonCodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20
+    },
+    "confirmed": {
+      "type": "boolean"
+    },
+    "appVersion": {
+      "type": "string"
+    },
+    "codexVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "usedPercent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "remainingPercent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "resetsAtUtc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "resetCreditCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "planType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

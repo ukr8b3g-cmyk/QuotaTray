@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/quantatrain/settings.schema.json",
+  "title": "QuantaTrain settings",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "general",
+    "display",
+    "language",
+    "notifications",
+    "history",
+    "connection"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "general": {
+      "type": "object",
+      "required": [
+        "launchAtStartup",
+        "startupMode",
+        "refreshIntervalSeconds",
+        "refreshOnPanelOpen"
+      ],
+      "properties": {
+        "launchAtStartup": {
+          "type": "boolean",
+          "default": false
+        },
+        "startupMode": {
+          "enum": [
+            "tray-only",
+            "compact",
+            "detail"
+          ],
+          "default": "tray-only"
+        },
+        "refreshIntervalSeconds": {
+          "enum": [
+            60,
+            120,
+            300
+          ],
+          "default": 60
+        },
+        "refreshOnPanelOpen": {
+          "type": "boolean",
+          "default": true
+        },
+        "showCachedOnFailure": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "required": [
+        "theme",
+        "accent",
+        "opacityPercent",
+        "alwaysOnTop",
+        "lockPosition",
+        "rememberPosition",
+        "snapToEdge",
+        "keepPanelOpen"
+      ],
+      "properties": {
+        "theme": {
+          "enum": [
+            "dark",
+            "light",
+            "system"
+          ],
+          "default": "dark"
+        },
+        "accent": {
+          "enum": [
+            "green",
+            "blue",
+            "cyan",
+            "purple",
+            "orange",
+            "monochrome"
+          ],
+          "default": "green"
+        },
+        "opacityPercent": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 100,
+          "default": 100
+        },
+        "alwaysOnTop": {
+          "type": "boolean",
+          "default": false
+        },
+        "lockPosition": {
+          "type": "boolean",
+          "default": false
+        },
+        "rememberPosition": {
+          "type": "boolean",
+          "default": false
+        },
+        "snapToEdge": {
+          "type": "boolean",
+          "default": false
+        },
+        "keepPanelOpen": {
+          "type": "boolean",
+          "default": false
+        },
+        "monitorDeviceName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "compactBounds": {
+          "$ref": "#/$defs/bounds"
+        },
+        "detailBounds": {
+          "$ref": "#/$defs/bounds"
+        }
+      }
+    },
+    "language": {
+      "type": "object",
+      "required": [
+        "mode",
+        "locale"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "auto",
+            "manual"
+          ],
+          "default": "auto"
+        },
+        "locale": {
+          "enum": [
+            "ja-JP",
+            "en-US",
+            "zh-Hans",
+            "zh-Hant",
+            "ko-KR",
+            "de-DE",
+            "fr-FR",
+            "es-ES",
+            "pt-BR",
+            "ru-RU"
+          ],
+          "default": "en-US"
+        }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "properties": {
+        "remaining30": {
+          "type": "boolean",
+          "default": false
+        },
+        "remaining10": {
+          "type": "boolean",
+          "default": true
+        },
+        "scheduledReset": {
+          "type": "boolean",
+          "default": false
+        },
+        "unexpectedResetCandidate": {
+          "type": "boolean",
+          "default": true
+        },
+        "resetCreditExpiring": {
+          "type": "boolean",
+          "default": true
+        },
+        "persistentConnectionFailure": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "required": [
+        "retentionDays"
+      ],
+      "properties": {
+        "retentionDays": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            90,
+            365,
+            null
+          ],
+          "default": 365
+        },
+        "checkpointMinutes": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 1440,
+          "default": 30
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "properties": {
+        "codexPathMode": {
+          "enum": [
+            "auto",
+            "manual"
+          ],
+          "default": "auto"
+        },
+        "codexExecutablePath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bounds": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 100
+        },
+        "height": {
+          "type": "number",
+          "minimum": 100
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Company>QuantaTrain contributors</Company>
+    <Product>QuantaTrain</Product>
+    <Copyright>Copyright © 2026 QuantaTrain contributors</Copyright>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>
