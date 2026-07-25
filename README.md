@@ -145,6 +145,8 @@ OpenAI、ChatGPT、Codexは各権利者の商標です。
 ---
 
 ## English
+<img width="1010" height="594" alt="qt01" src="https://github.com/user-attachments/assets/40fac32c-e59b-4f33-b8ae-bdfa123c9fb0" />
+
 
 <img width="1010" height="594" alt="qt01" src="https://github.com/user-attachments/assets/40fac32c-e59b-4f33-b8ae-bdfa123c9fb0" />
 
