@@ -4,7 +4,7 @@
 
 OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常駐モニターです。
 
-![QuantaTrayの3画面](assets/mockup_three_views.png)
+<img width="1010" height="594" alt="qt01ja" src="https://github.com/user-attachments/assets/f7c1c46c-7585-4eab-a73d-b0786cc0695f" />
 
 > 画像はUI構成を示すモックアップです。表示内容はCodex App Serverから取得できる情報によって変わります。
 
@@ -145,6 +145,8 @@ OpenAI、ChatGPT、Codexは各権利者の商標です。
 ---
 
 ## English
+
+<img width="1010" height="594" alt="qt01" src="https://github.com/user-attachments/assets/40fac32c-e59b-4f33-b8ae-bdfa123c9fb0" />
 
 QuantaTray is an unofficial Windows system-tray monitor for viewing your Codex usage limits.
 
