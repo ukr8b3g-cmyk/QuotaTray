@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expanded the Japanese README with contextual settings screenshots, recovery guidance, reset-history behavior, and issue-reporting instructions.
+- Changed the project license from MIT to CC0 1.0 Universal.
 - Added an opt-in titleless mini view with compact/detail recovery actions.
 - Added an opt-in mini-view click-through mode recoverable from the tray.
 - Added shared mini/compact/detail positioning, missing-monitor recovery, and position-only/full reset actions.

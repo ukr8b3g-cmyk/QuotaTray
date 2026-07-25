@@ -172,5 +172,5 @@ github:
   owner: "TBD_BY_USER"
   repository: "TBD_BY_USER"
   visibility: "TBD_BY_USER"
-  proposed_license: "MIT; confirm before publication"
+  proposed_license: "CC0-1.0"
   push_requires_explicit_user_authorization: true
