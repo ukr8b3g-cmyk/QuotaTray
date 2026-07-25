@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace QuantaTrain.Infrastructure;
@@ -57,11 +58,57 @@ public static class CodexLocator
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var localAppData = Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
+        foreach (var candidate in GetStandaloneCandidates(userProfile))
+        {
+            yield return candidate;
+        }
         yield return Path.Combine(userProfile, ".codex", "bin", "codex.exe");
         yield return Path.Combine(localAppData, "Programs", "Codex", "codex.exe");
     }
 
-    private static async Task<string?> ProbeVersionAsync(
+    internal static IReadOnlyList<string> GetStandaloneCandidates(string userProfile)
+    {
+        var releases = Path.Combine(
+            userProfile,
+            ".codex",
+            "packages",
+            "standalone",
+            "releases");
+        string[] directories;
+        try
+        {
+            directories = Directory.Exists(releases)
+                ? Directory.GetDirectories(releases)
+                : [];
+        }
+        catch (Exception exception) when (
+            exception is UnauthorizedAccessException or IOException)
+        {
+            return [];
+        }
+
+        return directories
+            .Select(directory => new
+            {
+                Directory = directory,
+                Version = ParseReleaseVersion(Path.GetFileName(directory)),
+            })
+            .OrderByDescending(item => item.Version ?? new Version())
+            .ThenByDescending(item => item.Directory, StringComparer.OrdinalIgnoreCase)
+            .Select(item => Path.Combine(item.Directory, "bin", "codex.exe"))
+            .ToArray();
+    }
+
+    private static Version? ParseReleaseVersion(string releaseDirectory)
+    {
+        var separator = releaseDirectory.IndexOf('-');
+        var versionText = separator >= 0
+            ? releaseDirectory[..separator]
+            : releaseDirectory;
+        return Version.TryParse(versionText, out var version) ? version : null;
+    }
+
+    internal static async Task<string?> ProbeVersionAsync(
         string executablePath,
         CancellationToken cancellationToken)
     {
@@ -75,14 +122,15 @@ public static class CodexLocator
         };
         startInfo.ArgumentList.Add("--version");
 
-        using var process = Process.Start(startInfo);
-        if (process is null)
-        {
-            return null;
-        }
-
+        Process? process = null;
         try
         {
+            process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return null;
+            }
+
             var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             await process.WaitForExitAsync(cancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(5), cancellationToken)
@@ -94,7 +142,7 @@ public static class CodexLocator
         }
         catch (OperationCanceledException)
         {
-            if (!process.HasExited)
+            if (process is { HasExited: false })
             {
                 process.Kill(entireProcessTree: true);
             }
@@ -102,11 +150,20 @@ public static class CodexLocator
         }
         catch (TimeoutException)
         {
-            if (!process.HasExited)
+            if (process is { HasExited: false })
             {
                 process.Kill(entireProcessTree: true);
             }
             return null;
+        }
+        catch (Exception exception) when (
+            exception is Win32Exception or UnauthorizedAccessException or IOException)
+        {
+            return null;
+        }
+        finally
+        {
+            process?.Dispose();
         }
     }
 }

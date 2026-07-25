@@ -75,7 +75,7 @@ ui_defaults:
   lock_position: false
   remember_position: false
   snap_to_edge: false
-  keep_panel_open: false
+  close_behavior: "explicit-close-only"
   compact_contents:
     - "weekly remaining percent"
     - "weekly progress bar"
@@ -103,7 +103,6 @@ settings:
     - "lock position"
     - "remember monitor and position"
     - "snap to screen edge"
-    - "keep panel open"
   language:
     auto_detect: true
     supported:

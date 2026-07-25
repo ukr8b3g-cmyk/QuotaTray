@@ -70,6 +70,8 @@ QuantaTrainがバックグラウンドで `codex app-server --stdio` を起動�
 - 詳細画面の歯車アイコン：設定画面
 - 設定画面の「閉じる」：設定を保存して閉じる
 
+コンパクト画面と詳細画面は、他のウィンドウを操作しても自動では閉じません。右上の×ボタンを押したときだけトレイへ隠れます。
+
 起動直後は「更新中…」と表示され、Codex App Serverへの初回接続後に数値が反映されます。
 
 ## 認証とプライバシー
@@ -120,7 +122,7 @@ Portable版：
 
 ### Codexが見つからない
 
-`codex --version` が実行できることを確認してください。必要に応じて、設定画面の「接続」で `codex.exe` のパスを指定します。
+`codex --version` が実行できることを確認してください。QuantaTrainはPATHに加え、公式のユーザー別standalone配置（`%USERPROFILE%\.codex\packages\standalone\releases\`）も自動探索します。必要に応じて、設定画面の「接続」で `codex.exe` のパスを指定します。
 
 ### 表示が100%と実際の残量の間で変わる
 
@@ -208,6 +210,8 @@ Settings, history, and logs are stored in the extracted `data` folder. Do not ru
 - Detail-view gear icon: open settings
 - Settings “Close” button: save settings and close
 
+Compact and detailed views remain visible when they lose focus. They return to the tray only when you press their top-right close button.
+
 The app shows “Updating…” at startup and fills in the values after its first Codex App Server connection.
 
 ## Authentication and privacy
@@ -258,7 +262,7 @@ The first connection can take some time. Check the connection status in the deta
 
 ### Codex is not found
 
-Confirm that `codex --version` works. If needed, select the `codex.exe` path under Settings → Connection.
+Confirm that `codex --version` works. QuantaTrain searches PATH and the official per-user standalone location under `%USERPROFILE%\.codex\packages\standalone\releases\`. If needed, select the `codex.exe` path under Settings → Connection.
 
 ### The value switches between 100% and the actual remaining amount
 

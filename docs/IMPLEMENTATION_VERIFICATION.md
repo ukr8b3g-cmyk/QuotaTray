@@ -38,6 +38,12 @@ weekly bucket and reset-credit count.
 
 - `account/rateLimits/read` accepts no params in Codex CLI 0.144.4. QuantaTrain
   omits the `params` member for this request.
+- Auto-discovery also checks the official per-user standalone package cache at
+  `%USERPROFILE%\.codex\packages\standalone\releases\*\bin\codex.exe`.
+  Inaccessible PATH candidates are skipped instead of aborting discovery.
+- A signed-in live probe with Codex CLI 0.145.0 confirmed that the same
+  discovery and App Server client path returns two buckets and selects the
+  10,080-minute weekly window. No raw account response was logged.
 - Rolling rate-limit notifications are sparse. QuantaTrain coalesces them into
   a fresh `account/rateLimits/read` request rather than clearing missing fields.
 - QuantaTrain does not enable experimental capabilities.

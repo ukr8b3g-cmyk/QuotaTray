@@ -29,7 +29,6 @@ public sealed class DisplaySettings
     public bool LockPosition { get; set; }
     public bool RememberPosition { get; set; }
     public bool SnapToEdge { get; set; }
-    public bool KeepPanelOpen { get; set; }
 }
 
 public sealed class LanguageSettings

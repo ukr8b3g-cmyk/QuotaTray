@@ -55,9 +55,11 @@ QuantaTrain.exe
 1. 設定画面の明示パス
 2. `QUANTATRAIN_CODEX_PATH`
 3. `PATH` の `codex.exe`
-4. 公式インストール方法で作成される安全に確認可能なユーザー領域
+4. `%USERPROFILE%\.codex\packages\standalone\releases\*\bin\codex.exe`
+5. 公式インストール方法で作成されるその他の安全に確認可能なユーザー領域
 
 探索結果ごとに `codex --version` を安全なタイムアウト付きで実行し、起動可能か確認する。
+PATH上に存在してもアクセス拒否や起動不能となる候補はスキップし、次の安全な候補を探索する。
 
 次は行わない：
 

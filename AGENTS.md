@@ -32,7 +32,7 @@ When generated mockups disagree with written specifications, the written specifi
 - Default polling interval is 60 seconds; opening the panel triggers a coalesced immediate refresh.
 - Persist history only when state changes, on reset events, or at a bounded checkpoint interval.
 - Default startup state is tray-only; left-click opens compact weekly-quota view.
-- Transparency, always-on-top, position lock, position memory, edge snap, and persistent panel behavior are opt-in and off by default.
+- Compact and detail panels remain open until their close button is pressed. Transparency, always-on-top, position lock, position memory, and edge snap are opt-in and off by default.
 - Produce a per-user x64 installer and a self-contained x64 portable ZIP. Do not produce x86.
 - Do not upload, push, create a release, or modify a remote repository until the user supplies the target repository and authorizes the write.
 

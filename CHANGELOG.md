@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Keep compact and detailed panels open until their close button is pressed.
+- Continue Codex CLI discovery past inaccessible PATH entries.
+- Detect the official per-user standalone Codex CLI package cache.
+- Retry Codex discovery and connection when Refresh is pressed before polling starts.
+
 ## 0.1.0 - 2026-07-25
 
 - Added a Windows tray monitor for the Codex weekly usage limit.

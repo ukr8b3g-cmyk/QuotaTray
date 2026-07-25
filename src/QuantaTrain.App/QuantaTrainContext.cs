@@ -17,6 +17,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private readonly SingleInstanceCoordinator _singleInstance;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly Control _dispatcher = new();
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _activationTimer;
@@ -99,18 +100,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
             null,
             async (_, _) => await RefreshAsync());
         menu.Items.Add(new ToolStripSeparator());
-
-        var keepOpen = new ToolStripMenuItem(_localizer.Text("Menu.KeepOpen"))
-        {
-            CheckOnClick = true,
-            Checked = _settings.Display.KeepPanelOpen,
-        };
-        keepOpen.CheckedChanged += async (_, _) =>
-        {
-            _settings.Display.KeepPanelOpen = keepOpen.Checked;
-            await SaveSettingsAsync();
-        };
-        menu.Items.Add(keepOpen);
 
         var topMost = new ToolStripMenuItem(_localizer.Text("Menu.AlwaysOnTop"))
         {
@@ -199,41 +188,64 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        _codex = await CodexLocator.LocateAsync(
-            _settings.Connection.CodexExecutablePath,
-            cancellationToken);
-        if (_codex is null)
+        await _connectionGate.WaitAsync(cancellationToken);
+        try
         {
-            SetSignedIn(false);
-            UpdateViews(null, false, _localizer.Text("Connection.CodexNotFound"));
-            _notifyIcon.ShowBalloonTip(
-                5000,
-                "QuantaTrain",
-                _localizer.Text("Connection.CodexNotFound"),
-                ToolTipIcon.Warning);
-            return;
-        }
+            if (_connection is not null && _accountClient is not null)
+            {
+                var existingAccount = await _accountClient.ReadAccountAsync(cancellationToken);
+                SetSignedIn(existingAccount.IsSignedIn);
+                if (existingAccount.IsSignedIn)
+                {
+                    await StartPollingAsync(cancellationToken);
+                }
+                else
+                {
+                    UpdateViews(null, false, null);
+                }
+                return;
+            }
 
-        _connection = await JsonRpcConnection.StartAsync(
-            _codex.ExecutablePath,
-            "0.1.0",
-            cancellationToken);
-        _connection.Exited += HandleConnectionExited;
-        _accountClient = new CodexAccountClient(_connection, _codex.Version);
-        _accountClient.LoginCompleted += HandleLoginCompleted;
-        _accountClient.AccountUpdated += HandleAccountUpdated;
+            _codex = await CodexLocator.LocateAsync(
+                _settings.Connection.CodexExecutablePath,
+                cancellationToken);
+            if (_codex is null)
+            {
+                SetSignedIn(false);
+                UpdateViews(null, false, _localizer.Text("Connection.CodexNotFound"));
+                _notifyIcon.ShowBalloonTip(
+                    5000,
+                    "QuantaTrain",
+                    _localizer.Text("Connection.CodexNotFound"),
+                    ToolTipIcon.Warning);
+                return;
+            }
 
-        var account = await _accountClient.ReadAccountAsync(cancellationToken);
-        SetSignedIn(account.IsSignedIn);
-        if (account.IsSignedIn)
-        {
-            await StartPollingAsync(cancellationToken);
+            _connection = await JsonRpcConnection.StartAsync(
+                _codex.ExecutablePath,
+                "0.1.0",
+                cancellationToken);
+            _connection.Exited += HandleConnectionExited;
+            _accountClient = new CodexAccountClient(_connection, _codex.Version);
+            _accountClient.LoginCompleted += HandleLoginCompleted;
+            _accountClient.AccountUpdated += HandleAccountUpdated;
+
+            var account = await _accountClient.ReadAccountAsync(cancellationToken);
+            SetSignedIn(account.IsSignedIn);
+            if (account.IsSignedIn)
+            {
+                await StartPollingAsync(cancellationToken);
+            }
+            else
+            {
+                UpdateViews(null, false, null);
+            }
+            _restartAttempt = 0;
         }
-        else
+        finally
         {
-            UpdateViews(null, false, null);
+            _connectionGate.Release();
         }
-        _restartAttempt = 0;
     }
 
     private async Task StartPollingAsync(CancellationToken cancellationToken)
@@ -408,13 +420,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _compactForm.DetailRequested += (_, _) => ShowDetail();
             _compactForm.SettingsRequested += (_, _) => ShowSettings();
             _compactForm.SignInRequested += async (_, _) => await StartLoginAsync();
-            _compactForm.Deactivate += (_, _) =>
-            {
-                if (!_settings.Display.KeepPanelOpen)
-                {
-                    _compactForm.Hide();
-                }
-            };
             ApplyDisplaySettings();
         }
         return _compactForm;
@@ -428,13 +433,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _detailForm.RefreshRequested += async (_, _) => await RefreshAsync();
             _detailForm.CompactRequested += (_, _) => ShowCompact();
             _detailForm.SettingsRequested += (_, _) => ShowSettings();
-            _detailForm.Deactivate += (_, _) =>
-            {
-                if (!_settings.Display.KeepPanelOpen)
-                {
-                    _detailForm.Hide();
-                }
-            };
             ApplyDisplaySettings();
         }
         return _detailForm;
@@ -499,9 +497,26 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private async Task RefreshAsync()
     {
-        if (_polling is not null)
+        try
         {
+            if (_polling is null)
+            {
+                await ConnectAsync(_lifetime.Token);
+                return;
+            }
+
             await _polling.RefreshAsync(_lifetime.Token);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            await _logger.WarningAsync(exception.Message, CancellationToken.None);
+            UpdateViews(
+                _polling?.Current,
+                false,
+                Redaction.Redact(exception.Message));
         }
     }
 
