@@ -6,6 +6,8 @@
 
 QuantaTrayはローカル中心の読み取り専用アプリです。開発者運営サーバー、テレメトリー、広告、利用解析はありません。Codex利用枠を取得するため、OpenAI公式Codex App Serverを介してOpenAI/ChatGPTへ通信します。
 
+本アプリはOpenAIの公式製品ではなく、OpenAIによる承認、提携、保証を受けたものではありません。
+
 ## QuantaTrayが取得・保存しない情報
 
 QuantaTrayは次の情報を独自に取得、保存、収集、外部送信しません。
@@ -37,7 +39,7 @@ QuantaTray
 
 QuantaTrayには開発者運営のAPI、テレメトリー送信先、広告サーバーはありません。Codex、ChatGPT、ドキュメント、GitHub Release等の外部リンクはユーザー操作時だけ既定ブラウザで開きます。
 
-将来、自動更新確認やクラッシュ送信を追加する場合は、実装前に本方針と設定画面を更新し、初期OFFまたは明示同意方式にします。
+将来、自動更新確認、クラッシュ送信、追加の外部通信を実装する場合は、実装前に本方針と設定画面を更新し、初期OFFまたは明示同意方式にします。
 
 ## ローカル保存する情報
 
@@ -56,12 +58,32 @@ QuantaTrayには開発者運営のAPI、テレメトリー送信先、広告サ�
 
 ## 保持と削除
 
-履歴の既定保持期間は365日です。設定画面から履歴を書き出し、または削除できます。アプリのアンインストール時にローカルデータを残すか削除するかを選択できるようにします。
+履歴の既定保持期間は365日です。設定画面から履歴を書き出し、または削除できます。アプリのアンインストール時にローカルデータを残すか削除するかを選択できます。
 
 ## 予定外リセットの推定
 
 OpenAIから理由が返されない場合、QuantaTrayは残量、予定リセット、リセット券件数等の変化から「予定外リセット候補」を推定します。この分類はローカル処理であり、OpenAIによる実行を断定するものではありません。
 
+## セキュリティ報告
+
+脆弱性または認証情報の露出につながる問題は、公開Issueへ詳細を書き込まず、[SECURITY.md](SECURITY.md) の手順に従ってください。
+
+## ライセンスと商標
+
+ソースコードは [MIT License](LICENSE) で提供されます。MIT Licenseは、OpenAI、ChatGPT、Codex、QuantaTrayその他の名称、ロゴ、商標に対する使用許可を与えるものではありません。
+
+OpenAI、ChatGPT、Codexは各権利者の商標です。
+
 ## 問い合わせ
 
-お問い合わせは [GitHub Issues](https://github.com/ukr8b3g-cmyk/QuotaTray/issues) へお願いします。
+一般的な不具合・要望は [GitHub Issues](https://github.com/ukr8b3g-cmyk/QuotaTray/issues) へお願いします。機密性のあるセキュリティ問題は [SECURITY.md](SECURITY.md) を参照してください。
+
+---
+
+## English summary
+
+QuantaTray is a local-first, read-only Windows utility. It has no developer-operated backend, telemetry, advertising, or analytics. It communicates with OpenAI only through the separately installed official Codex App Server.
+
+QuantaTray does not directly read or store browser cookies, saved passwords, Codex credential files, access tokens, account identifiers, conversations, source code, or project files. It stores only local settings, observed quota state, inferred reset history, and bounded redacted diagnostics.
+
+QuantaTray is unofficial and is not affiliated with, endorsed by, or warranted by OpenAI. See [SECURITY.md](SECURITY.md) for private vulnerability reporting guidance and [LICENSE](LICENSE) for the MIT License.
