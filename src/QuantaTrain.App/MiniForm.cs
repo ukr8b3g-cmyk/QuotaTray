@@ -125,6 +125,19 @@ internal sealed class MiniForm : FramelessForm
     public event EventHandler? SettingsRequested;
     public event EventHandler<MiniClickThroughEventArgs>? ClickThroughRequested;
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            if (_clickThrough)
+            {
+                parameters.ExStyle |= (int)(WsExLayered | WsExTransparent);
+            }
+            return parameters;
+        }
+    }
+
     public void SetClickThrough(bool enabled)
     {
         if (_clickThrough == enabled)

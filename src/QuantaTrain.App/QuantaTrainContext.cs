@@ -41,7 +41,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private WeeklyQuotaState? _previousState;
     private IReadOnlyList<string> _historyItems = [];
     private bool _confirmationPending;
-    private bool _settingsOpen;
+    private SettingsForm? _settingsForm;
     private int _restartAttempt;
     private bool _exiting;
 
@@ -561,90 +561,88 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ShowSettings()
     {
-        if (_settingsOpen)
+        if (_settingsForm is not null && !_settingsForm.IsDisposed)
         {
+            _settingsForm.Show();
+            _settingsForm.Activate();
             return;
         }
 
-        _settingsOpen = true;
-        try
+        var displayMode = _miniForm?.Visible == true
+            ? "mini"
+            : _detailForm?.Visible == true
+                ? "detail"
+                : "compact";
+        var form = new SettingsForm(
+            _settings,
+            _localizer,
+            initialPage: 1,
+            initialDisplayMode: displayMode);
+        _settingsForm = form;
+        form.FormClosed += (_, _) =>
         {
-            var page = 1;
-            while (true)
+            if (ReferenceEquals(_settingsForm, form))
             {
-                var displayMode = _miniForm?.Visible == true
-                    ? "mini"
-                    : _detailForm?.Visible == true
-                        ? "detail"
-                        : "compact";
-                using var form = new SettingsForm(
-                    _settings,
-                    _localizer,
-                    page,
-                    displayMode);
-                form.PositionResetRequested += async (_, _) =>
-                    await ResetPanelPositionAsync();
-                form.AllSettingsResetRequested += async (_, _) =>
-                {
-                    _panelPosition = new PanelPositionSettings();
-                    await ResetPanelPositionAsync();
-                };
-                form.SettingsPreviewChanged += async (_, eventArgs) =>
-                {
-                    try
-                    {
-                        if (eventArgs.Kind == SettingsPreviewKind.DisplayMode)
-                        {
-                            if (form.DisplayMode == "mini")
-                            {
-                                ShowMini(activate: false);
-                            }
-                            else if (form.DisplayMode == "detail")
-                            {
-                                ShowDetail(activate: false);
-                            }
-                            else
-                            {
-                                ShowCompact(activate: false);
-                            }
-                            return;
-                        }
-                        await ApplySettingsPreviewAsync(eventArgs.Kind);
-                    }
-                    catch (Exception exception)
-                    {
-                        await _logger.WarningAsync(
-                            exception.Message,
-                            CancellationToken.None);
-                    }
-                };
-                form.SettingsSaved += async (_, _) =>
-                {
-                    try
-                    {
-                        Theme.Configure(
-                            _settings.Display.Theme,
-                            _settings.Display.Accent);
-                        _localizer.Load(_settings.Language);
-                        ApplyDisplaySettings();
-                        ApplyPanelBehavior();
-                        await SaveSettingsAsync();
-                    }
-                    catch (Exception exception)
-                    {
-                        await _logger.WarningAsync(
-                            exception.Message,
-                            CancellationToken.None);
-                    }
-                };
-                form.ShowDialog();
-                break;
+                _settingsForm = null;
             }
-        }
-        finally
+        };
+        form.PositionResetRequested += async (_, _) =>
+            await ResetPanelPositionAsync();
+        form.AllSettingsResetRequested += async (_, _) =>
         {
-            _settingsOpen = false;
-        }
+            _panelPosition = new PanelPositionSettings();
+            await ResetPanelPositionAsync();
+        };
+        form.SettingsPreviewChanged += async (_, eventArgs) =>
+        {
+            try
+            {
+                if (eventArgs.Kind == SettingsPreviewKind.DisplayMode)
+                {
+                    if (form.DisplayMode == "mini")
+                    {
+                        ShowMini(activate: false);
+                    }
+                    else if (form.DisplayMode == "detail")
+                    {
+                        ShowDetail(activate: false);
+                    }
+                    else
+                    {
+                        ShowCompact(activate: false);
+                    }
+                    return;
+                }
+                await ApplySettingsPreviewAsync(eventArgs.Kind);
+            }
+            catch (Exception exception)
+            {
+                await _logger.WarningAsync(
+                    exception.Message,
+                    CancellationToken.None);
+            }
+        };
+        form.SettingsSaved += async (_, _) =>
+        {
+            try
+            {
+                Theme.Configure(
+                    _settings.Display.Theme,
+                    _settings.Display.Accent);
+                _localizer.Load(_settings.Language);
+                ApplyDisplaySettings();
+                ApplyPanelBehavior();
+                await SaveSettingsAsync();
+            }
+            catch (Exception exception)
+            {
+                await _logger.WarningAsync(
+                    exception.Message,
+                    CancellationToken.None);
+            }
+        };
+        form.Show();
+        form.Activate();
     }
 
     private async Task ApplySettingsPreviewAsync(SettingsPreviewKind kind)
@@ -1025,6 +1023,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _activationTimer.Stop();
         _notifyIcon.Visible = false;
         DisposeConnectionAsync().GetAwaiter().GetResult();
+        _settingsForm?.Dispose();
         _miniForm?.Dispose();
         _compactForm?.Dispose();
         _detailForm?.Dispose();

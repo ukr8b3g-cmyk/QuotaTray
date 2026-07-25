@@ -290,6 +290,39 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
+    public void MiniClickThroughDoesNotAffectCompactOrDetail()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var mini = new MiniForm(localizer);
+            using var compact = new CompactForm(localizer);
+            using var detail = new DetailForm(localizer);
+            using var settings = new SettingsForm(
+                new AppSettings(),
+                localizer);
+            mini.SetClickThrough(true);
+            mini.Show();
+            settings.Show();
+            compact.Show();
+            detail.Show();
+            Application.DoEvents();
+
+            var miniStyle = GetWindowLongPtr(mini.Handle, -20).ToInt64();
+            var compactStyle = GetWindowLongPtr(compact.Handle, -20).ToInt64();
+            var detailStyle = GetWindowLongPtr(detail.Handle, -20).ToInt64();
+
+            Assert.NotEqual(0, miniStyle & 0x20L);
+            Assert.Equal(0, compactStyle & 0x20L);
+            Assert.Equal(0, detailStyle & 0x20L);
+            Assert.True(compact.Enabled);
+            Assert.True(detail.Enabled);
+            Assert.True(settings.Visible);
+        });
+    }
+
+    [Fact]
     public void EveryQuotaPanelRendersDecimalQuotaWithoutError()
     {
         RunSta(() =>

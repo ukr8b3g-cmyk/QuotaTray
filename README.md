@@ -73,7 +73,7 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 - 詳細画面の歯車アイコン：設定画面
 - 設定画面の「閉じる」：設定を保存して閉じる
 
-ミニ、コンパクト、詳細画面は、他のウィンドウを操作しても自動では閉じません。ミニ表示のクリック透過は初期OFFで、ONにすると背後のアプリへマウス操作を通します。解除や表示切替はトレイの右クリックメニューから行えます。
+ミニ、コンパクト、詳細画面は、他のウィンドウを操作しても自動では閉じません。ミニ表示のクリック透過は初期OFFで、ONにするとミニ表示だけが背後のアプリへマウス操作を通します。コンパクト／詳細表示には適用されません。解除や表示切替はトレイの右クリックメニューから行えます。
 
 表示切替時は、位置固定のON/OFFに関係なく同じモニター・同じ基準位置を引き継ぎます。「位置を固定」はドラッグだけを禁止し、「モニターと位置を記憶」は再起動後の復元を制御します。モニターが外れた場合はメイン画面へ退避します。
 
@@ -229,7 +229,7 @@ Settings, history, and logs are stored in the extracted `data` folder. Do not ru
 - Detail-view gear icon: open settings
 - Settings “Close” button: save settings and close
 
-Mini, compact, and detailed views remain visible when they lose focus. Mini-view click-through is off by default; when enabled, mouse input passes to the application behind it. Use the tray menu to disable click-through or switch views.
+Mini, compact, and detailed views remain visible when they lose focus. Mini-view click-through is off by default; when enabled, only the mini view passes mouse input to the application behind it. It never applies to compact or detailed view. Use the tray menu to disable click-through or switch views.
 
 View changes keep the same monitor and visual anchor whether position lock is on or off. Position lock only prevents dragging; “Remember monitor and position” controls restoration after restart. If a monitor disappears, the panel returns to the primary display.
 
