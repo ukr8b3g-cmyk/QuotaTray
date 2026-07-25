@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added an opt-in titleless mini view with compact/detail recovery actions.
+- Added an opt-in mini-view click-through mode recoverable from the tray.
+- Added shared mini/compact/detail positioning, missing-monitor recovery, and position-only/full reset actions.
+- Added a clickable GitHub repository link to the About dialog.
+- Fixed live theme, accent, language, and display changes that could close Settings, raise WinForms handle errors, or terminate the app.
+- Fixed localized quota headings overlapping the remaining percentage.
+- Applied opacity, always-on-top, position lock, position memory, and edge snap to quota panels while keeping Settings opaque.
+- Applied the selected accent to normal quota values and added optional one-decimal percentage display.
+
 ## 0.1.2 - 2026-07-25
 
 - Fixed the opacity control so changes apply while the slider is moving.

@@ -75,7 +75,7 @@ internal static class Theme
             null => Subtle,
             <= 10 => Red,
             <= 30 => Yellow,
-            _ => Green,
+            _ => Accent,
         };
 
     public static Font Ui(float size = 9F, FontStyle style = FontStyle.Regular) =>

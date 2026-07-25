@@ -45,6 +45,7 @@ internal class FramelessForm : Form
 {
     private const int CsDropShadow = 0x00020000;
     private const int WmNclButtonDown = 0x00A1;
+    private const int WmExitSizeMove = 0x0232;
     private const int HtCaption = 2;
 
     public FramelessForm()
@@ -68,6 +69,10 @@ internal class FramelessForm : Form
         }
     }
 
+    public event EventHandler? MoveCompleted;
+
+    protected virtual bool CanDrag => true;
+
     protected override void OnSizeChanged(EventArgs eventArgs)
     {
         base.OnSizeChanged(eventArgs);
@@ -87,7 +92,7 @@ internal class FramelessForm : Form
     {
         control.MouseDown += (_, eventArgs) =>
         {
-            if (eventArgs.Button != MouseButtons.Left)
+            if (eventArgs.Button != MouseButtons.Left || !CanDrag)
             {
                 return;
             }
@@ -95,6 +100,15 @@ internal class FramelessForm : Form
             ReleaseCapture();
             SendMessage(Handle, WmNclButtonDown, HtCaption, 0);
         };
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg == WmExitSizeMove)
+        {
+            MoveCompleted?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     [DllImport("user32.dll")]
@@ -527,23 +541,40 @@ internal static class UiFactory
         };
     }
 
-    public static Button TextButton(string text, Rectangle bounds, bool primary = false)
+    public static Button TextButton(
+        string text,
+        Rectangle bounds,
+        bool primary = false,
+        bool danger = false)
     {
+        var background = danger
+            ? Theme.Red
+            : primary
+                ? Theme.Accent
+                : Theme.SurfaceRaised;
         var button = new Button
         {
             Text = text,
             Bounds = bounds,
-            Font = Theme.Ui(9F, primary ? FontStyle.Bold : FontStyle.Regular),
+            Font = Theme.Ui(
+                9F,
+                primary || danger ? FontStyle.Bold : FontStyle.Regular),
             ForeColor = Theme.Text,
-            BackColor = primary ? Theme.Accent : Theme.SurfaceRaised,
+            BackColor = background,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
             UseVisualStyleBackColor = false,
         };
-        button.FlatAppearance.BorderColor = primary ? Theme.Accent : Theme.Border;
+        button.FlatAppearance.BorderColor = danger
+            ? Theme.Red
+            : primary
+                ? Theme.Accent
+                : Theme.Border;
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor =
-            primary ? ControlPaint.Light(Theme.Accent) : Theme.SurfaceRaised;
+            primary || danger
+                ? ControlPaint.Light(background)
+                : Theme.SurfaceRaised;
         return button;
     }
 }

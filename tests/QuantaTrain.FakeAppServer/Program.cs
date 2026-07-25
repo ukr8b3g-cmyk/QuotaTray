@@ -37,7 +37,7 @@ while (await Console.In.ReadLineAsync() is { } line)
                     planType = (string?)null,
                     primary = new
                     {
-                        usedPercent = 75,
+                        usedPercent = 5.6,
                         windowDurationMins = 10080,
                         resetsAt = DateTimeOffset.UtcNow.AddDays(2).ToUnixTimeSeconds(),
                     },

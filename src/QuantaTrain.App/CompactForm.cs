@@ -5,6 +5,7 @@ namespace QuantaTrain.App;
 internal sealed class CompactForm : FramelessForm
 {
     private readonly LocalizationService _localizer;
+    private readonly Func<bool> _canDrag;
     private readonly RoundedPanel _quotaCard = new();
     private readonly Label _remainingPrefix = new();
     private readonly Label _remainingPercent = new();
@@ -14,11 +15,12 @@ internal sealed class CompactForm : FramelessForm
     private readonly Label _status = new();
     private readonly Button _signIn;
 
-    public CompactForm(LocalizationService localizer)
+    public CompactForm(LocalizationService localizer, Func<bool>? canDrag = null)
     {
         _localizer = localizer;
+        _canDrag = canDrag ?? (() => true);
         Text = "QuantaTray";
-        ClientSize = new Size(240, 175);
+        ClientSize = new Size(240, 180);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray compact quota panel";
 
@@ -47,12 +49,15 @@ internal sealed class CompactForm : FramelessForm
         var menu = BuildCompactMenu();
         more.Click += (_, _) => menu.Show(more, new Point(-100, more.Height + 2));
 
-        _quotaCard.Bounds = new Rectangle(10, 48, 220, 117);
+        _quotaCard.Bounds = new Rectangle(10, 48, 220, 122);
         var weekly = UiFactory.Label(
             _localizer.Text("Quota.Weekly"),
-            new Point(10, 10),
+            new Point(10, 4),
             8.7F,
             FontStyle.Bold);
+        weekly.AutoSize = false;
+        weekly.Size = new Size(200, 17);
+        weekly.AutoEllipsis = true;
 
         _remainingPrefix.AutoSize = true;
         _remainingPrefix.Font = Theme.Ui(7.8F);
@@ -65,18 +70,18 @@ internal sealed class CompactForm : FramelessForm
         _remainingPercent.BackColor = Color.Transparent;
         _remainingPercent.Text = "—";
 
-        _progress.Bounds = new Rectangle(10, 43, 200, 10);
-        _reset = UiFactory.Label(string.Empty, new Point(10, 63), 7.8F);
+        _progress.Bounds = new Rectangle(10, 54, 200, 10);
+        _reset = UiFactory.Label(string.Empty, new Point(10, 72), 7.8F);
         _reset.AutoSize = false;
         _reset.Size = new Size(200, 17);
         _reset.AutoEllipsis = true;
-        _countdown = UiFactory.Label(string.Empty, new Point(10, 81), 7.8F);
+        _countdown = UiFactory.Label(string.Empty, new Point(10, 90), 7.8F);
         _countdown.AutoSize = false;
         _countdown.Size = new Size(200, 16);
         _countdown.TextAlign = ContentAlignment.TopCenter;
         _status = UiFactory.Label(
             string.Empty,
-            new Point(10, 99),
+            new Point(10, 106),
             7.2F,
             FontStyle.Regular,
             Theme.Muted);
@@ -86,7 +91,7 @@ internal sealed class CompactForm : FramelessForm
 
         _signIn = UiFactory.TextButton(
             _localizer.Text("Auth.SignIn"),
-            new Rectangle(10, 67, 200, 29),
+            new Rectangle(10, 72, 200, 29),
             primary: true);
         _signIn.Visible = false;
         _signIn.Click += (_, _) => SignInRequested?.Invoke(this, EventArgs.Empty);
@@ -106,7 +111,10 @@ internal sealed class CompactForm : FramelessForm
         AlignRemaining();
     }
 
+    protected override bool CanDrag => _canDrag();
+
     public event EventHandler? RefreshRequested;
+    public event EventHandler? MiniRequested;
     public event EventHandler? DetailRequested;
     public event EventHandler? SettingsRequested;
     public event EventHandler? SignInRequested;
@@ -131,12 +139,13 @@ internal sealed class CompactForm : FramelessForm
         }
         else
         {
-            var remaining = (int)Math.Round(state.RemainingPercent);
-            _remainingPrefix.Text = RemainingPrefix(remaining);
-            _remainingPercent.Text = $"{remaining}%";
+            var remaining = state.RemainingPercent;
+            var remainingNumber = QuotaDisplay.Number(remaining);
+            _remainingPrefix.Text = RemainingPrefix(remainingNumber);
+            _remainingPercent.Text = QuotaDisplay.Percent(remaining);
             _remainingPercent.ForeColor = Theme.QuotaColor(remaining);
             _progress.ValueColor = Theme.QuotaColor(remaining);
-            _progress.Value = Math.Clamp(remaining, 0, 100);
+            _progress.Value = (int)Math.Round(Math.Clamp(remaining, 0d, 100d));
             _reset.Text = state.ResetsAtUtc is null
                 ? _localizer.Text("Quota.NextReset", "—")
                 : _localizer.Text(
@@ -173,6 +182,10 @@ internal sealed class CompactForm : FramelessForm
             ShowImageMargin = false,
         };
         menu.Items.Add(
+            _localizer.Text("Menu.ShowMini"),
+            null,
+            (_, _) => MiniRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add(
             _localizer.Text("Menu.ShowDetail"),
             null,
             (_, _) => DetailRequested?.Invoke(this, EventArgs.Empty));
@@ -192,17 +205,16 @@ internal sealed class CompactForm : FramelessForm
     {
         _remainingPercent.Location = new Point(
             _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
-            5);
+            22);
         _remainingPrefix.Location = new Point(
             _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
-            14);
+            30);
     }
 
-    private string RemainingPrefix(int value)
+    private string RemainingPrefix(string value)
     {
         var formatted = _localizer.Text("Common.Remaining", value);
-        var token = value.ToString();
-        var index = formatted.IndexOf(token, StringComparison.Ordinal);
+        var index = formatted.IndexOf(value, StringComparison.Ordinal);
         return index <= 0 ? string.Empty : formatted[..index].Trim();
     }
 

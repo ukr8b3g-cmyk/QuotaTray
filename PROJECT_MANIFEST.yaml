@@ -75,7 +75,13 @@ ui_defaults:
   lock_position: false
   remember_position: false
   snap_to_edge: false
+  mini_click_through: false
   close_behavior: "explicit-close-only"
+  mini_contents:
+    - "weekly remaining percent"
+    - "weekly progress bar"
+    - "next reset local date/time"
+    - "countdown"
   compact_contents:
     - "weekly remaining percent"
     - "weekly progress bar"
@@ -92,7 +98,7 @@ ui_defaults:
 settings:
   general:
     - "launch at Windows startup"
-    - "startup display: tray-only / compact / detail"
+    - "startup display: tray-only / mini / compact / detail"
     - "refresh interval"
     - "refresh when opened"
   display:
@@ -103,6 +109,8 @@ settings:
     - "lock position"
     - "remember monitor and position"
     - "snap to screen edge"
+    - "mini-view click-through"
+    - "reset shared display position"
   language:
     auto_detect: true
     supported:

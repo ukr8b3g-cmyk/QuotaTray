@@ -21,6 +21,7 @@ OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常�
 QuantaTrayは、公式Codex App Serverの読み取り専用APIを使用し、次の情報を表示します。
 
 - 週間利用枠の残量、次回リセット時刻、カウントダウン
+- App Serverが小数値を返す場合、残量を小数第1位まで表示（例：`94.4%`）
 - リセット券の件数と有効期限（取得できる場合）
 - 定期リセット、リセット券使用の可能性、予定外リセット候補のローカル履歴
 - Codexプランと接続状態
@@ -64,13 +65,17 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 
 - トレイアイコンを左クリック：コンパクト表示
 - トレイアイコンをダブルクリック：詳細表示
-- トレイアイコンを右クリック：主要メニュー
-- コンパクト画面の3点メニュー：詳細表示、更新、設定
+- トレイアイコンを右クリック：ミニ／コンパクト／詳細表示と主要設定
+- ミニ表示をダブルクリック：コンパクト表示へ戻る
+- ミニ表示を右クリック：コンパクト／詳細表示、更新、設定
+- コンパクト画面の3点メニュー：ミニ／詳細表示、更新、設定
 - 詳細画面の更新アイコン：最新情報を取得
 - 詳細画面の歯車アイコン：設定画面
 - 設定画面の「閉じる」：設定を保存して閉じる
 
-コンパクト画面と詳細画面は、他のウィンドウを操作しても自動では閉じません。右上の×ボタンを押したときだけトレイへ隠れます。
+ミニ、コンパクト、詳細画面は、他のウィンドウを操作しても自動では閉じません。ミニ表示のクリック透過は初期OFFで、ONにすると背後のアプリへマウス操作を通します。解除や表示切替はトレイの右クリックメニューから行えます。
+
+表示切替時は、位置固定のON/OFFに関係なく同じモニター・同じ基準位置を引き継ぎます。「位置を固定」はドラッグだけを禁止し、「モニターと位置を記憶」は再起動後の復元を制御します。モニターが外れた場合はメイン画面へ退避します。
 
 起動直後は「更新中…」と表示され、Codex App Serverへの初回接続後に数値が反映されます。
 
@@ -110,7 +115,6 @@ Portable版：
 - App Serverから週間枠が返らない場合、推測値は表示しません。
 - リセット券の詳細が返らない場合、件数だけ表示します。
 - リセット理由は返されないため、履歴の分類は観測値に基づく推定です。
-- 位置固定、位置記憶、画面端吸着は初期版では未完成です。
 - アプリ本体の自動アップデートは未実装です。
 - Windows x64以外は未検証です。
 
@@ -126,7 +130,15 @@ Portable版：
 
 ### 表示が100%と実際の残量の間で変わる
 
-v0.1.2では透明度をスライダー操作中に反映し、テーマ・アクセント色・言語を選択直後に表示パネル、設定画面、トレイメニューへ反映します。既存版から更新する場合は、最新版のセットアップを実行してください。
+v0.1.2では透明度をスライダー操作中に表示パネルへ反映し、テーマ・アクセント色・言語を選択直後に表示パネルとトレイメニューへ反映します。設定画面自体のテーマと言語は、安全のため次回表示時に反映します。既存版から更新する場合は、最新版のセットアップを実行してください。
+
+### ミニ表示をクリックできない
+
+「ミニ表示のクリック透過」がONです。トレイアイコンを右クリックし、クリック透過をOFFにするか、コンパクト／詳細表示へ切り替えてください。
+
+### パネルが画面外にある
+
+トレイアイコンを右クリックし、「表示位置をリセット」を選択してください。コンパクト表示がメイン画面中央へ戻ります。設定画面の表示ページからも同じ操作を実行できます。「すべての設定を初期化」は確認後に位置以外の設定も既定値へ戻します。
 
 ## 開発
 
@@ -165,6 +177,7 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 QuantaTray uses the read-only API provided by the official Codex App Server to display:
 
 - Weekly remaining allowance, next reset time, and countdown
+- One-decimal remaining allowance when supplied by App Server (for example, `94.4%`)
 - Reset-credit count and expiry dates when available
 - Local history of scheduled resets, possible reset-credit use, and unexpected reset candidates
 - Codex plan and connection status
@@ -208,13 +221,17 @@ Settings, history, and logs are stored in the extracted `data` folder. Do not ru
 
 - Left-click the tray icon: open the compact view
 - Double-click the tray icon: open the detailed view
-- Right-click the tray icon: open the main menu
-- Compact-view ellipsis: details, refresh, and settings
+- Right-click the tray icon: select mini, compact, or detailed view and open the main menu
+- Double-click the mini view: return to compact view
+- Right-click the mini view: compact/detailed view, refresh, and settings
+- Compact-view ellipsis: mini/detailed view, refresh, and settings
 - Detail-view refresh icon: request current data
 - Detail-view gear icon: open settings
 - Settings “Close” button: save settings and close
 
-Compact and detailed views remain visible when they lose focus. They return to the tray only when you press their top-right close button.
+Mini, compact, and detailed views remain visible when they lose focus. Mini-view click-through is off by default; when enabled, mouse input passes to the application behind it. Use the tray menu to disable click-through or switch views.
+
+View changes keep the same monitor and visual anchor whether position lock is on or off. Position lock only prevents dragging; “Remember monitor and position” controls restoration after restart. If a monitor disappears, the panel returns to the primary display.
 
 The app shows “Updating…” at startup and fills in the values after its first Codex App Server connection.
 
@@ -254,7 +271,6 @@ Japanese, English, Simplified Chinese, Traditional Chinese, Korean, German, Fren
 - QuantaTray does not invent a value when App Server does not return a weekly window.
 - Only the reset-credit count is shown when individual credit details are unavailable.
 - Reset reasons are not provided, so history classifications are inferences from observed values.
-- Position locking, position memory, and edge snapping are incomplete in the initial release.
 - Automatic application updates are not implemented.
 - Platforms other than Windows x64 are untested.
 
@@ -270,7 +286,15 @@ Confirm that `codex --version` works. QuantaTray searches PATH and the official 
 
 ### The value switches between 100% and the actual remaining amount
 
-Version 0.1.2 applies opacity while the slider is moving and applies theme, accent color, and language changes immediately to the panels, settings window, and tray menu. Run the latest Setup to upgrade from an earlier build.
+Version 0.1.2 applies opacity to the quota panels while the slider is moving and applies theme, accent color, and language changes immediately to the panels and tray menu. For stability, the Settings window itself reflects theme and language changes the next time it is opened. Run the latest Setup to upgrade from an earlier build.
+
+### The mini view does not respond to clicks
+
+Mini-view click-through is enabled. Right-click the tray icon to disable click-through or switch to compact/detailed view.
+
+### The panel is off-screen
+
+Right-click the tray icon and select “Reset display position.” The compact view returns to the center of the primary display. The same action is available on the Display settings page. “Restore defaults” resets all settings after confirmation.
 
 ## Development
 

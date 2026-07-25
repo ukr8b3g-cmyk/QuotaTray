@@ -30,7 +30,7 @@ public sealed class AppServerIntegrationTests
 
         Assert.True(account.IsSignedIn);
         Assert.NotNull(weekly);
-        Assert.Equal(25, weekly.RemainingPercent);
+        Assert.Equal(94.4, weekly.RemainingPercent, precision: 10);
         Assert.Equal(2, weekly.ResetCreditCount);
         Assert.Equal("plus", weekly.PlanType);
     }

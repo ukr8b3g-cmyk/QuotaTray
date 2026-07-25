@@ -31,7 +31,8 @@ dist/SHA256SUMS.txt
 
 The publish is self-contained, single-file, x64, untrimmed, and unsigned unless
 signing is added outside the repository. The portable archive includes
-`portable.flag`, an empty `data/` directory, localized strings, license, and
+`portable.flag`, an empty `data/` directory, the quick and full README files,
+localized strings, license, and
 third-party notices.
 
 For UI automation only, launch a test copy with `--qa-window` to expose panel

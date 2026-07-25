@@ -30,6 +30,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly RedactedLogger _logger;
     private readonly LocalizationService _localizer;
     private readonly AppSettings _settings;
+    private PanelPositionSettings _panelPosition;
+    private MiniForm? _miniForm;
     private CompactForm? _compactForm;
     private DetailForm? _detailForm;
     private JsonRpcConnection? _connection;
@@ -39,16 +41,20 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private WeeklyQuotaState? _previousState;
     private IReadOnlyList<string> _historyItems = [];
     private bool _confirmationPending;
+    private bool _settingsOpen;
     private int _restartAttempt;
     private bool _exiting;
 
     public QuantaTrainContext(SingleInstanceCoordinator singleInstance)
     {
         _singleInstance = singleInstance;
-        _dispatcher.CreateControl();
+        _ = _dispatcher.Handle;
         _paths = DataPathResolver.Resolve(AppContext.BaseDirectory);
         _settingsStore = new JsonSettingsStore(_paths.SettingsFile);
         _settings = _settingsStore.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
+        _panelPosition = _settings.Display.RememberPosition
+            ? PanelPlacement.Clone(_settings.Display.PanelPosition)
+            : new PanelPositionSettings();
         _historyStore = new JsonlHistoryStore(_paths.HistoryDirectory);
         _historyStore.Prune(_settings.History.RetentionDays);
         _logger = new RedactedLogger(_paths.LogsDirectory);
@@ -85,12 +91,18 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 ShowCompact();
             }
         };
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged +=
+            HandleDisplaySettingsChanged;
         _ = InitializeAsync();
     }
 
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
+        menu.Items.Add(
+            _localizer.Text("Menu.ShowMini"),
+            null,
+            (_, _) => ShowMini());
         menu.Items.Add(
             _localizer.Text("Menu.ShowCompact"),
             null,
@@ -129,10 +141,28 @@ internal sealed class QuantaTrainContext : ApplicationContext
             await SaveSettingsAsync();
         };
         menu.Items.Add(lockPosition);
+
+        var miniClickThrough = new ToolStripMenuItem(
+            _localizer.Text("Settings.MiniClickThrough"))
+        {
+            CheckOnClick = true,
+            Checked = _settings.Display.MiniClickThrough,
+        };
+        miniClickThrough.CheckedChanged += async (_, _) =>
+        {
+            _settings.Display.MiniClickThrough = miniClickThrough.Checked;
+            ApplyDisplaySettings();
+            await SaveSettingsAsync();
+        };
+        menu.Items.Add(miniClickThrough);
+        menu.Items.Add(
+            _localizer.Text("Menu.ResetPosition"),
+            null,
+            async (_, _) => await ResetPanelPositionAsync());
         menu.Items.Add(
             _localizer.Text("Common.Settings"),
             null,
-            (_, _) => ShowSettings());
+            (_, _) => QueueShowSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(
             _localizer.Text("Menu.OpenCodex"),
@@ -145,11 +175,11 @@ internal sealed class QuantaTrainContext : ApplicationContext
         menu.Items.Add(
             _localizer.Text("Settings.About"),
             null,
-            (_, _) => MessageBox.Show(
-                $"QuantaTray {ProductVersion}\nUnofficial; not affiliated with OpenAI.",
-                "QuantaTray",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information));
+            (_, _) =>
+            {
+                using var form = new AboutForm(_localizer, ProductVersion);
+                form.ShowDialog();
+            });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(
             _localizer.Text("Common.Exit"),
@@ -172,6 +202,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
             {
                 switch (_settings.General.StartupMode)
                 {
+                    case "mini":
+                        ShowMini();
+                        break;
                     case "compact":
                         ShowCompact();
                         break;
@@ -419,45 +452,107 @@ internal sealed class QuantaTrainContext : ApplicationContext
     {
         if (_compactForm is null || _compactForm.IsDisposed)
         {
-            _compactForm = new CompactForm(_localizer);
+            _compactForm = new CompactForm(
+                _localizer,
+                () => !_settings.Display.LockPosition);
             _compactForm.RefreshRequested += async (_, _) => await RefreshAsync();
+            _compactForm.MiniRequested += (_, _) => ShowMini();
             _compactForm.DetailRequested += (_, _) => ShowDetail();
-            _compactForm.SettingsRequested += (_, _) => ShowSettings();
+            _compactForm.SettingsRequested += (_, _) => QueueShowSettings();
             _compactForm.SignInRequested += async (_, _) => await StartLoginAsync();
+            _compactForm.MoveCompleted += async (_, _) =>
+                await HandlePanelMoveCompletedAsync(_compactForm);
             ApplyDisplaySettings();
         }
         return _compactForm;
+    }
+
+    private MiniForm GetMiniForm()
+    {
+        if (_miniForm is null || _miniForm.IsDisposed)
+        {
+            _miniForm = new MiniForm(
+                _localizer,
+                () => !_settings.Display.LockPosition);
+            _miniForm.CompactRequested += (_, _) => ShowCompact();
+            _miniForm.DetailRequested += (_, _) => ShowDetail();
+            _miniForm.RefreshRequested += async (_, _) => await RefreshAsync();
+            _miniForm.SettingsRequested += (_, _) => QueueShowSettings();
+            _miniForm.ClickThroughRequested += async (_, eventArgs) =>
+            {
+                _settings.Display.MiniClickThrough = eventArgs.Enabled;
+                ApplyDisplaySettings();
+                RebuildTrayMenu();
+                await SaveSettingsAsync();
+            };
+            _miniForm.MoveCompleted += async (_, _) =>
+                await HandlePanelMoveCompletedAsync(_miniForm);
+            ApplyDisplaySettings();
+        }
+        return _miniForm;
     }
 
     private DetailForm GetDetailForm()
     {
         if (_detailForm is null || _detailForm.IsDisposed)
         {
-            _detailForm = new DetailForm(_localizer);
+            _detailForm = new DetailForm(
+                _localizer,
+                () => !_settings.Display.LockPosition);
             _detailForm.RefreshRequested += async (_, _) => await RefreshAsync();
             _detailForm.CompactRequested += (_, _) => ShowCompact();
-            _detailForm.SettingsRequested += (_, _) => ShowSettings();
+            _detailForm.SettingsRequested += (_, _) => QueueShowSettings();
+            _detailForm.MoveCompleted += async (_, _) =>
+                await HandlePanelMoveCompletedAsync(_detailForm);
             ApplyDisplaySettings();
         }
         return _detailForm;
     }
 
-    private void ShowCompact()
+    private void ShowCompact(bool activate = true)
     {
+        CaptureVisiblePanelPosition();
+        _miniForm?.Hide();
         _detailForm?.Hide();
         var form = GetCompactForm();
-        form.PositionNearTray();
+        PositionPanel(form);
         form.Show();
-        form.Activate();
+        if (activate)
+        {
+            form.Activate();
+        }
     }
 
-    private void ShowDetail()
+    private void ShowDetail(bool activate = true)
     {
+        CaptureVisiblePanelPosition();
+        _miniForm?.Hide();
         _compactForm?.Hide();
         var form = GetDetailForm();
-        form.PositionNearTray();
+        PositionPanel(form);
         form.Show();
-        form.Activate();
+        if (activate)
+        {
+            form.Activate();
+        }
+        if (_settings.General.RefreshOnPanelOpen)
+        {
+            _ = RefreshAsync();
+        }
+    }
+
+    private void ShowMini(bool activate = true)
+    {
+        CaptureVisiblePanelPosition();
+        _compactForm?.Hide();
+        _detailForm?.Hide();
+        var form = GetMiniForm();
+        PositionPanel(form);
+        form.Show();
+        if (activate && !_settings.Display.MiniClickThrough)
+        {
+            form.Activate();
+        }
         if (_settings.General.RefreshOnPanelOpen)
         {
             _ = RefreshAsync();
@@ -466,33 +561,103 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ShowSettings()
     {
-        var page = 1;
-        while (true)
+        if (_settingsOpen)
         {
-            using var form = new SettingsForm(_settings, _localizer, page);
-            form.SettingsPreviewChanged += async (_, eventArgs) =>
-                await ApplySettingsPreviewAsync(eventArgs.Kind);
-            form.SettingsSaved += async (_, _) =>
+            return;
+        }
+
+        _settingsOpen = true;
+        try
+        {
+            var page = 1;
+            while (true)
             {
-                Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
-                _localizer.Load(_settings.Language);
-                ApplyDisplaySettings();
-                await SaveSettingsAsync();
-            };
-            form.ShowDialog();
-            if (!form.ReopenRequested)
-            {
+                var displayMode = _miniForm?.Visible == true
+                    ? "mini"
+                    : _detailForm?.Visible == true
+                        ? "detail"
+                        : "compact";
+                using var form = new SettingsForm(
+                    _settings,
+                    _localizer,
+                    page,
+                    displayMode);
+                form.PositionResetRequested += async (_, _) =>
+                    await ResetPanelPositionAsync();
+                form.AllSettingsResetRequested += async (_, _) =>
+                {
+                    _panelPosition = new PanelPositionSettings();
+                    await ResetPanelPositionAsync();
+                };
+                form.SettingsPreviewChanged += async (_, eventArgs) =>
+                {
+                    try
+                    {
+                        if (eventArgs.Kind == SettingsPreviewKind.DisplayMode)
+                        {
+                            if (form.DisplayMode == "mini")
+                            {
+                                ShowMini(activate: false);
+                            }
+                            else if (form.DisplayMode == "detail")
+                            {
+                                ShowDetail(activate: false);
+                            }
+                            else
+                            {
+                                ShowCompact(activate: false);
+                            }
+                            return;
+                        }
+                        await ApplySettingsPreviewAsync(eventArgs.Kind);
+                    }
+                    catch (Exception exception)
+                    {
+                        await _logger.WarningAsync(
+                            exception.Message,
+                            CancellationToken.None);
+                    }
+                };
+                form.SettingsSaved += async (_, _) =>
+                {
+                    try
+                    {
+                        Theme.Configure(
+                            _settings.Display.Theme,
+                            _settings.Display.Accent);
+                        _localizer.Load(_settings.Language);
+                        ApplyDisplaySettings();
+                        ApplyPanelBehavior();
+                        await SaveSettingsAsync();
+                    }
+                    catch (Exception exception)
+                    {
+                        await _logger.WarningAsync(
+                            exception.Message,
+                            CancellationToken.None);
+                    }
+                };
+                form.ShowDialog();
                 break;
             }
-            page = form.ReopenPage;
+        }
+        finally
+        {
+            _settingsOpen = false;
         }
     }
 
     private async Task ApplySettingsPreviewAsync(SettingsPreviewKind kind)
     {
-        if (kind == SettingsPreviewKind.Opacity)
+        if (kind is SettingsPreviewKind.Opacity
+            or SettingsPreviewKind.DisplayBehavior)
         {
             ApplyDisplaySettings();
+            ApplyPanelBehavior();
+            if (kind == SettingsPreviewKind.DisplayBehavior)
+            {
+                RebuildTrayMenu();
+            }
             await SaveSettingsAsync();
             return;
         }
@@ -506,6 +671,22 @@ internal sealed class QuantaTrainContext : ApplicationContext
         ApplyDisplaySettings();
         UpdateViews(_polling?.Current, false, null);
         await SaveSettingsAsync();
+    }
+
+    private void QueueShowSettings()
+    {
+        PostToUi(() =>
+        {
+            ShowSettings();
+            return Task.CompletedTask;
+        });
+    }
+
+    private void RebuildTrayMenu()
+    {
+        var oldMenu = _notifyIcon.ContextMenuStrip;
+        _notifyIcon.ContextMenuStrip = BuildMenu();
+        oldMenu?.Dispose();
     }
 
     private async Task StartLoginAsync()
@@ -564,6 +745,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void UpdateViews(WeeklyQuotaState? state, bool updating, string? error)
     {
+        _miniForm?.UpdateState(state);
         _compactForm?.UpdateState(state, updating, error);
         _detailForm?.UpdateState(state, updating, error, _historyItems);
 
@@ -572,7 +754,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
         oldIcon?.Dispose();
         var remainingText = state is null
             ? _localizer.Text("Quota.Unavailable")
-            : _localizer.Text("Common.Remaining", Math.Round(state.RemainingPercent));
+            : _localizer.Text(
+                "Common.Remaining",
+                QuotaDisplay.Number(state.RemainingPercent));
         _notifyIcon.Text = remainingText.Length <= 63
             ? remainingText
             : remainingText[..63];
@@ -580,7 +764,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ApplyDisplaySettings()
     {
-        foreach (var form in new Form?[] { _compactForm, _detailForm })
+        foreach (var form in new Form?[] { _miniForm, _compactForm, _detailForm })
         {
             if (form is null || form.IsDisposed)
             {
@@ -589,37 +773,174 @@ internal sealed class QuantaTrainContext : ApplicationContext
             form.TopMost = _settings.Display.AlwaysOnTop;
             form.Opacity = _settings.Display.OpacityPercent / 100d;
         }
+        if (_miniForm is not null && !_miniForm.IsDisposed)
+        {
+            _miniForm.SetClickThrough(_settings.Display.MiniClickThrough);
+        }
+    }
+
+    private void ApplyPanelBehavior()
+    {
+        var form = VisiblePanel();
+        if (form is null || form.IsDisposed)
+        {
+            return;
+        }
+        if (_settings.Display.SnapToEdge)
+        {
+            PanelPlacement.SnapToEdge(form);
+        }
+        PanelPlacement.Capture(form, _panelPosition);
+        if (_settings.Display.RememberPosition)
+        {
+            _settings.Display.PanelPosition =
+                PanelPlacement.Clone(_panelPosition);
+        }
+    }
+
+    private void PositionPanel(Form form)
+    {
+        var previousMonitor = _panelPosition.MonitorDeviceName;
+        if (PanelPlacement.TryRestore(form, _panelPosition))
+        {
+            PanelPlacement.Capture(form, _panelPosition);
+            PersistPanelPosition();
+            if (_settings.Display.RememberPosition
+                && !string.Equals(
+                    previousMonitor,
+                    _panelPosition.MonitorDeviceName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _ = SaveSettingsAsync();
+            }
+            return;
+        }
+
+        if (form is MiniForm mini)
+        {
+            mini.PositionNearTray();
+        }
+        else if (form is CompactForm compact)
+        {
+            compact.PositionNearTray();
+        }
+        else if (form is DetailForm detail)
+        {
+            detail.PositionNearTray();
+        }
+        PanelPlacement.Capture(form, _panelPosition);
+        PersistPanelPosition();
+    }
+
+    private async Task HandlePanelMoveCompletedAsync(Form? form)
+    {
+        if (form is null || form.IsDisposed)
+        {
+            return;
+        }
+        if (_settings.Display.SnapToEdge)
+        {
+            PanelPlacement.SnapToEdge(form);
+        }
+        PanelPlacement.Capture(form, _panelPosition);
+        if (_settings.Display.RememberPosition)
+        {
+            _settings.Display.PanelPosition =
+                PanelPlacement.Clone(_panelPosition);
+            await SaveSettingsAsync();
+        }
     }
 
     private void RebuildViews()
     {
+        var miniVisible = _miniForm?.Visible == true;
         var compactVisible = _compactForm?.Visible == true;
         var detailVisible = _detailForm?.Visible == true;
-        var compactLocation = _compactForm?.Location ?? Point.Empty;
-        var detailLocation = _detailForm?.Location ?? Point.Empty;
+        CaptureVisiblePanelPosition();
 
+        _miniForm?.Dispose();
         _compactForm?.Dispose();
         _detailForm?.Dispose();
+        _miniForm = null;
         _compactForm = null;
         _detailForm = null;
 
-        if (compactVisible)
+        if (miniVisible)
         {
-            var compact = GetCompactForm();
-            compact.StartPosition = FormStartPosition.Manual;
-            compact.Location = compactLocation;
-            compact.Show();
-            compact.Activate();
+            ShowMini();
+        }
+        else if (compactVisible)
+        {
+            ShowCompact();
+        }
+        else if (detailVisible)
+        {
+            ShowDetail();
+        }
+    }
+
+    private Form? VisiblePanel() =>
+        _miniForm?.Visible == true
+            ? _miniForm
+            : _compactForm?.Visible == true
+                ? _compactForm
+                : _detailForm?.Visible == true
+                    ? _detailForm
+                    : null;
+
+    private void CaptureVisiblePanelPosition()
+    {
+        var form = VisiblePanel();
+        if (form is null || form.IsDisposed)
+        {
+            return;
         }
 
-        if (detailVisible)
+        PanelPlacement.Capture(form, _panelPosition);
+        PersistPanelPosition();
+    }
+
+    private void PersistPanelPosition()
+    {
+        if (_settings.Display.RememberPosition)
         {
-            var detail = GetDetailForm();
-            detail.StartPosition = FormStartPosition.Manual;
-            detail.Location = detailLocation;
-            detail.Show();
-            detail.Activate();
+            _settings.Display.PanelPosition =
+                PanelPlacement.Clone(_panelPosition);
         }
+    }
+
+    private async Task ResetPanelPositionAsync()
+    {
+        _panelPosition = new PanelPositionSettings();
+        _settings.Display.PanelPosition = new PanelPositionSettings();
+        _miniForm?.Hide();
+        _detailForm?.Hide();
+        var compact = GetCompactForm();
+        PanelPlacement.CenterOnPrimary(compact);
+        PanelPlacement.Capture(compact, _panelPosition);
+        PersistPanelPosition();
+        compact.Show();
+        compact.Activate();
+        await SaveSettingsAsync();
+    }
+
+    private void HandleDisplaySettingsChanged(object? sender, EventArgs eventArgs)
+    {
+        PostToUi(EnsureVisiblePanelReachableAsync);
+    }
+
+    private async Task EnsureVisiblePanelReachableAsync()
+    {
+        var form = VisiblePanel();
+        if (form is null || form.IsDisposed || PanelPlacement.IsReachable(form))
+        {
+            return;
+        }
+
+        PanelPlacement.CenterOnPrimary(form);
+        PanelPlacement.Capture(form, _panelPosition);
+        PersistPanelPosition();
+        await SaveSettingsAsync();
     }
 
     private async Task SaveSettingsAsync()
@@ -645,7 +966,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void PostToUi(Func<Task> action)
     {
-        if (_dispatcher.IsDisposed || _exiting)
+        if (_dispatcher.IsDisposed || !_dispatcher.IsHandleCreated || _exiting)
         {
             return;
         }
@@ -658,6 +979,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
+            }
+            catch (Exception exception)
+            {
+                await _logger.WarningAsync(
+                    exception.Message,
+                    CancellationToken.None);
             }
         });
     }
@@ -692,10 +1019,13 @@ internal sealed class QuantaTrainContext : ApplicationContext
         }
 
         _exiting = true;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -=
+            HandleDisplaySettingsChanged;
         _lifetime.Cancel();
         _activationTimer.Stop();
         _notifyIcon.Visible = false;
         DisposeConnectionAsync().GetAwaiter().GetResult();
+        _miniForm?.Dispose();
         _compactForm?.Dispose();
         _detailForm?.Dispose();
         _notifyIcon.Dispose();

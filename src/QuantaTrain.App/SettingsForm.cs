@@ -5,6 +5,8 @@ namespace QuantaTrain.App;
 internal enum SettingsPreviewKind
 {
     Opacity,
+    DisplayBehavior,
+    DisplayMode,
     Appearance,
 }
 
@@ -33,21 +35,26 @@ internal sealed class SettingsForm : FramelessForm
     private readonly ToggleSwitch _lockPosition = new();
     private readonly ToggleSwitch _rememberPosition = new();
     private readonly ToggleSwitch _snapToEdge = new();
+    private readonly ToggleSwitch _miniClickThrough = new();
+    private readonly ComboBox _displayMode = new();
     private readonly NumericUpDown _historyDays = new();
     private readonly TextBox _codexPath = new();
+    private readonly string _initialDisplayMode;
     private string _accent = "green";
     private bool _loadingControls;
 
     public SettingsForm(
         AppSettings settings,
         LocalizationService localizer,
-        int initialPage = 1)
+        int initialPage = 1,
+        string initialDisplayMode = "compact")
     {
         _settings = settings;
         _localizer = localizer;
+        _initialDisplayMode = initialDisplayMode;
         Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
         ClientSize = new Size(448, 570);
-        StartPosition = FormStartPosition.CenterScreen;
+        StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray settings";
 
         var title = UiFactory.Label(
@@ -103,11 +110,24 @@ internal sealed class SettingsForm : FramelessForm
         };
         var defaults = UiFactory.TextButton(
             _localizer.Text("Settings.RestoreDefaults"),
-            new Rectangle(17, 526, 112, 30));
+            new Rectangle(17, 526, 174, 30),
+            danger: true);
         defaults.Click += (_, _) =>
         {
-            LoadControls(new AppSettings());
-            RequestReopen(1);
+            if (MessageBox.Show(
+                    this,
+                    _localizer.Text("Settings.ResetAllConfirm"),
+                    _localizer.Text("Settings.RestoreDefaults"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning)
+                != DialogResult.Yes)
+            {
+                return;
+            }
+
+            ResetAllSettings();
+            AllSettingsResetRequested?.Invoke(this, EventArgs.Empty);
+            NotifyPreviewChanged(SettingsPreviewKind.Appearance);
         };
 
         var done = UiFactory.TextButton(
@@ -131,14 +151,20 @@ internal sealed class SettingsForm : FramelessForm
         MakeDraggable(title);
 
         LoadControls(_settings);
-        Opacity = Math.Clamp(_settings.Display.OpacityPercent, 60, 100) / 100d;
         SelectPage(Math.Clamp(initialPage, 0, _pages.Count - 1));
+        PanelPlacement.CenterOnPrimary(this);
     }
 
     public event EventHandler? SettingsSaved;
     public event EventHandler<SettingsPreviewChangedEventArgs>? SettingsPreviewChanged;
-    public bool ReopenRequested { get; private set; }
-    public int ReopenPage { get; private set; } = 1;
+    public event EventHandler? PositionResetRequested;
+    public event EventHandler? AllSettingsResetRequested;
+    public string DisplayMode => _displayMode.SelectedIndex switch
+    {
+        0 => "mini",
+        2 => "detail",
+        _ => "compact",
+    };
 
     private void AddNav(
         Control parent,
@@ -166,7 +192,7 @@ internal sealed class SettingsForm : FramelessForm
             _launchAtStartup,
             52);
 
-        ConfigureCombo(_startupMode, ["tray-only", "compact", "detail"]);
+        ConfigureCombo(_startupMode, ["tray-only", "mini", "compact", "detail"]);
         AddControlRow(
             page,
             _localizer.Text("Settings.StartupMode"),
@@ -227,7 +253,7 @@ internal sealed class SettingsForm : FramelessForm
                         ? Theme.Text
                         : Theme.Window;
                 }
-                RequestReopen(1);
+                NotifyPreviewChanged(SettingsPreviewKind.Appearance);
             };
             page.Controls.Add(swatch);
         }
@@ -241,11 +267,12 @@ internal sealed class SettingsForm : FramelessForm
         _opacity.ValueChanged += (_, _) =>
         {
             _opacityValue.Text = $"{_opacity.Value}%";
-            Opacity = _opacity.Value / 100d;
             NotifyPreviewChanged(SettingsPreviewKind.Opacity);
         };
-        _theme.SelectedValueChanged += (_, _) => RequestReopen(1);
-        _locale.SelectedValueChanged += (_, _) => RequestReopen(2);
+        _theme.SelectedValueChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.Appearance);
+        _locale.SelectedValueChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.Appearance);
         page.Controls.AddRange([_opacity, _opacityValue]);
 
         AddToggleRow(page, _localizer.Text("Menu.AlwaysOnTop"), _alwaysOnTop, 177);
@@ -256,15 +283,42 @@ internal sealed class SettingsForm : FramelessForm
             _rememberPosition,
             253);
         AddToggleRow(page, _localizer.Text("Settings.SnapToEdge"), _snapToEdge, 291);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.MiniClickThrough"),
+            _miniClickThrough,
+            329);
+        _alwaysOnTop.CheckedChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
+        _lockPosition.CheckedChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
+        _rememberPosition.CheckedChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
+        _snapToEdge.CheckedChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
+        _miniClickThrough.CheckedChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
 
-        var displayMode = new ComboBox();
-        ConfigureCombo(displayMode, [_localizer.Text("Menu.ShowCompact")]);
-        displayMode.SelectedIndex = 0;
+        ConfigureCombo(
+            _displayMode,
+            [
+                _localizer.Text("Menu.ShowMini"),
+                _localizer.Text("Menu.ShowCompact"),
+                _localizer.Text("Menu.ShowDetail"),
+            ]);
+        _displayMode.SelectedIndexChanged += (_, _) =>
+            NotifyPreviewChanged(SettingsPreviewKind.DisplayMode);
         AddControlRow(
             page,
             _localizer.Text("Settings.DisplayState"),
-            displayMode,
-            342);
+            _displayMode,
+            380);
+        var resetPosition = UiFactory.TextButton(
+            _localizer.Text("Menu.ResetPosition"),
+            new Rectangle(0, 413, 270, 28));
+        resetPosition.Click += (_, _) =>
+            PositionResetRequested?.Invoke(this, EventArgs.Empty);
+        page.Controls.Add(resetPosition);
         return page;
     }
 
@@ -459,6 +513,13 @@ internal sealed class SettingsForm : FramelessForm
         _lockPosition.Checked = settings.Display.LockPosition;
         _rememberPosition.Checked = settings.Display.RememberPosition;
         _snapToEdge.Checked = settings.Display.SnapToEdge;
+        _miniClickThrough.Checked = settings.Display.MiniClickThrough;
+        _displayMode.SelectedIndex = _initialDisplayMode.ToLowerInvariant() switch
+        {
+            "mini" => 0,
+            "detail" => 2,
+            _ => 1,
+        };
         _locale.SelectedItem = settings.Language.Mode == "auto"
             ? "auto"
             : settings.Language.Locale;
@@ -481,6 +542,7 @@ internal sealed class SettingsForm : FramelessForm
         _settings.Display.LockPosition = _lockPosition.Checked;
         _settings.Display.RememberPosition = _rememberPosition.Checked;
         _settings.Display.SnapToEdge = _snapToEdge.Checked;
+        _settings.Display.MiniClickThrough = _miniClickThrough.Checked;
         var locale = _locale.SelectedItem?.ToString() ?? "auto";
         _settings.Language.Mode = locale == "auto" ? "auto" : "manual";
         if (locale != "auto")
@@ -492,6 +554,19 @@ internal sealed class SettingsForm : FramelessForm
             string.IsNullOrWhiteSpace(_codexPath.Text) ? null : _codexPath.Text.Trim();
         _settings.Connection.CodexPathMode =
             _settings.Connection.CodexExecutablePath is null ? "auto" : "manual";
+    }
+
+    private void ResetAllSettings()
+    {
+        var defaults = new AppSettings();
+        _settings.SchemaVersion = defaults.SchemaVersion;
+        _settings.General = defaults.General;
+        _settings.Display = defaults.Display;
+        _settings.Language = defaults.Language;
+        _settings.Notifications = defaults.Notifications;
+        _settings.History = defaults.History;
+        _settings.Connection = defaults.Connection;
+        LoadControls(_settings);
     }
 
     private void NotifyPreviewChanged(SettingsPreviewKind kind)
@@ -507,16 +582,4 @@ internal sealed class SettingsForm : FramelessForm
             new SettingsPreviewChangedEventArgs(kind));
     }
 
-    private void RequestReopen(int page)
-    {
-        if (_loadingControls)
-        {
-            return;
-        }
-
-        NotifyPreviewChanged(SettingsPreviewKind.Appearance);
-        ReopenRequested = true;
-        ReopenPage = page;
-        BeginInvoke(Close);
-    }
 }

@@ -29,6 +29,17 @@ public sealed class DisplaySettings
     public bool LockPosition { get; set; }
     public bool RememberPosition { get; set; }
     public bool SnapToEdge { get; set; }
+    public bool MiniClickThrough { get; set; }
+    public PanelPositionSettings PanelPosition { get; set; } = new();
+}
+
+public sealed class PanelPositionSettings
+{
+    public string? MonitorDeviceName { get; set; }
+    public string HorizontalAnchor { get; set; } = "left";
+    public string VerticalAnchor { get; set; } = "top";
+    public int? X { get; set; }
+    public int? Y { get; set; }
 }
 
 public sealed class LanguageSettings

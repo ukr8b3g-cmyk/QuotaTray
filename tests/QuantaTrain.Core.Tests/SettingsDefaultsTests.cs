@@ -17,5 +17,8 @@ public sealed class SettingsDefaultsTests
         Assert.False(settings.Display.LockPosition);
         Assert.False(settings.Display.RememberPosition);
         Assert.False(settings.Display.SnapToEdge);
+        Assert.False(settings.Display.MiniClickThrough);
+        Assert.Null(settings.Display.PanelPosition.X);
+        Assert.Null(settings.Display.PanelPosition.Y);
     }
 }

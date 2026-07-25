@@ -9,6 +9,7 @@ internal sealed class DetailForm : FramelessForm
     private const int MaxVisibleHistoryRows = 3;
 
     private readonly LocalizationService _localizer;
+    private readonly Func<bool> _canDrag;
     private readonly RoundedPanel _quotaCard = new();
     private readonly Label _remainingPrefix = new();
     private readonly Label _remainingPercent = new();
@@ -23,9 +24,10 @@ internal sealed class DetailForm : FramelessForm
     private readonly Label _plan;
     private readonly Label _connection;
 
-    public DetailForm(LocalizationService localizer)
+    public DetailForm(LocalizationService localizer, Func<bool>? canDrag = null)
     {
         _localizer = localizer;
+        _canDrag = canDrag ?? (() => true);
         Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTray";
         ClientSize = new Size(260, BaseClientHeight);
         StartPosition = FormStartPosition.Manual;
@@ -166,6 +168,8 @@ internal sealed class DetailForm : FramelessForm
         ShowEmptyRows();
     }
 
+    protected override bool CanDrag => _canDrag();
+
     public event EventHandler? RefreshRequested;
     public event EventHandler? CompactRequested;
     public event EventHandler? SettingsRequested;
@@ -193,12 +197,13 @@ internal sealed class DetailForm : FramelessForm
         }
         else
         {
-            var remaining = (int)Math.Round(state.RemainingPercent);
-            _remainingPrefix.Text = RemainingPrefix(remaining);
-            _remainingPercent.Text = $"{remaining}%";
+            var remaining = state.RemainingPercent;
+            var remainingNumber = QuotaDisplay.Number(remaining);
+            _remainingPrefix.Text = RemainingPrefix(remainingNumber);
+            _remainingPercent.Text = QuotaDisplay.Percent(remaining);
             _remainingPercent.ForeColor = Theme.QuotaColor(remaining);
             _progress.ValueColor = Theme.QuotaColor(remaining);
-            _progress.Value = Math.Clamp(remaining, 0, 100);
+            _progress.Value = (int)Math.Round(Math.Clamp(remaining, 0d, 100d));
             _reset.Text = _localizer.Text(
                 "Quota.NextReset",
                 state.ResetsAtUtc?.ToLocalTime().ToString("g") ?? "—");
@@ -318,11 +323,10 @@ internal sealed class DetailForm : FramelessForm
             14);
     }
 
-    private string RemainingPrefix(int value)
+    private string RemainingPrefix(string value)
     {
         var formatted = _localizer.Text("Common.Remaining", value);
-        var token = value.ToString();
-        var index = formatted.IndexOf(token, StringComparison.Ordinal);
+        var index = formatted.IndexOf(value, StringComparison.Ordinal);
         return index <= 0 ? string.Empty : formatted[..index].Trim();
     }
 
