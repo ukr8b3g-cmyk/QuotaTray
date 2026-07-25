@@ -1,17 +1,14 @@
-# QuantaTray v0.1.1
+# QuantaTray v0.1.2
 
-This maintenance release corrects the product name from QuantaTrain to
-QuantaTray and fixes shutdown/relaunch behavior.
+This release makes display settings take effect immediately.
 
-- Product display name, executable, installer, portable ZIP, and data directory
-  now use QuantaTray.
-- Exit no longer deadlocks after hiding the tray icon, so the application can
-  be launched again normally.
-- Compact and detailed panels are smaller, and the detailed view has an
-  explicit control to return to compact view.
-- Recent reset history grows as entries are added and scrolls after three rows.
-- Existing `QUANTATRAIN_CODEX_PATH` and legacy local data remain supported for
-  upgrade compatibility.
+- Opacity now changes while the slider is moving and is persisted immediately.
+- Dark, light, and Windows-system themes are applied without restarting the app.
+- Accent-color changes are applied to interactive controls immediately.
+- Language changes rebuild visible panels, the settings window, and the tray
+  menu with the selected locale.
+- Existing QuantaTray settings and QuantaTrain compatibility paths remain
+  supported.
 
 - Installer: per-user installation, no administrator privileges required.
 - Portable ZIP: extract to a writable folder; data stays under `data/`.

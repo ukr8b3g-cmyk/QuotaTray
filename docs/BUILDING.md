@@ -18,14 +18,14 @@ dotnet test QuantaTrain.slnx -c Release --no-build
 ## Build release assets
 
 ```powershell
-.\packaging\scripts\build-release.ps1 -Version 0.1.1
+.\packaging\scripts\build-release.ps1 -Version 0.1.2
 ```
 
 Outputs:
 
 ```text
-dist/QuantaTray-v0.1.1-win-x64-setup.exe
-dist/QuantaTray-v0.1.1-win-x64-portable.zip
+dist/QuantaTray-v0.1.2-win-x64-setup.exe
+dist/QuantaTray-v0.1.2-win-x64-portable.zip
 dist/SHA256SUMS.txt
 ```
 

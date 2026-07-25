@@ -2,6 +2,18 @@ using QuantaTrain.Core;
 
 namespace QuantaTrain.App;
 
+internal enum SettingsPreviewKind
+{
+    Opacity,
+    Appearance,
+}
+
+internal sealed class SettingsPreviewChangedEventArgs(SettingsPreviewKind kind)
+    : EventArgs
+{
+    public SettingsPreviewKind Kind { get; } = kind;
+}
+
 internal sealed class SettingsForm : FramelessForm
 {
     private readonly AppSettings _settings;
@@ -24,8 +36,12 @@ internal sealed class SettingsForm : FramelessForm
     private readonly NumericUpDown _historyDays = new();
     private readonly TextBox _codexPath = new();
     private string _accent = "green";
+    private bool _loadingControls;
 
-    public SettingsForm(AppSettings settings, LocalizationService localizer)
+    public SettingsForm(
+        AppSettings settings,
+        LocalizationService localizer,
+        int initialPage = 1)
     {
         _settings = settings;
         _localizer = localizer;
@@ -88,7 +104,11 @@ internal sealed class SettingsForm : FramelessForm
         var defaults = UiFactory.TextButton(
             _localizer.Text("Settings.RestoreDefaults"),
             new Rectangle(17, 526, 112, 30));
-        defaults.Click += (_, _) => LoadControls(new AppSettings());
+        defaults.Click += (_, _) =>
+        {
+            LoadControls(new AppSettings());
+            RequestReopen(1);
+        };
 
         var done = UiFactory.TextButton(
             _localizer.Text("Common.Close"),
@@ -111,10 +131,14 @@ internal sealed class SettingsForm : FramelessForm
         MakeDraggable(title);
 
         LoadControls(_settings);
-        SelectPage(1);
+        Opacity = Math.Clamp(_settings.Display.OpacityPercent, 60, 100) / 100d;
+        SelectPage(Math.Clamp(initialPage, 0, _pages.Count - 1));
     }
 
     public event EventHandler? SettingsSaved;
+    public event EventHandler<SettingsPreviewChangedEventArgs>? SettingsPreviewChanged;
+    public bool ReopenRequested { get; private set; }
+    public int ReopenPage { get; private set; } = 1;
 
     private void AddNav(
         Control parent,
@@ -203,6 +227,7 @@ internal sealed class SettingsForm : FramelessForm
                         ? Theme.Text
                         : Theme.Window;
                 }
+                RequestReopen(1);
             };
             page.Controls.Add(swatch);
         }
@@ -213,7 +238,14 @@ internal sealed class SettingsForm : FramelessForm
         _opacityValue.Font = Theme.Ui(8.7F);
         _opacityValue.ForeColor = Theme.Text;
         _opacityValue.TextAlign = ContentAlignment.MiddleRight;
-        _opacity.ValueChanged += (_, _) => _opacityValue.Text = $"{_opacity.Value}%";
+        _opacity.ValueChanged += (_, _) =>
+        {
+            _opacityValue.Text = $"{_opacity.Value}%";
+            Opacity = _opacity.Value / 100d;
+            NotifyPreviewChanged(SettingsPreviewKind.Opacity);
+        };
+        _theme.SelectedValueChanged += (_, _) => RequestReopen(1);
+        _locale.SelectedValueChanged += (_, _) => RequestReopen(2);
         page.Controls.AddRange([_opacity, _opacityValue]);
 
         AddToggleRow(page, _localizer.Text("Menu.AlwaysOnTop"), _alwaysOnTop, 177);
@@ -332,7 +364,7 @@ internal sealed class SettingsForm : FramelessForm
                 FontStyle.Bold));
         page.Controls.Add(
             UiFactory.Label(
-                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.1"}",
+                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.2"}",
                 new Point(0, 86),
                 8.7F,
                 FontStyle.Regular,
@@ -411,6 +443,7 @@ internal sealed class SettingsForm : FramelessForm
 
     private void LoadControls(AppSettings settings)
     {
+        _loadingControls = true;
         _launchAtStartup.Checked = settings.General.LaunchAtStartup;
         _startupMode.SelectedItem = settings.General.StartupMode;
         _startupMode.SelectedIndex = _startupMode.SelectedIndex < 0 ? 0 : _startupMode.SelectedIndex;
@@ -432,6 +465,7 @@ internal sealed class SettingsForm : FramelessForm
         _locale.SelectedIndex = _locale.SelectedIndex < 0 ? 0 : _locale.SelectedIndex;
         _historyDays.Value = Math.Clamp(settings.History.RetentionDays ?? 365, 1, 3650);
         _codexPath.Text = settings.Connection.CodexExecutablePath ?? string.Empty;
+        _loadingControls = false;
     }
 
     private void ApplyControls()
@@ -458,5 +492,31 @@ internal sealed class SettingsForm : FramelessForm
             string.IsNullOrWhiteSpace(_codexPath.Text) ? null : _codexPath.Text.Trim();
         _settings.Connection.CodexPathMode =
             _settings.Connection.CodexExecutablePath is null ? "auto" : "manual";
+    }
+
+    private void NotifyPreviewChanged(SettingsPreviewKind kind)
+    {
+        if (_loadingControls)
+        {
+            return;
+        }
+
+        ApplyControls();
+        SettingsPreviewChanged?.Invoke(
+            this,
+            new SettingsPreviewChangedEventArgs(kind));
+    }
+
+    private void RequestReopen(int page)
+    {
+        if (_loadingControls)
+        {
+            return;
+        }
+
+        NotifyPreviewChanged(SettingsPreviewKind.Appearance);
+        ReopenRequested = true;
+        ReopenPage = page;
+        BeginInvoke(Close);
     }
 }

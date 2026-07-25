@@ -7,7 +7,7 @@ namespace QuantaTrain.App;
 internal sealed class QuantaTrainContext : ApplicationContext
 {
     private static readonly string ProductVersion =
-        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.1";
+        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.2";
 
     private static readonly TimeSpan[] RestartBackoff =
     [
@@ -54,6 +54,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _logger = new RedactedLogger(_paths.LogsDirectory);
         _localizer = new LocalizationService(Path.Combine(AppContext.BaseDirectory, "locales"));
         _localizer.Load(_settings.Language);
+        Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
 
         _notifyIcon = new NotifyIcon
         {
@@ -465,13 +466,46 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ShowSettings()
     {
-        using var form = new SettingsForm(_settings, _localizer);
-        form.SettingsSaved += async (_, _) =>
+        var page = 1;
+        while (true)
+        {
+            using var form = new SettingsForm(_settings, _localizer, page);
+            form.SettingsPreviewChanged += async (_, eventArgs) =>
+                await ApplySettingsPreviewAsync(eventArgs.Kind);
+            form.SettingsSaved += async (_, _) =>
+            {
+                Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
+                _localizer.Load(_settings.Language);
+                ApplyDisplaySettings();
+                await SaveSettingsAsync();
+            };
+            form.ShowDialog();
+            if (!form.ReopenRequested)
+            {
+                break;
+            }
+            page = form.ReopenPage;
+        }
+    }
+
+    private async Task ApplySettingsPreviewAsync(SettingsPreviewKind kind)
+    {
+        if (kind == SettingsPreviewKind.Opacity)
         {
             ApplyDisplaySettings();
             await SaveSettingsAsync();
-        };
-        form.ShowDialog();
+            return;
+        }
+
+        Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
+        _localizer.Load(_settings.Language);
+        var oldMenu = _notifyIcon.ContextMenuStrip;
+        _notifyIcon.ContextMenuStrip = BuildMenu();
+        oldMenu?.Dispose();
+        RebuildViews();
+        ApplyDisplaySettings();
+        UpdateViews(_polling?.Current, false, null);
+        await SaveSettingsAsync();
     }
 
     private async Task StartLoginAsync()
@@ -554,6 +588,37 @@ internal sealed class QuantaTrainContext : ApplicationContext
             }
             form.TopMost = _settings.Display.AlwaysOnTop;
             form.Opacity = _settings.Display.OpacityPercent / 100d;
+        }
+    }
+
+    private void RebuildViews()
+    {
+        var compactVisible = _compactForm?.Visible == true;
+        var detailVisible = _detailForm?.Visible == true;
+        var compactLocation = _compactForm?.Location ?? Point.Empty;
+        var detailLocation = _detailForm?.Location ?? Point.Empty;
+
+        _compactForm?.Dispose();
+        _detailForm?.Dispose();
+        _compactForm = null;
+        _detailForm = null;
+
+        if (compactVisible)
+        {
+            var compact = GetCompactForm();
+            compact.StartPosition = FormStartPosition.Manual;
+            compact.Location = compactLocation;
+            compact.Show();
+            compact.Activate();
+        }
+
+        if (detailVisible)
+        {
+            var detail = GetDetailForm();
+            detail.StartPosition = FormStartPosition.Manual;
+            detail.Location = detailLocation;
+            detail.Show();
+            detail.Activate();
         }
     }
 

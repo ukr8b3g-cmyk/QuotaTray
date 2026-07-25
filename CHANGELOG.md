@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-07-25
+
+- Fixed the opacity control so changes apply while the slider is moving.
+- Added live dark, light, and Windows-system theme switching.
+- Added live accent-color and language switching for panels, settings, and the tray menu.
+- Added runtime appearance and localization regression tests.
+
+## 0.1.1 - 2026-07-25
+
 - Renamed the product, executable, and release assets from QuantaTrain to QuantaTray.
 - Fixed shutdown deadlock that could leave an invisible process blocking relaunch.
 - Added an explicit detailed-to-compact view control and reduced both panel sizes.

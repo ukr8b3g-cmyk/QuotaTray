@@ -280,7 +280,7 @@ internal sealed class ToggleSwitch : Control
         using var track = UiGeometry.RoundedRectangle(
             new Rectangle(0, 2, Width - 1, Height - 5),
             (Height - 4) / 2);
-        using var trackBrush = new SolidBrush(Checked ? Theme.Green : Theme.SurfaceRaised);
+        using var trackBrush = new SolidBrush(Checked ? Theme.Accent : Theme.SurfaceRaised);
         eventArgs.Graphics.FillPath(trackBrush, track);
 
         var knobSize = Height - 8;
@@ -349,13 +349,13 @@ internal sealed class ValueSlider : Control
 
         var ratio = (Value - Minimum) / (double)(Maximum - Minimum);
         var x = 4 + (int)Math.Round((Width - 10) * ratio);
-        using var valuePen = new Pen(Color.FromArgb(93, 203, 176), 4)
+        using var valuePen = new Pen(Theme.Accent, 4)
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,
         };
         eventArgs.Graphics.DrawLine(valuePen, 4, y, x, y);
-        using var knob = new SolidBrush(Color.FromArgb(204, 229, 233));
+        using var knob = new SolidBrush(Theme.Accent);
         eventArgs.Graphics.FillEllipse(knob, x - 6, y - 6, 12, 12);
     }
 
@@ -535,15 +535,15 @@ internal static class UiFactory
             Bounds = bounds,
             Font = Theme.Ui(9F, primary ? FontStyle.Bold : FontStyle.Regular),
             ForeColor = Theme.Text,
-            BackColor = primary ? Color.FromArgb(48, 132, 58) : Theme.SurfaceRaised,
+            BackColor = primary ? Theme.Accent : Theme.SurfaceRaised,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
             UseVisualStyleBackColor = false,
         };
-        button.FlatAppearance.BorderColor = primary ? Color.FromArgb(58, 146, 69) : Theme.Border;
+        button.FlatAppearance.BorderColor = primary ? Theme.Accent : Theme.Border;
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor =
-            primary ? Color.FromArgb(57, 147, 67) : Color.FromArgb(45, 53, 60);
+            primary ? ControlPaint.Light(Theme.Accent) : Theme.SurfaceRaised;
         return button;
     }
 }
