@@ -7,7 +7,7 @@ namespace QuantaTrain.App;
 internal sealed class QuantaTrainContext : ApplicationContext
 {
     private static readonly string ProductVersion =
-        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.2";
+        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.3";
 
     private static readonly TimeSpan[] RestartBackoff =
     [
@@ -21,6 +21,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly SingleInstanceCoordinator _singleInstance;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
+    private readonly SemaphoreSlim _settingsPreviewGate = new(1, 1);
     private readonly Control _dispatcher = new();
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _activationTimer;
@@ -549,7 +550,15 @@ internal sealed class QuantaTrainContext : ApplicationContext
         var form = GetMiniForm();
         PositionPanel(form);
         form.Show();
-        if (activate && !_settings.Display.MiniClickThrough)
+        if (_settings.Display.MiniClickThrough)
+        {
+            if (activate || _settingsForm is null)
+            {
+                form.EnsureVisibleWithoutActivation(
+                    _settings.Display.AlwaysOnTop);
+            }
+        }
+        else if (activate)
         {
             form.Activate();
         }
@@ -581,9 +590,16 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _settingsForm = form;
         form.FormClosed += (_, _) =>
         {
+            var restoreClickThroughMini =
+                _miniForm?.Visible == true && _settings.Display.MiniClickThrough;
             if (ReferenceEquals(_settingsForm, form))
             {
                 _settingsForm = null;
+            }
+            if (restoreClickThroughMini)
+            {
+                _miniForm?.EnsureVisibleWithoutActivation(
+                    _settings.Display.AlwaysOnTop);
             }
         };
         form.PositionResetRequested += async (_, _) =>
@@ -626,13 +642,24 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             try
             {
-                Theme.Configure(
-                    _settings.Display.Theme,
-                    _settings.Display.Accent);
-                _localizer.Load(_settings.Language);
-                ApplyDisplaySettings();
-                ApplyPanelBehavior();
-                await SaveSettingsAsync();
+                await _settingsPreviewGate.WaitAsync(_lifetime.Token);
+                try
+                {
+                    Theme.Configure(
+                        _settings.Display.Theme,
+                        _settings.Display.Accent);
+                    _localizer.Load(_settings.Language);
+                    ApplyDisplaySettings();
+                    ApplyPanelBehavior();
+                    await SaveSettingsAsync();
+                }
+                finally
+                {
+                    _settingsPreviewGate.Release();
+                }
+            }
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+            {
             }
             catch (Exception exception)
             {
@@ -647,28 +674,36 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private async Task ApplySettingsPreviewAsync(SettingsPreviewKind kind)
     {
-        if (kind is SettingsPreviewKind.Opacity
-            or SettingsPreviewKind.DisplayBehavior)
+        await _settingsPreviewGate.WaitAsync(_lifetime.Token);
+        try
         {
-            ApplyDisplaySettings();
-            ApplyPanelBehavior();
-            if (kind == SettingsPreviewKind.DisplayBehavior)
+            if (kind is SettingsPreviewKind.Opacity
+                or SettingsPreviewKind.DisplayBehavior)
             {
-                RebuildTrayMenu();
+                ApplyDisplaySettings();
+                ApplyPanelBehavior();
+                if (kind == SettingsPreviewKind.DisplayBehavior)
+                {
+                    RebuildTrayMenu();
+                }
+                await SaveSettingsAsync();
+                return;
             }
-            await SaveSettingsAsync();
-            return;
-        }
 
-        Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
-        _localizer.Load(_settings.Language);
-        var oldMenu = _notifyIcon.ContextMenuStrip;
-        _notifyIcon.ContextMenuStrip = BuildMenu();
-        oldMenu?.Dispose();
-        RebuildViews();
-        ApplyDisplaySettings();
-        UpdateViews(_polling?.Current, false, null);
-        await SaveSettingsAsync();
+            Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
+            _localizer.Load(_settings.Language);
+            var oldMenu = _notifyIcon.ContextMenuStrip;
+            _notifyIcon.ContextMenuStrip = BuildMenu();
+            oldMenu?.Dispose();
+            RebuildViews();
+            ApplyDisplaySettings();
+            UpdateViews(_polling?.Current, false, null);
+            await SaveSettingsAsync();
+        }
+        finally
+        {
+            _settingsPreviewGate.Release();
+        }
     }
 
     private void QueueShowSettings()
@@ -851,11 +886,18 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void RebuildViews()
     {
-        var miniVisible = _miniForm?.Visible == true;
-        var compactVisible = _compactForm?.Visible == true;
-        var detailVisible = _detailForm?.Visible == true;
+        var displayMode = _miniForm?.Visible == true
+            ? "mini"
+            : _compactForm?.Visible == true
+                ? "compact"
+                : _detailForm?.Visible == true
+                    ? "detail"
+                    : null;
         CaptureVisiblePanelPosition();
 
+        _miniForm?.Hide();
+        _compactForm?.Hide();
+        _detailForm?.Hide();
         _miniForm?.Dispose();
         _compactForm?.Dispose();
         _detailForm?.Dispose();
@@ -863,17 +905,17 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _compactForm = null;
         _detailForm = null;
 
-        if (miniVisible)
+        switch (displayMode)
         {
-            ShowMini();
-        }
-        else if (compactVisible)
-        {
-            ShowCompact();
-        }
-        else if (detailVisible)
-        {
-            ShowDetail();
+            case "mini":
+                ShowMini(activate: false);
+                break;
+            case "compact":
+                ShowCompact(activate: false);
+                break;
+            case "detail":
+                ShowDetail(activate: false);
+                break;
         }
     }
 

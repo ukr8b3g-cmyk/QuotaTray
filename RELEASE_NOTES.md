@@ -1,12 +1,17 @@
-# QuantaTray v0.1.2
+# QuantaTray v0.1.3
 
-This release makes display settings take effect immediately.
+This release adds the mini view and stabilizes live display changes.
 
-- Opacity now changes while the slider is moving and is persisted immediately.
-- Dark, light, and Windows-system themes are applied without restarting the app.
-- Accent-color changes are applied to interactive controls immediately.
-- Language changes rebuild visible panels, the settings window, and the tray
-  menu with the selected locale.
+- Added an opt-in titleless mini view and mini-only click-through mode.
+- Fixed click-through mini panels becoming faint, disappearing behind other
+  windows, or failing to return after Settings closes.
+- Restores click-through mini panels without taking keyboard focus.
+- Serializes live Settings previews so repeated theme, accent-color, and
+  language changes cannot overlap panel reconstruction.
+- Added shared mini/compact/detail positioning, missing-monitor recovery, and
+  position reset actions.
+- Added optional one-decimal quota display when Codex returns fractional data.
+- Expanded the Japanese README and changed the project license to CC0 1.0.
 - Existing QuantaTray settings and QuantaTrain compatibility paths remain
   supported.
 

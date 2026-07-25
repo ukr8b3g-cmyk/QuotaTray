@@ -1,6 +1,6 @@
 # QuantaTray
 
-[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常駐モニターです。
 <img width="1010" height="594" alt="$RV2PCS5" src="https://github.com/user-attachments/assets/899a2de1-946b-43cd-a1bc-7b869800a89c" />
@@ -10,8 +10,8 @@ OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常�
 
 ## ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
@@ -42,7 +42,7 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 
 ### Installer版
 
-1. `QuantaTray-v0.1.2-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.1.3-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行し、画面の案内に従います。
 3. 更新インストール時は、常駐中のQuantaTrayが自動的に終了します。
 4. インストール後、QuantaTrayがタスクトレイに常駐します。
@@ -55,7 +55,7 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 
 ### Portable ZIP版
 
-1. `QuantaTray-v0.1.2-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.1.3-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -167,7 +167,7 @@ Portable版：
 
 ### 表示が100%と実際の残量の間で変わる
 
-v0.1.2では透明度をスライダー操作中に表示パネルへ反映し、テーマ・アクセント色・言語を選択直後に表示パネルとトレイメニューへ反映します。設定画面自体のテーマと言語は、安全のため次回表示時に反映します。既存版から更新する場合は、最新版のセットアップを実行してください。
+v0.1.3では設定変更を直列処理し、テーマ・アクセント色・言語を連続変更しても表示パネルを安全に再構築します。クリック透過中のミニ表示は、設定を閉じた後やトレイから選び直した時に、フォーカスを奪わず再表示されます。既存版から更新する場合は、最新版のセットアップを実行してください。
 
 ### ミニ表示をクリックできない
 
@@ -207,8 +207,8 @@ QuantaTray is an unofficial Windows system-tray monitor for viewing your Codex u
 
 ## Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.2-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the SHA-256 value against the release checksum file.
@@ -239,7 +239,7 @@ QuantaTray launches `codex app-server --stdio` in the background, so the Codex d
 
 ### Installer
 
-1. Download `QuantaTray-v0.1.2-win-x64-setup.exe`.
+1. Download `QuantaTray-v0.1.3-win-x64-setup.exe`.
 2. Run Setup and follow the prompts.
 3. During an upgrade, Setup automatically closes the running QuantaTray process.
 4. QuantaTray starts in the system tray after installation.
@@ -252,7 +252,7 @@ Install location:
 
 ### Portable ZIP
 
-1. Download `QuantaTray-v0.1.2-win-x64-portable.zip`.
+1. Download `QuantaTray-v0.1.3-win-x64-portable.zip`.
 2. Extract the entire archive to a writable folder.
 3. Run `QuantaTray.exe`.
 
@@ -327,7 +327,7 @@ Confirm that `codex --version` works. QuantaTray searches PATH and the official 
 
 ### The value switches between 100% and the actual remaining amount
 
-Version 0.1.2 applies opacity to the quota panels while the slider is moving and applies theme, accent color, and language changes immediately to the panels and tray menu. For stability, the Settings window itself reflects theme and language changes the next time it is opened. Run the latest Setup to upgrade from an earlier build.
+Version 0.1.3 serializes live Settings changes so repeated theme, accent-color, and language selections can safely rebuild the visible panels. A click-through mini panel is restored without taking focus after Settings closes or when mini view is selected again from the tray. Run the latest Setup to upgrade from an earlier build.
 
 ### The mini view does not respond to clicks
 

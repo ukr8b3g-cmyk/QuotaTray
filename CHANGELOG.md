@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-07-25
+
 - Expanded the Japanese README with contextual settings screenshots, recovery guidance, reset-history behavior, and issue-reporting instructions.
 - Changed the project license from MIT to CC0 1.0 Universal.
 - Added an opt-in titleless mini view with compact/detail recovery actions.
 - Added an opt-in mini-view click-through mode recoverable from the tray.
+- Fixed click-through mini panels becoming faint, disappearing behind other windows, or failing to return after Settings closes.
+- Serialized live settings previews and safely restored the active panel after repeated theme, accent, or language changes.
 - Added shared mini/compact/detail positioning, missing-monitor recovery, and position-only/full reset actions.
 - Added a clickable GitHub repository link to the About dialog.
 - Fixed live theme, accent, language, and display changes that could close Settings, raise WinForms handle errors, or terminate the app.

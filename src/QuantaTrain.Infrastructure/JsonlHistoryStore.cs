@@ -50,7 +50,7 @@ public sealed class JsonlHistoryStore
             reasonCodes = resetEvent.ReasonCodes.Take(20),
             confirmed = resetEvent.Confirmed,
             appVersion =
-                typeof(JsonlHistoryStore).Assembly.GetName().Version?.ToString(3) ?? "0.1.2",
+                typeof(JsonlHistoryStore).Assembly.GetName().Version?.ToString(3) ?? "0.1.3",
             codexVersion = resetEvent.After.CodexVersion,
         };
 

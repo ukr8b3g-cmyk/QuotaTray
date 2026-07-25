@@ -418,7 +418,7 @@ internal sealed class SettingsForm : FramelessForm
                 FontStyle.Bold));
         page.Controls.Add(
             UiFactory.Label(
-                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.2"}",
+                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.3"}",
                 new Point(0, 86),
                 8.7F,
                 FontStyle.Regular,

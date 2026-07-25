@@ -25,7 +25,7 @@ QuantaTray.exe
 接続ごとに：
 
 ```json
-{"method":"initialize","id":1,"params":{"clientInfo":{"name":"quantatray","title":"QuantaTray","version":"0.1.2"}}}
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"quantatray","title":"QuantaTray","version":"0.1.3"}}}
 {"method":"initialized","params":{}}
 ```
 

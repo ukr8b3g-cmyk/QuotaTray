@@ -62,13 +62,13 @@ ARM64は有効化前に明示テストを追加する。
 
 ## 5. Release命名
 
-Tag：`v0.1.2`
+Tag：`v0.1.3`
 
 Assets：
 
 ```text
-QuantaTray-v0.1.2-win-x64-setup.exe
-QuantaTray-v0.1.2-win-x64-portable.zip
+QuantaTray-v0.1.3-win-x64-setup.exe
+QuantaTray-v0.1.3-win-x64-portable.zip
 SHA256SUMS.txt
 ```
 

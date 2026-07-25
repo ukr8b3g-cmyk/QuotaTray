@@ -268,6 +268,83 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
+    public void ClickThroughMiniCanBeShownWithoutActivation()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var form = new MiniForm(localizer);
+            form.SetClickThrough(true);
+
+            form.Show();
+            form.EnsureVisibleWithoutActivation(alwaysOnTop: false);
+            Application.DoEvents();
+
+            var style = GetWindowLongPtr(form.Handle, -20).ToInt64();
+            Assert.True(form.Visible);
+            Assert.NotEqual(0, style & 0x20L);
+        });
+    }
+
+    [Fact]
+    public void ClickThroughMiniSurvivesThreeAppearanceRebuilds()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            MiniForm? form = null;
+            try
+            {
+                foreach (var accent in new[] { "blue", "purple", "green" })
+                {
+                    form?.Hide();
+                    form?.Dispose();
+                    Theme.Configure("dark", accent);
+                    form = new MiniForm(localizer);
+                    form.SetClickThrough(true);
+                    form.Show();
+                    form.EnsureVisibleWithoutActivation(alwaysOnTop: false);
+                    Application.DoEvents();
+
+                    Assert.True(form.Visible);
+                    Assert.False(form.IsDisposed);
+                }
+            }
+            finally
+            {
+                form?.Dispose();
+            }
+        });
+    }
+
+    [Fact]
+    public void ClickThroughMiniRemainsVisibleAfterSettingsCloses()
+    {
+        RunSta(() =>
+        {
+            var appSettings = new AppSettings();
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(appSettings.Language);
+            using var mini = new MiniForm(localizer);
+            using var settings = new SettingsForm(appSettings, localizer);
+            mini.SetClickThrough(true);
+            mini.Show();
+            mini.EnsureVisibleWithoutActivation(alwaysOnTop: false);
+            settings.FormClosed += (_, _) =>
+                mini.EnsureVisibleWithoutActivation(alwaysOnTop: false);
+            settings.Show();
+
+            settings.Close();
+            Application.DoEvents();
+
+            Assert.True(mini.Visible);
+            Assert.False(mini.IsDisposed);
+        });
+    }
+
+    [Fact]
     public void MiniViewDoubleClickRequestsCompactView()
     {
         RunSta(() =>
@@ -539,7 +616,7 @@ public sealed class RuntimeAppearanceTests
                 Mode = "manual",
                 Locale = "en-US",
             });
-            using var form = new AboutForm(localizer, "0.1.2");
+            using var form = new AboutForm(localizer, "0.1.3");
             var repository = Descendants(form).OfType<LinkLabel>().Single();
 
             Assert.Contains("ukr8b3g-cmyk/QuotaTray", repository.Text);

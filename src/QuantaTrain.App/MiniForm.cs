@@ -12,6 +12,8 @@ internal sealed class MiniForm : FramelessForm
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
+    private const uint SwpShowWindow = 0x0040;
+    private static readonly nint HwndTopMost = new(-1);
 
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
@@ -148,6 +150,31 @@ internal sealed class MiniForm : FramelessForm
         _clickThrough = enabled;
         _clickThroughItem.Checked = enabled;
         ApplyClickThrough();
+    }
+
+    /// <summary>
+    /// Makes a click-through mini panel visible without taking keyboard focus.
+    /// This is required because a WS_EX_TRANSPARENT window cannot be activated
+    /// normally, and Show() alone can leave it behind the active application.
+    /// </summary>
+    public void EnsureVisibleWithoutActivation(bool alwaysOnTop)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        _ = Handle;
+        SetWindowPos(
+            Handle,
+            alwaysOnTop ? HwndTopMost : nint.Zero,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoActivate | SwpShowWindow | SwpFrameChanged);
+        Invalidate(true);
+        Update();
     }
 
     protected override bool CanDrag => _canDrag() && !_clickThrough;
