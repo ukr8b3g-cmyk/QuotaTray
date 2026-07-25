@@ -1,8 +1,8 @@
-# QuantaTrain repository instructions
+# QuantaTray repository instructions
 
 ## Mission
 
-Implement and release QuantaTrain, a lightweight Windows tray monitor that displays OpenAI Codex weekly quota remaining, reset time, reset-credit metadata, and locally inferred reset history.
+Implement and release QuantaTray, a lightweight Windows tray monitor that displays OpenAI Codex weekly quota remaining, reset time, reset-credit metadata, and locally inferred reset history.
 
 ## Source of truth
 
@@ -17,7 +17,7 @@ When generated mockups disagree with written specifications, the written specifi
 
 ## Non-negotiable requirements
 
-- Product name is `QuantaTrain` / `クオンタトレイン`.
+- Product name is `QuantaTray` / `クオンタトレイ`.
 - Target Windows with C# and .NET 10 LTS using Windows Forms.
 - Do not use Electron, WebView, a browser-embedded UI, or a local HTTP listener.
 - Use `codex app-server` over local stdio JSONL only.

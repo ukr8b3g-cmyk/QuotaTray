@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Renamed the product, executable, and release assets from QuantaTrain to QuantaTray.
+- Fixed shutdown deadlock that could leave an invisible process blocking relaunch.
+- Added an explicit detailed-to-compact view control and reduced both panel sizes.
+- Made the recent reset history card grow only as entries are added.
 - Keep compact and detailed panels open until their close button is pressed.
 - Continue Codex CLI discovery past inaccessible PATH entries.
 - Detect the official per-user standalone Codex CLI package cache.

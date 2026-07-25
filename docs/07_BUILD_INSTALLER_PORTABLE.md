@@ -3,8 +3,8 @@
 ## 1. 必須成果物
 
 ```text
-QuantaTrain-v0.1.0-win-x64-setup.exe
-QuantaTrain-v0.1.0-win-x64-portable.zip
+QuantaTray-v0.1.1-win-x64-setup.exe
+QuantaTray-v0.1.1-win-x64-portable.zip
 SHA256SUMS.txt
 ```
 
@@ -43,7 +43,7 @@ dotnet publish src/QuantaTrain.App/QuantaTrain.App.csproj `
 Inno Setupを使用。
 
 - per-user
-- `%LOCALAPPDATA%\Programs\QuantaTrain`
+- `%LOCALAPPDATA%\Programs\QuantaTray`
 - 管理者権限不要
 - Start Menuショートカット
 - アンインストーラー
@@ -65,7 +65,7 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Run
 内容：
 
 ```text
-QuantaTrain.exe
+QuantaTray.exe
 portable.flag
 data/
 README.txt

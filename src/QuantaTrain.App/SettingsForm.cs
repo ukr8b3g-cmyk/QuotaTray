@@ -29,10 +29,10 @@ internal sealed class SettingsForm : FramelessForm
     {
         _settings = settings;
         _localizer = localizer;
-        Text = $"{_localizer.Text("Common.Settings")} — QuantaTrain";
+        Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
         ClientSize = new Size(448, 570);
         StartPosition = FormStartPosition.CenterScreen;
-        AccessibleName = "QuantaTrain settings";
+        AccessibleName = "QuantaTray settings";
 
         var title = UiFactory.Label(
             _localizer.Text("Common.Settings"),
@@ -326,13 +326,13 @@ internal sealed class SettingsForm : FramelessForm
         page.Controls.Add(PageTitle(_localizer.Text("Settings.About")));
         page.Controls.Add(
             UiFactory.Label(
-                "QuantaTrain",
+                "QuantaTray",
                 new Point(0, 56),
                 12F,
                 FontStyle.Bold));
         page.Controls.Add(
             UiFactory.Label(
-                "Version 0.1.0",
+                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.1"}",
                 new Point(0, 86),
                 8.7F,
                 FontStyle.Regular,

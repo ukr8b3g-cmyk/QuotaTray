@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $assets = Get-ChildItem -LiteralPath $DistPath -File |
-    Where-Object { $_.Name -match '^QuantaTrain-v.+-win-x64-(setup\.exe|portable\.zip)$' } |
+    Where-Object { $_.Name -match '^QuantaTray-v.+-win-x64-(setup\.exe|portable\.zip)$' } |
     Sort-Object Name
 if ($assets.Count -ne 2) {
     throw "Expected setup and portable assets; found $($assets.Count)."

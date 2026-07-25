@@ -4,11 +4,11 @@
 
 ## 要約
 
-QuantaTrainはローカル中心の読み取り専用アプリです。開発者運営サーバー、テレメトリー、広告、利用解析はありません。Codex利用枠を取得するため、OpenAI公式Codex App Serverを介してOpenAI/ChatGPTへ通信します。
+QuantaTrayはローカル中心の読み取り専用アプリです。開発者運営サーバー、テレメトリー、広告、利用解析はありません。Codex利用枠を取得するため、OpenAI公式Codex App Serverを介してOpenAI/ChatGPTへ通信します。
 
-## QuantaTrainが取得・保存しない情報
+## QuantaTrayが取得・保存しない情報
 
-QuantaTrainは次の情報を独自に取得、保存、収集、外部送信しません。
+QuantaTrayは次の情報を独自に取得、保存、収集、外部送信しません。
 
 - ChatGPT/OpenAIのパスワード
 - ブラウザCookie、保存パスワード、閲覧履歴
@@ -21,21 +21,21 @@ QuantaTrainは次の情報を独自に取得、保存、収集、外部送信し
 
 ## 認証
 
-QuantaTrainはOpenAI公式Codex App Serverに認証状態の確認を依頼します。既存のCodex認証キャッシュが有効な場合、App Serverがその認証を再利用します。未認証の場合はOpenAI公式ブラウザログインを開始します。
+QuantaTrayはOpenAI公式Codex App Serverに認証状態の確認を依頼します。既存のCodex認証キャッシュが有効な場合、App Serverがその認証を再利用します。未認証の場合はOpenAI公式ブラウザログインを開始します。
 
-QuantaTrain自身が `auth.json`、OS資格情報ストア、Chrome/Edge等のCookieやパスワードを直接読み取ることはありません。
+QuantaTray自身が `auth.json`、OS資格情報ストア、Chrome/Edge等のCookieやパスワードを直接読み取ることはありません。
 
 ## 通信
 
 通常動作の通信経路：
 
 ```text
-QuantaTrain
+QuantaTray
   └─ ローカルstdio JSONL → codex app-server
        └─ HTTPS → OpenAI / ChatGPT
 ```
 
-QuantaTrainには開発者運営のAPI、テレメトリー送信先、広告サーバーはありません。Codex、ChatGPT、ドキュメント、GitHub Release等の外部リンクはユーザー操作時だけ既定ブラウザで開きます。
+QuantaTrayには開発者運営のAPI、テレメトリー送信先、広告サーバーはありません。Codex、ChatGPT、ドキュメント、GitHub Release等の外部リンクはユーザー操作時だけ既定ブラウザで開きます。
 
 将来、自動更新確認やクラッシュ送信を追加する場合は、実装前に本方針と設定画面を更新し、初期OFFまたは明示同意方式にします。
 
@@ -51,7 +51,7 @@ QuantaTrainには開発者運営のAPI、テレメトリー送信先、広告サ
 
 ## 保存場所
 
-- インストーラー版：`%LOCALAPPDATA%\QuantaTrain\`
+- インストーラー版：`%LOCALAPPDATA%\QuantaTray\`
 - ポータブル版：アプリフォルダー内の `data\`
 
 ## 保持と削除
@@ -60,7 +60,7 @@ QuantaTrainには開発者運営のAPI、テレメトリー送信先、広告サ
 
 ## 予定外リセットの推定
 
-OpenAIから理由が返されない場合、QuantaTrainは残量、予定リセット、リセット券件数等の変化から「予定外リセット候補」を推定します。この分類はローカル処理であり、OpenAIによる実行を断定するものではありません。
+OpenAIから理由が返されない場合、QuantaTrayは残量、予定リセット、リセット券件数等の変化から「予定外リセット候補」を推定します。この分類はローカル処理であり、OpenAIによる実行を断定するものではありません。
 
 ## 問い合わせ
 

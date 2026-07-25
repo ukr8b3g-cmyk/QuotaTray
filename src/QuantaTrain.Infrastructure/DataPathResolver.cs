@@ -14,11 +14,15 @@ public static class DataPathResolver
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationDirectory);
         var portable = File.Exists(Path.Combine(applicationDirectory, "portable.flag"));
+        var localAppData = Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData);
+        var currentRoot = Path.Combine(localAppData, "QuantaTray");
+        var legacyRoot = Path.Combine(localAppData, "QuantaTrain");
         var root = portable
             ? Path.Combine(applicationDirectory, "data")
-            : Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "QuantaTrain");
+            : Directory.Exists(currentRoot) || !Directory.Exists(legacyRoot)
+                ? currentRoot
+                : legacyRoot;
 
         EnsureWritable(root, portable);
         var history = Path.Combine(root, "history");

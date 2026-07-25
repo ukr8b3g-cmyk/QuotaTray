@@ -2,12 +2,12 @@
 
 ## 1. 前提
 
-QuantaTrainはOpenAI公式Codex App Serverのアカウント系メソッドだけを使う。Codexの会話、スレッド、コマンド実行、プロジェクトファイルは扱わない。
+QuantaTrayはOpenAI公式Codex App Serverのアカウント系メソッドだけを使う。Codexの会話、スレッド、コマンド実行、プロジェクトファイルは扱わない。
 
 ## 2. プロセス構成
 
 ```text
-QuantaTrain.exe
+QuantaTray.exe
   └─ child process: codex.exe app-server
        stdin/stdout: JSONL
        stderr: bounded redacted diagnostics
@@ -25,7 +25,7 @@ QuantaTrain.exe
 接続ごとに：
 
 ```json
-{"method":"initialize","id":1,"params":{"clientInfo":{"name":"quantatrain","title":"QuantaTrain","version":"0.1.0"}}}
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"quantatray","title":"QuantaTray","version":"0.1.1"}}}
 {"method":"initialized","params":{}}
 ```
 
@@ -53,7 +53,7 @@ QuantaTrain.exe
 ## 6. Codex実行ファイル探索
 
 1. 設定画面の明示パス
-2. `QUANTATRAIN_CODEX_PATH`
+2. `QUANTATRAY_CODEX_PATH`
 3. `PATH` の `codex.exe`
 4. `%USERPROFILE%\.codex\packages\standalone\releases\*\bin\codex.exe`
 5. 公式インストール方法で作成されるその他の安全に確認可能なユーザー領域
@@ -78,14 +78,14 @@ PATH上に存在してもアクセス拒否や起動不能となる候補はス�
 6. `account/login/completed` と `account/updated` を待つ
 7. 成功後に `account/rateLimits/read`
 
-ブラウザ側で既にChatGPTへログイン済みなら、ブラウザ自身のセッションにより入力が減る場合がある。QuantaTrainがそのCookieを読むわけではない。
+ブラウザ側で既にChatGPTへログイン済みなら、ブラウザ自身のセッションにより入力が減る場合がある。QuantaTrayがそのCookieを読むわけではない。
 
 ## 8. 認証キャッシュ再利用
 
-- QuantaTrainは通常の環境変数を継承し、`CODEX_HOME` を勝手に変更しない。
+- QuantaTrayは通常の環境変数を継承し、`CODEX_HOME` を勝手に変更しない。
 - Codex CLI/App Serverが管理する既存キャッシュを利用させる。
 - `auth.json` やOS資格情報ストアはApp Serverの責任範囲。
-- QuantaTrainの設定・履歴へ認証情報を複製しない。
+- QuantaTrayの設定・履歴へ認証情報を複製しない。
 
 ## 9. エラー処理
 
@@ -101,7 +101,7 @@ PATH上に存在してもアクセス拒否や起動不能となる候補はス�
 通常ログに記録可能：
 
 - 時刻
-- QuantaTrainバージョン
+- QuantaTrayバージョン
 - Codexバージョン
 - メソッド名
 - 成否

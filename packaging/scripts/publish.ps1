@@ -40,16 +40,16 @@ if ($LASTEXITCODE -ne 0) {
 
 New-Item -ItemType Directory -Path (Join-Path $portable 'data') -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $portable 'data\README.txt') `
-    -Value 'QuantaTrain stores portable settings, history, and redacted logs in this folder.' `
+    -Value 'QuantaTray stores portable settings, history, and redacted logs in this folder.' `
     -Encoding utf8
-Copy-Item -LiteralPath (Join-Path $publish 'QuantaTrain.exe') -Destination $portable
+Copy-Item -LiteralPath (Join-Path $publish 'QuantaTray.exe') -Destination $portable
 Copy-Item -LiteralPath (Join-Path $publish 'locales') -Destination $portable -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'packaging\README-portable.txt') -Destination (Join-Path $portable 'README.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination (Join-Path $portable 'LICENSE.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'THIRD-PARTY-NOTICES.md') -Destination (Join-Path $portable 'THIRD-PARTY-NOTICES.txt')
 New-Item -ItemType File -Path (Join-Path $portable 'portable.flag') -Force | Out-Null
 
-$zip = Join-Path $dist "QuantaTrain-v$Version-win-x64-portable.zip"
+$zip = Join-Path $dist "QuantaTray-v$Version-win-x64-portable.zip"
 if (Test-Path -LiteralPath $zip) {
     Remove-Item -LiteralPath $zip -Force
 }

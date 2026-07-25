@@ -37,10 +37,17 @@ public static class CodexLocator
             yield return Path.GetFullPath(explicitPath);
         }
 
-        var environmentPath = Environment.GetEnvironmentVariable("QUANTATRAIN_CODEX_PATH");
-        if (!string.IsNullOrWhiteSpace(environmentPath))
+        foreach (var variableName in new[]
+                 {
+                     "QUANTATRAY_CODEX_PATH",
+                     "QUANTATRAIN_CODEX_PATH",
+                 })
         {
-            yield return Path.GetFullPath(environmentPath);
+            var environmentPath = Environment.GetEnvironmentVariable(variableName);
+            if (!string.IsNullOrWhiteSpace(environmentPath))
+            {
+                yield return Path.GetFullPath(environmentPath);
+            }
         }
 
         var path = Environment.GetEnvironmentVariable("PATH");

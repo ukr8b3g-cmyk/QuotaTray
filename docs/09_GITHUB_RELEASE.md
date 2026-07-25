@@ -18,7 +18,7 @@
 ## 2. 推奨ブランチ
 
 ```text
-feat/initial-quantatrain
+feat/initial-quantatray
 ```
 
 ## 3. 初回コミット構成
@@ -62,13 +62,13 @@ ARM64は有効化前に明示テストを追加する。
 
 ## 5. Release命名
 
-Tag：`v0.1.0`
+Tag：`v0.1.1`
 
 Assets：
 
 ```text
-QuantaTrain-v0.1.0-win-x64-setup.exe
-QuantaTrain-v0.1.0-win-x64-portable.zip
+QuantaTray-v0.1.1-win-x64-setup.exe
+QuantaTray-v0.1.1-win-x64-portable.zip
 SHA256SUMS.txt
 ```
 

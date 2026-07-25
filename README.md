@@ -1,24 +1,24 @@
-# QuantaTrain
+# QuantaTray
 
-[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-portable.zip)
+[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-portable.zip)
 
 OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常駐モニターです。
 
-![QuantaTrainの3画面](assets/mockup_three_views.png)
+![QuantaTrayの3画面](assets/mockup_three_views.png)
 
 > 画像はUI構成を示すモックアップです。表示内容はCodex App Serverから取得できる情報によって変わります。
 
 ## ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
 
 ## 概要
 
-QuantaTrainは、公式Codex App Serverの読み取り専用APIを使用し、次の情報を表示します。
+QuantaTrayは、公式Codex App Serverの読み取り専用APIを使用し、次の情報を表示します。
 
 - 週間利用枠の残量、次回リセット時刻、カウントダウン
 - リセット券の件数と有効期限（取得できる場合）
@@ -35,28 +35,28 @@ QuantaTrainは、公式Codex App Serverの読み取り専用APIを使用し、�
 - Codexを利用できるChatGPTアカウント
 - インターネット接続
 
-QuantaTrainがバックグラウンドで `codex app-server --stdio` を起動するため、Codexデスクトップ画面を開いておく必要はありません。`codex.exe` を自動検出できない場合は、設定画面でパスを指定できます。
+QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動するため、Codexデスクトップ画面を開いておく必要はありません。`codex.exe` を自動検出できない場合は、設定画面でパスを指定できます。
 
 ## インストール方法
 
 ### Installer版
 
-1. `QuantaTrain-v0.1.0-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.1.1-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行し、画面の案内に従います。
-3. 更新インストール時は、常駐中のQuantaTrainが自動的に終了します。
-4. インストール後、QuantaTrainがタスクトレイに常駐します。
+3. 更新インストール時は、常駐中のQuantaTrayが自動的に終了します。
+4. インストール後、QuantaTrayがタスクトレイに常駐します。
 
 インストール先：
 
 ```text
-%LOCALAPPDATA%\Programs\QuantaTrain\
+%LOCALAPPDATA%\Programs\QuantaTray\
 ```
 
 ### Portable ZIP版
 
-1. `QuantaTrain-v0.1.0-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.1.1-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
-3. `QuantaTrain.exe` を実行します。
+3. `QuantaTray.exe` を実行します。
 
 設定、履歴、ログは展開先の `data` フォルダーへ保存されます。ZIP内から直接実行しないでください。
 
@@ -76,7 +76,7 @@ QuantaTrainがバックグラウンドで `codex app-server --stdio` を起動�
 
 ## 認証とプライバシー
 
-QuantaTrainはCodex App Serverへローカルstdioで接続します。OpenAIへの通信はCodex App Serverが行います。
+QuantaTrayはCodex App Serverへローカルstdioで接続します。OpenAIへの通信はCodex App Serverが行います。
 
 - ブラウザCookie、保存パスワード、Codex認証ファイルを直接読み取りません
 - パスワード、アクセストークン、会話内容、プロジェクトファイルを収集しません
@@ -90,7 +90,7 @@ QuantaTrainはCodex App Serverへローカルstdioで接続します。OpenAIへ
 Installer版：
 
 ```text
-%LOCALAPPDATA%\QuantaTrain\
+%LOCALAPPDATA%\QuantaTray\
 ```
 
 Portable版：
@@ -122,11 +122,11 @@ Portable版：
 
 ### Codexが見つからない
 
-`codex --version` が実行できることを確認してください。QuantaTrainはPATHに加え、公式のユーザー別standalone配置（`%USERPROFILE%\.codex\packages\standalone\releases\`）も自動探索します。必要に応じて、設定画面の「接続」で `codex.exe` のパスを指定します。
+`codex --version` が実行できることを確認してください。QuantaTrayはPATHに加え、公式のユーザー別standalone配置（`%USERPROFILE%\.codex\packages\standalone\releases\`）も自動探索します。必要に応じて、設定画面の「接続」で `codex.exe` のパスを指定します。
 
 ### 表示が100%と実際の残量の間で変わる
 
-v0.1.0の最新ビルドでは、複数の7日枠が返された場合も同じ枠を決定的に選択します。古いセットアップを使用している場合は最新版で上書きしてください。
+v0.1.1では製品名をQuantaTrayへ修正し、終了後に非表示プロセスが残って再起動を妨げる問題を修正しました。既存のQuantaTrain v0.1.0から更新する場合も、最新版のセットアップを実行してください。
 
 ## 開発
 
@@ -146,19 +146,19 @@ OpenAI、ChatGPT、Codexは各権利者の商標です。
 
 ## English
 
-QuantaTrain is an unofficial Windows system-tray monitor for viewing your Codex usage limits.
+QuantaTray is an unofficial Windows system-tray monitor for viewing your Codex usage limits.
 
 ## Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTrain-v0.1.0-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.1-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the SHA-256 value against the release checksum file.
 
 ## What it shows
 
-QuantaTrain uses the read-only API provided by the official Codex App Server to display:
+QuantaTray uses the read-only API provided by the official Codex App Server to display:
 
 - Weekly remaining allowance, next reset time, and countdown
 - Reset-credit count and expiry dates when available
@@ -166,7 +166,7 @@ QuantaTrain uses the read-only API provided by the official Codex App Server to 
 - Codex plan and connection status
 - Automatic polling every 60 seconds and manual refresh
 
-QuantaTrain is not an official OpenAI product and is not endorsed, sponsored, or warranted by OpenAI.
+QuantaTray is not an official OpenAI product and is not endorsed, sponsored, or warranted by OpenAI.
 
 ## Requirements
 
@@ -175,28 +175,28 @@ QuantaTrain is not an official OpenAI product and is not endorsed, sponsored, or
 - A ChatGPT account with access to Codex
 - Internet connection
 
-QuantaTrain launches `codex app-server --stdio` in the background, so the Codex desktop window does not need to remain open. If `codex.exe` cannot be detected automatically, select it in Settings.
+QuantaTray launches `codex app-server --stdio` in the background, so the Codex desktop window does not need to remain open. If `codex.exe` cannot be detected automatically, select it in Settings.
 
 ## Installation
 
 ### Installer
 
-1. Download `QuantaTrain-v0.1.0-win-x64-setup.exe`.
+1. Download `QuantaTray-v0.1.1-win-x64-setup.exe`.
 2. Run Setup and follow the prompts.
-3. During an upgrade, Setup automatically closes the running QuantaTrain process.
-4. QuantaTrain starts in the system tray after installation.
+3. During an upgrade, Setup automatically closes the running QuantaTray process.
+4. QuantaTray starts in the system tray after installation.
 
 Install location:
 
 ```text
-%LOCALAPPDATA%\Programs\QuantaTrain\
+%LOCALAPPDATA%\Programs\QuantaTray\
 ```
 
 ### Portable ZIP
 
-1. Download `QuantaTrain-v0.1.0-win-x64-portable.zip`.
+1. Download `QuantaTray-v0.1.1-win-x64-portable.zip`.
 2. Extract the entire archive to a writable folder.
-3. Run `QuantaTrain.exe`.
+3. Run `QuantaTray.exe`.
 
 Settings, history, and logs are stored in the extracted `data` folder. Do not run the application directly from inside the ZIP archive.
 
@@ -216,7 +216,7 @@ The app shows “Updating…” at startup and fills in the values after its fir
 
 ## Authentication and privacy
 
-QuantaTrain communicates with Codex App Server over local stdio. Codex App Server handles communication with OpenAI.
+QuantaTray communicates with Codex App Server over local stdio. Codex App Server handles communication with OpenAI.
 
 - It does not directly read browser cookies, saved passwords, or Codex authentication files.
 - It does not collect passwords, access tokens, conversations, or project files.
@@ -230,7 +230,7 @@ See [PRIVACY.md](PRIVACY.md) for details.
 Installed mode:
 
 ```text
-%LOCALAPPDATA%\QuantaTrain\
+%LOCALAPPDATA%\QuantaTray\
 ```
 
 Portable mode:
@@ -247,7 +247,7 @@ Japanese, English, Simplified Chinese, Traditional Chinese, Korean, German, Fren
 
 ## Current limitations
 
-- QuantaTrain does not invent a value when App Server does not return a weekly window.
+- QuantaTray does not invent a value when App Server does not return a weekly window.
 - Only the reset-credit count is shown when individual credit details are unavailable.
 - Reset reasons are not provided, so history classifications are inferences from observed values.
 - Position locking, position memory, edge snapping, and theme switching are incomplete in the initial release.
@@ -262,11 +262,11 @@ The first connection can take some time. Check the connection status in the deta
 
 ### Codex is not found
 
-Confirm that `codex --version` works. QuantaTrain searches PATH and the official per-user standalone location under `%USERPROFILE%\.codex\packages\standalone\releases\`. If needed, select the `codex.exe` path under Settings → Connection.
+Confirm that `codex --version` works. QuantaTray searches PATH and the official per-user standalone location under `%USERPROFILE%\.codex\packages\standalone\releases\`. If needed, select the `codex.exe` path under Settings → Connection.
 
 ### The value switches between 100% and the actual remaining amount
 
-The latest v0.1.0 build deterministically selects the same limit when App Server returns multiple seven-day windows. Install the latest Setup over older test builds.
+Version 0.1.1 corrects the product name to QuantaTray and fixes an invisible process that could remain after Exit and block relaunch. Run the latest Setup to upgrade from QuantaTrain v0.1.0.
 
 ## Development
 

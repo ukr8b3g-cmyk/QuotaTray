@@ -26,14 +26,14 @@ internal sealed class DetailForm : FramelessForm
     public DetailForm(LocalizationService localizer)
     {
         _localizer = localizer;
-        Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTrain";
+        Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTray";
         ClientSize = new Size(260, BaseClientHeight);
         StartPosition = FormStartPosition.Manual;
-        AccessibleName = "QuantaTrain detailed quota panel";
+        AccessibleName = "QuantaTray detailed quota panel";
 
         var brand = UiFactory.BrandIcon(new Point(12, 11), 22);
         var title = UiFactory.Label(
-            "QuantaTrain",
+            "QuantaTray",
             new Point(41, 10),
             10F,
             FontStyle.Bold);

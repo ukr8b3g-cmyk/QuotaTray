@@ -17,14 +17,14 @@ internal sealed class CompactForm : FramelessForm
     public CompactForm(LocalizationService localizer)
     {
         _localizer = localizer;
-        Text = "QuantaTrain";
+        Text = "QuantaTray";
         ClientSize = new Size(240, 175);
         StartPosition = FormStartPosition.Manual;
-        AccessibleName = "QuantaTrain compact quota panel";
+        AccessibleName = "QuantaTray compact quota panel";
 
         var brand = UiFactory.BrandIcon(new Point(13, 12), 22);
         var title = UiFactory.Label(
-            "QuantaTrain",
+            "QuantaTray",
             new Point(42, 11),
             10F,
             FontStyle.Bold);

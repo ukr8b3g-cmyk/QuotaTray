@@ -77,7 +77,7 @@
 
 ## 7. 情報
 
-- QuantaTrainバージョン
+- QuantaTrayバージョン
 - ライセンス
 - PRIVACY
 - GitHub Releaseを開く

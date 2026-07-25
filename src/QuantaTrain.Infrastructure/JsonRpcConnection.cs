@@ -89,8 +89,8 @@ public sealed class JsonRpcConnection : IAsyncDisposable
                 {
                     clientInfo = new
                     {
-                        name = "quantatrain",
-                        title = "QuantaTrain",
+                        name = "quantatray",
+                        title = "QuantaTray",
                         version = clientVersion,
                     },
                     capabilities = new { experimentalApi = false },

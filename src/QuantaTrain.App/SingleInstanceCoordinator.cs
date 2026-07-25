@@ -30,9 +30,9 @@ internal sealed class SingleInstanceCoordinator : IDisposable
         var user = new string(Environment.UserName
             .Where(character => char.IsLetterOrDigit(character))
             .ToArray());
-        var name = $"Local\\QuantaTrain-{user}";
+        var name = $"Local\\QuantaTray-{user}";
         var mutex = new Mutex(initiallyOwned: true, name, out var createdNew);
-        return new SingleInstanceCoordinator(mutex, createdNew, $"QuantaTrain-{user}");
+        return new SingleInstanceCoordinator(mutex, createdNew, $"QuantaTray-{user}");
     }
 
     public bool ConsumeActivationRequest() =>

@@ -4,10 +4,10 @@ handoff:
   status: "approved-design-for-implementation"
 
 product:
-  display_name: "QuantaTrain"
-  japanese_name: "クオンタトレイン"
-  executable_name: "QuantaTrain.exe"
-  repository_slug_suggestion: "quantatrain"
+  display_name: "QuantaTray"
+  japanese_name: "クオンタトレイ"
+  executable_name: "QuantaTray.exe"
+  repository_slug_suggestion: "quantatray"
   description: "Unofficial local usage monitor for OpenAI Codex"
   affiliation_notice: "Unofficial; not affiliated with or endorsed by OpenAI."
 
@@ -40,7 +40,7 @@ codex_integration:
   transport: "stdio JSONL"
   websocket: false
   experimental_api: false
-  initialize_client_name: "quantatrain"
+  initialize_client_name: "quantatray"
   methods_used:
     - "account/read"
     - "account/login/start"
@@ -143,12 +143,12 @@ privacy:
 
 release_assets:
   required:
-    - "QuantaTrain-v<version>-win-x64-setup.exe"
-    - "QuantaTrain-v<version>-win-x64-portable.zip"
+    - "QuantaTray-v<version>-win-x64-setup.exe"
+    - "QuantaTray-v<version>-win-x64-portable.zip"
     - "SHA256SUMS.txt"
   optional:
-    - "QuantaTrain-v<version>-win-arm64-setup.exe"
-    - "QuantaTrain-v<version>-win-arm64-portable.zip"
+    - "QuantaTray-v<version>-win-arm64-setup.exe"
+    - "QuantaTray-v<version>-win-arm64-portable.zip"
 
 out_of_scope_v1:
   - "Consuming reset credits"

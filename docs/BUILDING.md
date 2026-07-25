@@ -1,4 +1,4 @@
-# Building QuantaTrain
+# Building QuantaTray
 
 ## Requirements
 
@@ -18,14 +18,14 @@ dotnet test QuantaTrain.slnx -c Release --no-build
 ## Build release assets
 
 ```powershell
-.\packaging\scripts\build-release.ps1 -Version 0.1.0
+.\packaging\scripts\build-release.ps1 -Version 0.1.1
 ```
 
 Outputs:
 
 ```text
-dist/QuantaTrain-v0.1.0-win-x64-setup.exe
-dist/QuantaTrain-v0.1.0-win-x64-portable.zip
+dist/QuantaTray-v0.1.1-win-x64-setup.exe
+dist/QuantaTray-v0.1.1-win-x64-portable.zip
 dist/SHA256SUMS.txt
 ```
 

@@ -6,6 +6,9 @@ namespace QuantaTrain.App;
 
 internal sealed class QuantaTrainContext : ApplicationContext
 {
+    private static readonly string ProductVersion =
+        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.1";
+
     private static readonly TimeSpan[] RestartBackoff =
     [
         TimeSpan.FromMinutes(1),
@@ -55,7 +58,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _notifyIcon = new NotifyIcon
         {
             Icon = IconFactory.Create(null),
-            Text = "QuantaTrain",
+            Text = "QuantaTray",
             Visible = true,
             ContextMenuStrip = BuildMenu(),
         };
@@ -142,8 +145,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _localizer.Text("Settings.About"),
             null,
             (_, _) => MessageBox.Show(
-                "QuantaTrain 0.1.0\nUnofficial; not affiliated with OpenAI.",
-                "QuantaTrain",
+                $"QuantaTray {ProductVersion}\nUnofficial; not affiliated with OpenAI.",
+                "QuantaTray",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information));
         menu.Items.Add(new ToolStripSeparator());
@@ -215,7 +218,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 UpdateViews(null, false, _localizer.Text("Connection.CodexNotFound"));
                 _notifyIcon.ShowBalloonTip(
                     5000,
-                    "QuantaTrain",
+                    "QuantaTray",
                     _localizer.Text("Connection.CodexNotFound"),
                     ToolTipIcon.Warning);
                 return;
@@ -223,7 +226,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
             _connection = await JsonRpcConnection.StartAsync(
                 _codex.ExecutablePath,
-                "0.1.0",
+                ProductVersion,
                 cancellationToken);
             _connection.Exited += HandleConnectionExited;
             _accountClient = new CodexAccountClient(_connection, _codex.Version);
@@ -336,7 +339,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             _notifyIcon.ShowBalloonTip(
                 5000,
-                "QuantaTrain",
+                "QuantaTray",
                 resetEvent.Classification.ToString(),
                 ToolTipIcon.Info);
         }
@@ -489,7 +492,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             await _logger.WarningAsync(exception.Message, CancellationToken.None);
             MessageBox.Show(
                 Redaction.Redact(exception.Message),
-                "QuantaTrain",
+                "QuantaTray",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
@@ -562,7 +565,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             StartupRegistration.SetEnabled(
                 _settings.General.LaunchAtStartup,
                 Environment.ProcessPath
-                    ?? Path.Combine(AppContext.BaseDirectory, "QuantaTrain.exe"));
+                    ?? Path.Combine(AppContext.BaseDirectory, "QuantaTray.exe"));
         }
         catch (Exception exception)
         {
@@ -599,7 +602,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         if (_polling is not null)
         {
             _polling.StateChanged -= HandlePollingStateChanged;
-            await _polling.DisposeAsync();
+            await _polling.DisposeAsync().ConfigureAwait(false);
             _polling = null;
         }
         if (_accountClient is not null)
@@ -611,7 +614,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         if (_connection is not null)
         {
             _connection.Exited -= HandleConnectionExited;
-            await _connection.DisposeAsync();
+            await _connection.DisposeAsync().ConfigureAwait(false);
             _connection = null;
         }
     }

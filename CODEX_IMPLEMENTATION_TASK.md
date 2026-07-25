@@ -2,10 +2,10 @@
 
 ## ゴール
 
-QuantaTrainの初回公開版を実装し、次の成果物を生成できる状態にしてください。
+QuantaTrayの初回公開版を実装し、次の成果物を生成できる状態にしてください。
 
-- `QuantaTrain-v<version>-win-x64-setup.exe`
-- `QuantaTrain-v<version>-win-x64-portable.zip`
+- `QuantaTray-v<version>-win-x64-setup.exe`
+- `QuantaTray-v<version>-win-x64-portable.zip`
 - `SHA256SUMS.txt`
 - GitHub用README、PRIVACY、CHANGELOG、ライセンス、Release Notes
 
@@ -59,14 +59,14 @@ docs/
 
 - 実行ファイル探索順：
   1. ユーザー設定の明示パス
-  2. `QUANTATRAIN_CODEX_PATH`
+  2. `QUANTATRAY_CODEX_PATH`
   3. `PATH` 上の `codex.exe`
   4. 公式インストーラーで使われる既知のユーザー領域（安全に確認できる範囲のみ）
 - Microsoft Storeの保護された`WindowsApps`内部を直接探索・コピーしない。
 - 見つからない場合は、公式インストール案内を開くボタンを表示する。
 - `codex app-server` を非表示子プロセスとして1回起動し、stdio JSONL接続を維持する。
 - 起動直後に `initialize`、成功後に `initialized`。
-- `clientInfo.name = "quantatrain"`、titleとversionも送る。
+- `clientInfo.name = "quantatray"`、titleとversionも送る。
 - 通常利用で会話スレッドを作成しない。
 - App Server終了時は指数バックオフで再起動し、再起動回数を制限する。
 - アプリ終了時はstdinを閉じ、短時間待機後に残存プロセスだけ終了する。
@@ -141,7 +141,7 @@ docs/
 - インストーラー：Inno Setup、per-user、管理者権限不要。
 - ポータブルZIP：`portable.flag` と `data/` を含める。
 - スタートアップ登録は初期OFF、設定からHKCUへ登録・解除する。
-- インストーラー版の設定は `%LOCALAPPDATA%\QuantaTrain`。
+- インストーラー版の設定は `%LOCALAPPDATA%\QuantaTray`。
 - ポータブル版は原則 `./data`。書き込み不可なら無断で別場所へ移さず、選択を促す。
 - x86版は作らない。
 - ARM64はx64合格後、Codex CLI/App Server互換性を実機または公式ランナーで確認できた場合だけ追加する。

@@ -21,7 +21,7 @@ public sealed class RedactedLogger
             RotateIfNeeded();
             var line = $"{DateTimeOffset.UtcNow:O} WARN {Redaction.Redact(message)}{Environment.NewLine}";
             await File.AppendAllTextAsync(
-                Path.Combine(_directory, "quantatrain.log"),
+                Path.Combine(_directory, "quantatray.log"),
                 line,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -33,7 +33,7 @@ public sealed class RedactedLogger
 
     private void RotateIfNeeded()
     {
-        var current = Path.Combine(_directory, "quantatrain.log");
+        var current = Path.Combine(_directory, "quantatray.log");
         if (!File.Exists(current) || new FileInfo(current).Length < MaximumFileBytes)
         {
             return;
@@ -41,13 +41,13 @@ public sealed class RedactedLogger
 
         for (var index = MaximumFiles - 1; index >= 1; index--)
         {
-            var source = Path.Combine(_directory, $"quantatrain.{index}.log");
-            var destination = Path.Combine(_directory, $"quantatrain.{index + 1}.log");
+            var source = Path.Combine(_directory, $"quantatray.{index}.log");
+            var destination = Path.Combine(_directory, $"quantatray.{index + 1}.log");
             if (File.Exists(source))
             {
                 File.Move(source, destination, overwrite: true);
             }
         }
-        File.Move(current, Path.Combine(_directory, "quantatrain.1.log"), overwrite: true);
+        File.Move(current, Path.Combine(_directory, "quantatray.1.log"), overwrite: true);
     }
 }

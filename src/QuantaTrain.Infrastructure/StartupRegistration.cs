@@ -5,7 +5,8 @@ namespace QuantaTrain.Infrastructure;
 public static class StartupRegistration
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "QuantaTrain";
+    private const string ValueName = "QuantaTray";
+    private const string LegacyValueName = "QuantaTrain";
 
     public static void SetEnabled(bool enabled, string executablePath)
     {
@@ -16,6 +17,7 @@ public static class StartupRegistration
 
         using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true)
             ?? throw new InvalidOperationException("Windows startup key is unavailable.");
+        key.DeleteValue(LegacyValueName, throwOnMissingValue: false);
         if (enabled)
         {
             key.SetValue(ValueName, $"\"{executablePath}\" --background", RegistryValueKind.String);

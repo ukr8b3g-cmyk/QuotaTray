@@ -49,7 +49,8 @@ public sealed class JsonlHistoryStore
             after = ToStoredState(resetEvent.After),
             reasonCodes = resetEvent.ReasonCodes.Take(20),
             confirmed = resetEvent.Confirmed,
-            appVersion = "0.1.0",
+            appVersion =
+                typeof(JsonlHistoryStore).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
             codexVersion = resetEvent.After.CodexVersion,
         };
 

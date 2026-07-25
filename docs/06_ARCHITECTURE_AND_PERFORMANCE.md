@@ -67,7 +67,7 @@ QuantaTrain.Infrastructure
 - 履歴一覧はページングまたは仮想表示。全履歴を常時メモリへ載せない
 - ログ表示も末尾限定
 
-App Serverは別プロセスとして計測し、QuantaTrain本体のリークと混同しない。
+App Serverは別プロセスとして計測し、QuantaTray本体のリークと混同しない。
 
 ## 6. CPU・I/O
 
