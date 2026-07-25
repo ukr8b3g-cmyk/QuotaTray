@@ -31,8 +31,8 @@ jobs:
         with:
           name: release-win-x64
           path: |
-            dist/QuantaTrain-v*-win-x64-setup.exe
-            dist/QuantaTrain-v*-win-x64-portable.zip
+            dist/QuantaTray-v*-win-x64-setup.exe
+            dist/QuantaTray-v*-win-x64-portable.zip
             dist/SHA256SUMS.txt
       - name: Create draft GitHub Release
         shell: pwsh
@@ -41,8 +41,8 @@ jobs:
         run: |
           gh release create '${{ github.ref_name }}' `
             --draft `
-            --title 'QuantaTrain ${{ github.ref_name }}' `
+            --title 'QuantaTray ${{ github.ref_name }}' `
             --notes-file RELEASE_NOTES.md `
-            dist/QuantaTrain-v*-win-x64-setup.exe `
-            dist/QuantaTrain-v*-win-x64-portable.zip `
+            dist/QuantaTray-v*-win-x64-setup.exe `
+            dist/QuantaTray-v*-win-x64-portable.zip `
             dist/SHA256SUMS.txt
