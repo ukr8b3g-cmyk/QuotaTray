@@ -4,6 +4,10 @@ namespace QuantaTrain.App;
 
 internal sealed class DetailForm : FramelessForm
 {
+    private const int BaseClientHeight = 504;
+    private const int HistoryRowHeight = 24;
+    private const int MaxVisibleHistoryRows = 3;
+
     private readonly LocalizationService _localizer;
     private readonly RoundedPanel _quotaCard = new();
     private readonly Label _remainingPrefix = new();
@@ -13,7 +17,9 @@ internal sealed class DetailForm : FramelessForm
     private readonly Label _countdown;
     private readonly Label _credits;
     private readonly FlowLayoutPanel _creditExpirations = new();
+    private readonly RoundedPanel _historyCard = new();
     private readonly FlowLayoutPanel _history = new();
+    private readonly RoundedPanel _infoCard = new();
     private readonly Label _plan;
     private readonly Label _connection;
 
@@ -21,71 +27,82 @@ internal sealed class DetailForm : FramelessForm
     {
         _localizer = localizer;
         Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTrain";
-        ClientSize = new Size(354, 636);
+        ClientSize = new Size(260, BaseClientHeight);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTrain detailed quota panel";
 
-        var brand = UiFactory.BrandIcon(new Point(14, 15), 25);
+        var brand = UiFactory.BrandIcon(new Point(12, 11), 22);
         var title = UiFactory.Label(
             "QuantaTrain",
-            new Point(47, 15),
-            11F,
+            new Point(41, 10),
+            10F,
             FontStyle.Bold);
-        title.Size = new Size(176, 28);
+        title.Size = new Size(88, 25);
         title.AutoSize = false;
         title.TextAlign = ContentAlignment.MiddleLeft;
 
         var refresh = HeaderButton(
             FluentSymbol.Refresh,
             _localizer.Text("Common.Refresh"),
-            248);
+            131);
         refresh.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
+        var compact = HeaderButton(
+            FluentSymbol.Compact,
+            _localizer.Text("Menu.ShowCompact"),
+            160);
+        compact.Click += (_, _) => CompactRequested?.Invoke(this, EventArgs.Empty);
         var settings = HeaderButton(
             FluentSymbol.Settings,
             _localizer.Text("Common.Settings"),
-            281);
+            189);
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var close = HeaderButton(
             FluentSymbol.Close,
             _localizer.Text("Common.Close"),
-            314);
+            220);
         close.Click += (_, _) => Hide();
 
-        _quotaCard.Bounds = new Rectangle(12, 56, 330, 133);
+        _quotaCard.Bounds = new Rectangle(10, 48, 240, 133);
         var quotaHeading = UiFactory.Label(
             _localizer.Text("Quota.Weekly"),
-            new Point(12, 13),
-            10F,
+            new Point(10, 11),
+            8.7F,
             FontStyle.Bold);
         _remainingPrefix.AutoSize = true;
-        _remainingPrefix.Font = Theme.Ui(8.5F);
+        _remainingPrefix.Font = Theme.Ui(7.8F);
         _remainingPrefix.ForeColor = Theme.Text;
         _remainingPrefix.BackColor = Color.Transparent;
         _remainingPercent.AutoSize = true;
-        _remainingPercent.Font = Theme.Ui(16F, FontStyle.Bold);
+        _remainingPercent.Font = Theme.Ui(14F, FontStyle.Bold);
         _remainingPercent.ForeColor = Theme.Subtle;
         _remainingPercent.BackColor = Color.Transparent;
         _remainingPercent.Text = "—";
-        _progress.Bounds = new Rectangle(12, 55, 306, 12);
-        _reset = UiFactory.Label(string.Empty, new Point(12, 82), 8.7F);
-        _countdown = UiFactory.Label(string.Empty, new Point(86, 105), 8.7F);
+        _progress.Bounds = new Rectangle(10, 51, 220, 10);
+        _reset = UiFactory.Label(string.Empty, new Point(10, 76), 7.8F);
+        _reset.AutoSize = false;
+        _reset.Size = new Size(220, 17);
+        _reset.AutoEllipsis = true;
+        _countdown = UiFactory.Label(string.Empty, new Point(10, 99), 7.8F);
+        _countdown.AutoSize = false;
+        _countdown.Size = new Size(220, 17);
+        _countdown.TextAlign = ContentAlignment.TopCenter;
         _quotaCard.Controls.AddRange(
         [
             quotaHeading, _remainingPrefix, _remainingPercent,
             _progress, _reset, _countdown,
         ]);
 
-        var creditsCard = new RoundedPanel { Bounds = new Rectangle(12, 198, 330, 113) };
+        var creditsCard = new RoundedPanel { Bounds = new Rectangle(10, 189, 240, 110) };
         var creditsHeading = UiFactory.Label(
             _localizer.Text("Credits.Title"),
-            new Point(12, 12),
-            10F,
+            new Point(10, 10),
+            8.7F,
             FontStyle.Bold);
-        _credits = UiFactory.Label(string.Empty, new Point(222, 13), 9F);
-        _credits.Size = new Size(96, 22);
+        _credits = UiFactory.Label(string.Empty, new Point(148, 11), 8F);
+        _credits.Size = new Size(82, 20);
         _credits.AutoSize = false;
         _credits.TextAlign = ContentAlignment.TopRight;
-        _creditExpirations.Bounds = new Rectangle(12, 42, 306, 60);
+        _creditExpirations.Bounds = new Rectangle(10, 37, 220, 62);
         _creditExpirations.FlowDirection = FlowDirection.TopDown;
         _creditExpirations.WrapContents = false;
         _creditExpirations.AutoScroll = false;
@@ -93,47 +110,53 @@ internal sealed class DetailForm : FramelessForm
         _creditExpirations.Margin = Padding.Empty;
         creditsCard.Controls.AddRange([creditsHeading, _credits, _creditExpirations]);
 
-        var historyCard = new RoundedPanel { Bounds = new Rectangle(12, 320, 330, 194) };
+        _historyCard.Bounds = new Rectangle(10, 307, 240, 78);
         var historyHeading = UiFactory.Label(
             _localizer.Text("History.Title"),
-            new Point(12, 12),
-            10F,
+            new Point(10, 10),
+            8.7F,
             FontStyle.Bold);
         var historyLink = UiFactory.Label(
             _localizer.Text("History.ShowAll"),
-            new Point(244, 13),
-            8.5F,
+            new Point(160, 11),
+            7.8F,
             FontStyle.Regular,
             Theme.Blue);
-        historyLink.Size = new Size(74, 20);
+        historyLink.Size = new Size(70, 18);
         historyLink.AutoSize = false;
         historyLink.TextAlign = ContentAlignment.TopRight;
-        _history.Bounds = new Rectangle(12, 41, 306, 141);
+        _history.Bounds = new Rectangle(10, 38, 220, 30);
         _history.FlowDirection = FlowDirection.TopDown;
         _history.WrapContents = false;
         _history.AutoScroll = true;
         _history.BackColor = Theme.Surface;
-        historyCard.Controls.AddRange([historyHeading, historyLink, _history]);
+        _historyCard.Controls.AddRange([historyHeading, historyLink, _history]);
 
-        var infoCard = new RoundedPanel { Bounds = new Rectangle(12, 523, 330, 101) };
+        _infoCard.Bounds = new Rectangle(10, 393, 240, 101);
         var infoHeading = UiFactory.Label(
             _localizer.Text("Detail.OtherInformation"),
-            new Point(12, 11),
-            10F,
+            new Point(10, 10),
+            8.7F,
             FontStyle.Bold);
-        _plan = UiFactory.Label(string.Empty, new Point(12, 43), 8.7F);
+        _plan = UiFactory.Label(string.Empty, new Point(10, 39), 7.8F);
+        _plan.AutoSize = false;
+        _plan.Size = new Size(220, 18);
+        _plan.AutoEllipsis = true;
         _connection = UiFactory.Label(
             string.Empty,
-            new Point(12, 69),
-            8.4F,
+            new Point(10, 66),
+            7.6F,
             FontStyle.Regular,
             Theme.Muted);
-        infoCard.Controls.AddRange([infoHeading, _plan, _connection]);
+        _connection.AutoSize = false;
+        _connection.Size = new Size(220, 18);
+        _connection.AutoEllipsis = true;
+        _infoCard.Controls.AddRange([infoHeading, _plan, _connection]);
 
         Controls.AddRange(
         [
-            brand, title, refresh, settings, close,
-            _quotaCard, creditsCard, historyCard, infoCard,
+            brand, title, refresh, compact, settings, close,
+            _quotaCard, creditsCard, _historyCard, _infoCard,
         ]);
         MakeDraggable(this);
         MakeDraggable(brand);
@@ -208,7 +231,8 @@ internal sealed class DetailForm : FramelessForm
             _history,
             history.Count == 0 ? [_localizer.Text("History.Empty")] : history,
             history.Count == 0 ? Theme.Muted : Theme.Text,
-            rowHeight: 39);
+            rowHeight: HistoryRowHeight);
+        AdjustHistoryLayout(history.Count);
 
         _connection.Text = updating
             ? _localizer.Text("Status.Updating")
@@ -228,7 +252,7 @@ internal sealed class DetailForm : FramelessForm
         new(symbol)
         {
             AccessibleName = accessibleName,
-            Bounds = new Rectangle(x, 12, 30, 32),
+            Bounds = new Rectangle(x, 8, 28, 30),
         };
 
     private void ShowEmptyRows()
@@ -242,7 +266,8 @@ internal sealed class DetailForm : FramelessForm
             _history,
             [_localizer.Text("History.Empty")],
             Theme.Muted,
-            rowHeight: 39);
+            rowHeight: HistoryRowHeight);
+        AdjustHistoryLayout(0);
         _plan.Text = _localizer.Text("Detail.Plan", "—");
         _connection.Text = _localizer.Text("Status.Stale");
     }
@@ -251,7 +276,7 @@ internal sealed class DetailForm : FramelessForm
         FlowLayoutPanel panel,
         IEnumerable<string> values,
         Color color,
-        int rowHeight = 24)
+        int rowHeight = 22)
     {
         panel.SuspendLayout();
         panel.Controls.Clear();
@@ -260,7 +285,7 @@ internal sealed class DetailForm : FramelessForm
             var label = new Label
             {
                 Text = value,
-                Font = Theme.Ui(8.5F),
+                Font = Theme.Ui(7.7F),
                 ForeColor = color,
                 BackColor = Theme.Surface,
                 Margin = Padding.Empty,
@@ -273,14 +298,24 @@ internal sealed class DetailForm : FramelessForm
         panel.ResumeLayout();
     }
 
+    private void AdjustHistoryLayout(int historyCount)
+    {
+        var visibleRows = Math.Clamp(historyCount, 1, MaxVisibleHistoryRows);
+        var extraHeight = (visibleRows - 1) * HistoryRowHeight;
+        _historyCard.Height = 78 + extraHeight;
+        _history.Height = 30 + extraHeight;
+        _infoCard.Top = 393 + extraHeight;
+        ClientSize = new Size(260, BaseClientHeight + extraHeight);
+    }
+
     private void AlignRemaining()
     {
         _remainingPercent.Location = new Point(
             _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 12,
-            9);
+            5);
         _remainingPrefix.Location = new Point(
             _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
-            18);
+            14);
     }
 
     private string RemainingPrefix(int value)

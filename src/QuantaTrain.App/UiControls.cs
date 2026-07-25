@@ -8,6 +8,7 @@ internal static class FluentSymbol
 {
     public const string More = "\uE712";
     public const string Refresh = "\uE72C";
+    public const string Compact = "\uE73F";
     public const string Settings = "\uE713";
     public const string Close = "\uE8BB";
     public const string General = "\uE713";

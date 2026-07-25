@@ -18,66 +18,75 @@ internal sealed class CompactForm : FramelessForm
     {
         _localizer = localizer;
         Text = "QuantaTrain";
-        ClientSize = new Size(322, 214);
+        ClientSize = new Size(240, 175);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTrain compact quota panel";
 
-        var brand = UiFactory.BrandIcon(new Point(16, 16), 25);
+        var brand = UiFactory.BrandIcon(new Point(13, 12), 22);
         var title = UiFactory.Label(
             "QuantaTrain",
-            new Point(49, 16),
-            11F,
+            new Point(42, 11),
+            10F,
             FontStyle.Bold);
-        title.Size = new Size(158, 27);
+        title.Size = new Size(116, 25);
         title.AutoSize = false;
         title.TextAlign = ContentAlignment.MiddleLeft;
 
         var more = new IconButton(FluentSymbol.More)
         {
             AccessibleName = _localizer.Text("Common.Settings"),
-            Bounds = new Rectangle(247, 12, 31, 32),
+            Bounds = new Rectangle(167, 8, 29, 30),
         };
         var close = new IconButton(FluentSymbol.Close)
         {
             AccessibleName = _localizer.Text("Common.Close"),
-            Bounds = new Rectangle(282, 12, 30, 32),
+            Bounds = new Rectangle(201, 8, 29, 30),
         };
         close.Click += (_, _) => Hide();
 
         var menu = BuildCompactMenu();
         more.Click += (_, _) => menu.Show(more, new Point(-100, more.Height + 2));
 
-        _quotaCard.Bounds = new Rectangle(12, 55, 298, 147);
+        _quotaCard.Bounds = new Rectangle(10, 48, 220, 117);
         var weekly = UiFactory.Label(
             _localizer.Text("Quota.Weekly"),
-            new Point(13, 14),
-            10F,
+            new Point(10, 10),
+            8.7F,
             FontStyle.Bold);
 
         _remainingPrefix.AutoSize = true;
-        _remainingPrefix.Font = Theme.Ui(8.5F);
+        _remainingPrefix.Font = Theme.Ui(7.8F);
         _remainingPrefix.ForeColor = Theme.Text;
         _remainingPrefix.BackColor = Color.Transparent;
 
         _remainingPercent.AutoSize = true;
-        _remainingPercent.Font = Theme.Ui(16F, FontStyle.Bold);
+        _remainingPercent.Font = Theme.Ui(14F, FontStyle.Bold);
         _remainingPercent.ForeColor = Theme.Subtle;
         _remainingPercent.BackColor = Color.Transparent;
         _remainingPercent.Text = "—";
 
-        _progress.Bounds = new Rectangle(13, 57, 272, 12);
-        _reset = UiFactory.Label(string.Empty, new Point(13, 86), 8.7F);
-        _countdown = UiFactory.Label(string.Empty, new Point(109, 111), 8.7F);
+        _progress.Bounds = new Rectangle(10, 43, 200, 10);
+        _reset = UiFactory.Label(string.Empty, new Point(10, 63), 7.8F);
+        _reset.AutoSize = false;
+        _reset.Size = new Size(200, 17);
+        _reset.AutoEllipsis = true;
+        _countdown = UiFactory.Label(string.Empty, new Point(10, 81), 7.8F);
+        _countdown.AutoSize = false;
+        _countdown.Size = new Size(200, 16);
+        _countdown.TextAlign = ContentAlignment.TopCenter;
         _status = UiFactory.Label(
             string.Empty,
-            new Point(13, 120),
-            8F,
+            new Point(10, 99),
+            7.2F,
             FontStyle.Regular,
             Theme.Muted);
+        _status.AutoSize = false;
+        _status.Size = new Size(200, 14);
+        _status.AutoEllipsis = true;
 
         _signIn = UiFactory.TextButton(
             _localizer.Text("Auth.SignIn"),
-            new Rectangle(135, 105, 150, 29),
+            new Rectangle(10, 67, 200, 29),
             primary: true);
         _signIn.Visible = false;
         _signIn.Click += (_, _) => SignInRequested?.Invoke(this, EventArgs.Empty);
@@ -105,6 +114,7 @@ internal sealed class CompactForm : FramelessForm
     public void SetSignedIn(bool signedIn)
     {
         _signIn.Visible = !signedIn;
+        _reset.Visible = signedIn;
         _countdown.Visible = signedIn;
     }
 
@@ -144,9 +154,6 @@ internal sealed class CompactForm : FramelessForm
             : error is not null
                 ? _localizer.Text("Status.Failed")
                 : string.Empty;
-        _status.Location = _countdown.Text.Length == 0
-            ? new Point(13, 112)
-            : new Point(13, 126);
         AlignRemaining();
     }
 
@@ -185,10 +192,10 @@ internal sealed class CompactForm : FramelessForm
     {
         _remainingPercent.Location = new Point(
             _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
-            10);
+            5);
         _remainingPrefix.Location = new Point(
             _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
-            19);
+            14);
     }
 
     private string RemainingPrefix(int value)
