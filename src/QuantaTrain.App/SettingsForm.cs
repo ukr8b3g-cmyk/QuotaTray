@@ -1,3 +1,4 @@
+using System.Text.Json;
 using QuantaTrain.Core;
 
 namespace QuantaTrain.App;
@@ -10,21 +11,36 @@ internal enum SettingsPreviewKind
     Appearance,
 }
 
+internal sealed class UsageExportRequestedEventArgs(string format)
+    : EventArgs
+{
+    public string Format { get; } = format;
+}
+
+internal sealed class OpenDocumentRequestedEventArgs(string fileName)
+    : EventArgs
+{
+    public string FileName { get; } = fileName;
+}
+
 internal sealed class SettingsPreviewChangedEventArgs(SettingsPreviewKind kind)
     : EventArgs
 {
     public SettingsPreviewKind Kind { get; } = kind;
 }
 
-internal sealed class SettingsForm : FramelessForm
+internal sealed class SettingsForm : FixedWidthResizableForm
 {
     private readonly AppSettings _settings;
+    private readonly AppSettings _originalSettings;
     private readonly LocalizationService _localizer;
     private readonly Panel _contentHost = new();
     private readonly List<NavButton> _navButtons = [];
     private readonly List<Panel> _pages = [];
 
     private readonly ToggleSwitch _launchAtStartup = new();
+    private readonly ToggleSwitch _refreshOnOpen = new();
+    private readonly ToggleSwitch _showCachedOnFailure = new();
     private readonly ComboBox _startupMode = new();
     private readonly ComboBox _refreshInterval = new();
     private readonly ComboBox _theme = new();
@@ -36,12 +52,50 @@ internal sealed class SettingsForm : FramelessForm
     private readonly ToggleSwitch _rememberPosition = new();
     private readonly ToggleSwitch _snapToEdge = new();
     private readonly ToggleSwitch _miniClickThrough = new();
+    private readonly ToggleSwitch _rememberDetailHeight = new();
+    private readonly ToggleSwitch _rememberSettingsHeight = new();
     private readonly ComboBox _displayMode = new();
     private readonly NumericUpDown _historyDays = new();
+    private readonly ComboBox _retention = new();
     private readonly TextBox _codexPath = new();
+    private readonly ToggleSwitch _scheduledResetNotification = new();
+    private readonly ToggleSwitch _remaining30Notification = new();
+    private readonly ToggleSwitch _remaining10Notification = new();
+    private readonly ToggleSwitch _unexpectedResetNotification = new();
+    private readonly ToggleSwitch _creditExpiryNotification = new();
+    private readonly ToggleSwitch _connectionFailureNotification = new();
+    private readonly ToggleSwitch _storeQuotaState = new();
+    private readonly ToggleSwitch _detectRecovery = new();
+    private readonly ToggleSwitch _confirmRecovery = new();
+    private readonly NumericUpDown _recentHistoryCount = new();
+    private readonly ToggleSwitch _usageEnabled = new();
+    private readonly ToggleSwitch _includeArchives = new();
+    private readonly ToggleSwitch _collectModel = new();
+    private readonly ToggleSwitch _collectReasoning = new();
+    private readonly ToggleSwitch _collectTier = new();
+    private readonly ToggleSwitch _collectTokens = new();
+    private readonly ToggleSwitch _collectElapsed = new();
+    private readonly ToggleSwitch _collectTurns = new();
+    private readonly ComboBox _usagePeriod = new();
+    private readonly ComboBox _usageMetric = new();
+    private readonly ComboBox _chartStyle = new();
+    private readonly ComboBox _sortOrder = new();
+    private readonly ComboBox _numberFormat = new();
+    private readonly NumericUpDown _maximumModels = new();
+    private readonly ToggleSwitch _showElapsed = new();
+    private readonly ToggleSwitch _showTurns = new();
+    private readonly ToggleSwitch _showReasoning = new();
+    private readonly ToggleSwitch _showTier = new();
+    private readonly ToggleSwitch _groupOtherModels = new();
+    private readonly ToggleSwitch _usageEstimate = new();
+    private readonly ComboBox _logRetention = new();
+    private readonly ComboBox _codexPathMode = new();
+    private readonly Label _connectionStatus = new();
+    private readonly Label _usageScanStatus = new();
     private readonly string _initialDisplayMode;
     private string _accent = "green";
     private bool _loadingControls;
+    private bool _saved;
 
     public SettingsForm(
         AppSettings settings,
@@ -50,68 +104,91 @@ internal sealed class SettingsForm : FramelessForm
         string initialDisplayMode = "compact")
     {
         _settings = settings;
+        _originalSettings = settings.Clone();
         _localizer = localizer;
         _initialDisplayMode = initialDisplayMode;
         Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
-        ClientSize = new Size(448, 570);
+        ConfigureFixedLogicalWidth(800, 600, 520);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray settings";
 
         var title = UiFactory.Label(
             _localizer.Text("Common.Settings"),
-            new Point(18, 14),
+            new Point(22, 14),
             10F,
             FontStyle.Bold);
-        title.Size = new Size(200, 28);
+        title.Size = new Size(400, 28);
         title.AutoSize = false;
         title.TextAlign = ContentAlignment.MiddleLeft;
 
         var closeIcon = new IconButton(FluentSymbol.Close)
         {
             AccessibleName = _localizer.Text("Common.Close"),
-            Bounds = new Rectangle(407, 10, 31, 32),
+            Bounds = new Rectangle(755, 10, 31, 32),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
         closeIcon.Click += (_, _) => Close();
 
         var sidebar = new Panel
         {
-            Bounds = new Rectangle(10, 55, 116, 448),
+            Bounds = new Rectangle(14, 55, 190, 478),
             BackColor = Theme.Window,
+            Anchor = AnchorStyles.Left | AnchorStyles.Top |
+                AnchorStyles.Bottom,
         };
         var divider = new Panel
         {
-            Bounds = new Rectangle(128, 55, 1, 448),
+            Bounds = new Rectangle(210, 55, 1, 478),
             BackColor = Theme.Border,
+            Anchor = AnchorStyles.Left | AnchorStyles.Top |
+                AnchorStyles.Bottom,
         };
-        _contentHost.Bounds = new Rectangle(143, 55, 293, 448);
+        _contentHost.Bounds = new Rectangle(228, 55, 552, 478);
         _contentHost.BackColor = Theme.Window;
+        _contentHost.Anchor = AnchorStyles.Left | AnchorStyles.Top |
+            AnchorStyles.Right | AnchorStyles.Bottom;
 
         AddNav(sidebar, FluentSymbol.General, _localizer.Text("Settings.General"), 0);
         AddNav(sidebar, FluentSymbol.Display, _localizer.Text("Settings.Display"), 1);
         AddNav(sidebar, FluentSymbol.Language, _localizer.Text("Settings.Language"), 2);
         AddNav(sidebar, FluentSymbol.Notification, _localizer.Text("Settings.Notifications"), 3);
-        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.History"), 4);
-        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.Connection"), 5);
-        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.About"), 6);
+        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.Connection"), 4);
+        AddNav(sidebar, FluentSymbol.Refresh, _localizer.Text("Settings.QuotaReset"), 5);
+        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.HistoryData"), 6);
+        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.UsageAcquisition"), 7);
+        AddNav(sidebar, FluentSymbol.Display, _localizer.Text("Settings.UsageDisplay"), 8);
+        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.UsageEstimates"), 9);
+        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.Backup"), 10);
+        AddNav(sidebar, FluentSymbol.Settings, _localizer.Text("Settings.Advanced"), 11);
+        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.About"), 12);
 
         _pages.Add(BuildGeneralPage());
         _pages.Add(BuildDisplayPage());
         _pages.Add(BuildLanguagePage());
         _pages.Add(BuildNotificationsPage());
-        _pages.Add(BuildHistoryPage());
         _pages.Add(BuildConnectionPage());
+        _pages.Add(BuildQuotaResetPage());
+        _pages.Add(BuildHistoryPage());
+        _pages.Add(BuildUsageAcquisitionPage());
+        _pages.Add(BuildUsageDisplayPage());
+        _pages.Add(BuildUsageEstimatePage());
+        _pages.Add(BuildBackupPage());
+        _pages.Add(BuildAdvancedPage());
         _pages.Add(BuildAboutPage());
         _contentHost.Controls.AddRange([.. _pages]);
 
         var footerLine = new Panel
         {
-            Bounds = new Rectangle(0, 510, 448, 1),
+            Bounds = new Rectangle(0, 541, 800, 1),
             BackColor = Theme.Border,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right |
+                AnchorStyles.Bottom,
         };
         var defaults = UiFactory.TextButton(
             _localizer.Text("Settings.RestoreDefaults"),
-            new Rectangle(17, 526, 174, 30),
+            new Rectangle(18, 555, 174, 32),
             danger: true);
+        defaults.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
         defaults.Click += (_, _) =>
         {
             if (MessageBox.Show(
@@ -130,13 +207,21 @@ internal sealed class SettingsForm : FramelessForm
             NotifyPreviewChanged(SettingsPreviewKind.Appearance);
         };
 
+        var cancel = UiFactory.TextButton(
+            _localizer.Text("Common.Cancel"),
+            new Rectangle(570, 555, 96, 32));
+        cancel.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+        cancel.Click += (_, _) => Close();
+
         var done = UiFactory.TextButton(
-            _localizer.Text("Common.Close"),
-            new Rectangle(326, 526, 104, 30),
+            _localizer.Text("Common.Save"),
+            new Rectangle(680, 555, 102, 32),
             primary: true);
+        done.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         done.Click += (_, _) =>
         {
             ApplyControls();
+            _saved = true;
             SettingsSaved?.Invoke(this, EventArgs.Empty);
             Close();
         };
@@ -144,7 +229,7 @@ internal sealed class SettingsForm : FramelessForm
         Controls.AddRange(
         [
             title, closeIcon, sidebar, divider, _contentHost,
-            footerLine, defaults, done,
+            footerLine, defaults, cancel, done,
         ]);
         AcceptButton = done;
         MakeDraggable(this);
@@ -159,12 +244,33 @@ internal sealed class SettingsForm : FramelessForm
     public event EventHandler<SettingsPreviewChangedEventArgs>? SettingsPreviewChanged;
     public event EventHandler? PositionResetRequested;
     public event EventHandler? AllSettingsResetRequested;
+    public event EventHandler? UsageRescanRequested;
+    public event EventHandler? UsageCacheRebuildRequested;
+    public event EventHandler? ConnectionDiagnosticRequested;
+    public event EventHandler? OpenHistoryRequested;
+    public event EventHandler? HistoryExportRequested;
+    public event EventHandler<UsageExportRequestedEventArgs>? UsageExportRequested;
+    public event EventHandler? OpenLogsRequested;
+    public event EventHandler? ClearCacheRequested;
+    public event EventHandler? ReconnectRequested;
+    public event EventHandler? OpenStorageRequested;
+    public event EventHandler<OpenDocumentRequestedEventArgs>? OpenDocumentRequested;
     public string DisplayMode => _displayMode.SelectedIndex switch
     {
         0 => "mini",
         2 => "detail",
         _ => "compact",
     };
+
+    public void SetConnectionStatus(string text)
+    {
+        _connectionStatus.Text = text;
+    }
+
+    public void SetUsageScanStatus(string text)
+    {
+        _usageScanStatus.Text = text;
+    }
 
     private void AddNav(
         Control parent,
@@ -174,7 +280,7 @@ internal sealed class SettingsForm : FramelessForm
     {
         var nav = new NavButton(symbol, label)
         {
-            Bounds = new Rectangle(0, index * 37, 112, 34),
+            Bounds = new Rectangle(0, index * 36, 186, 33),
             AccessibleName = label,
         };
         nav.Click += (_, _) => SelectPage(index);
@@ -205,6 +311,16 @@ internal sealed class SettingsForm : FramelessForm
             _localizer.Text("Settings.RefreshInterval"),
             _refreshInterval,
             148);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.RefreshOnOpen"),
+            _refreshOnOpen,
+            196);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ShowCachedOnFailure"),
+            _showCachedOnFailure,
+            238);
         return page;
     }
 
@@ -231,7 +347,7 @@ internal sealed class SettingsForm : FramelessForm
         {
             var swatch = new Button
             {
-                Bounds = new Rectangle(143 + index * 25, 92, 21, 21),
+                Bounds = new Rectangle(355 + index * 28, 92, 22, 22),
                 BackColor = colors[index].Item2,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
@@ -259,8 +375,8 @@ internal sealed class SettingsForm : FramelessForm
         }
 
         page.Controls.Add(RowLabel(_localizer.Text("Settings.Opacity"), 139));
-        _opacity.Bounds = new Rectangle(135, 136, 102, 22);
-        _opacityValue.Bounds = new Rectangle(241, 137, 47, 22);
+        _opacity.Bounds = new Rectangle(350, 136, 130, 22);
+        _opacityValue.Bounds = new Rectangle(485, 137, 50, 22);
         _opacityValue.Font = Theme.Ui(8.7F);
         _opacityValue.ForeColor = Theme.Text;
         _opacityValue.TextAlign = ContentAlignment.MiddleRight;
@@ -288,6 +404,16 @@ internal sealed class SettingsForm : FramelessForm
             _localizer.Text("Settings.MiniClickThrough"),
             _miniClickThrough,
             329);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.RememberDetailHeight"),
+            _rememberDetailHeight,
+            367);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.RememberSettingsHeight"),
+            _rememberSettingsHeight,
+            405);
         _alwaysOnTop.CheckedChanged += (_, _) =>
             NotifyPreviewChanged(SettingsPreviewKind.DisplayBehavior);
         _lockPosition.CheckedChanged += (_, _) =>
@@ -312,13 +438,26 @@ internal sealed class SettingsForm : FramelessForm
             page,
             _localizer.Text("Settings.DisplayState"),
             _displayMode,
-            380);
+            447);
         var resetPosition = UiFactory.TextButton(
             _localizer.Text("Menu.ResetPosition"),
-            new Rectangle(0, 413, 270, 28));
+            new Rectangle(282, 482, 252, 28));
         resetPosition.Click += (_, _) =>
             PositionResetRequested?.Invoke(this, EventArgs.Empty);
-        page.Controls.Add(resetPosition);
+        var resetDetailHeight = UiFactory.TextButton(
+            _localizer.Text("Settings.ResetDetailHeight"),
+            new Rectangle(282, 518, 122, 28));
+        resetDetailHeight.Click += (_, _) =>
+            _settings.Display.DetailWindowHeightLogical = 600;
+        var resetSettingsHeight = UiFactory.TextButton(
+            _localizer.Text("Settings.ResetSettingsHeight"),
+            new Rectangle(412, 518, 122, 28));
+        resetSettingsHeight.Click += (_, _) =>
+            _settings.Display.SettingsWindowHeightLogical = 600;
+        page.Controls.AddRange(
+        [
+            resetPosition, resetDetailHeight, resetSettingsHeight,
+        ]);
         return page;
     }
 
@@ -332,7 +471,7 @@ internal sealed class SettingsForm : FramelessForm
                 "auto", "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
                 "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU",
             ]);
-        _locale.Bounds = new Rectangle(0, 53, 270, 29);
+        _locale.Bounds = new Rectangle(282, 53, 252, 29);
         page.Controls.Add(_locale);
         page.Controls.Add(
             UiFactory.Label(
@@ -350,21 +489,38 @@ internal sealed class SettingsForm : FramelessForm
         page.Controls.Add(PageTitle(_localizer.Text("Settings.Notifications")));
         AddToggleRow(
             page,
-            _localizer.Text("Settings.ResetNotifications"),
-            new ToggleSwitch { Checked = _settings.Notifications.ScheduledReset },
+            _localizer.Text("Settings.Remaining30Notification"),
+            _remaining30Notification,
             52);
         AddToggleRow(
             page,
-            _localizer.Text("Settings.ConnectionNotifications"),
-            new ToggleSwitch
-            {
-                Checked = _settings.Notifications.PersistentConnectionFailure,
-            },
+            _localizer.Text("Settings.Remaining10Notification"),
+            _remaining10Notification,
             92);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ResetNotifications"),
+            _scheduledResetNotification,
+            132);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.UnexpectedResetNotifications"),
+            _unexpectedResetNotification,
+            172);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.CreditExpiryNotifications"),
+            _creditExpiryNotification,
+            212);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ConnectionNotifications"),
+            _connectionFailureNotification,
+            252);
         page.Controls.Add(
             UiFactory.Label(
                 _localizer.Text("Settings.NotificationHint"),
-                new Point(0, 145),
+                new Point(0, 305),
                 8.5F,
                 FontStyle.Regular,
                 Theme.Muted));
@@ -374,15 +530,24 @@ internal sealed class SettingsForm : FramelessForm
     private Panel BuildHistoryPage()
     {
         var page = CreatePage();
-        page.Controls.Add(PageTitle(_localizer.Text("Settings.History")));
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.HistoryData")));
         page.Controls.Add(RowLabel(_localizer.Text("Settings.RetentionDays"), 55));
-        _historyDays.Bounds = new Rectangle(164, 50, 104, 27);
-        _historyDays.Minimum = 1;
-        _historyDays.Maximum = 3650;
-        _historyDays.BackColor = Theme.SurfaceRaised;
-        _historyDays.ForeColor = Theme.Text;
-        _historyDays.BorderStyle = BorderStyle.FixedSingle;
-        page.Controls.Add(_historyDays);
+        ConfigureCombo(
+            _retention,
+            [
+                _localizer.Text("Settings.Retention1Year"),
+                _localizer.Text("Settings.Retention3Years"),
+                _localizer.Text("Settings.Retention5Years"),
+                _localizer.Text("Settings.RetentionUnlimited"),
+            ]);
+        _retention.Bounds = new Rectangle(350, 50, 184, 29);
+        page.Controls.Add(_retention);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.RetentionInternalCleanup"),
+                0,
+                102,
+                534));
         return page;
     }
 
@@ -390,19 +555,290 @@ internal sealed class SettingsForm : FramelessForm
     {
         var page = CreatePage();
         page.Controls.Add(PageTitle(_localizer.Text("Settings.Connection")));
-        page.Controls.Add(RowLabel(_localizer.Text("Settings.CodexExecutable"), 54));
-        _codexPath.Bounds = new Rectangle(0, 84, 270, 28);
+        ConfigureCombo(_codexPathMode, ["auto", "manual"]);
+        _codexPathMode.SelectedIndexChanged += (_, _) =>
+            _codexPath.Enabled =
+                string.Equals(
+                    _codexPathMode.SelectedItem?.ToString(),
+                    "manual",
+                    StringComparison.Ordinal);
+        AddControlRow(
+            page,
+            _localizer.Text("Settings.CodexPathMode"),
+            _codexPathMode,
+            54);
+        page.Controls.Add(RowLabel(_localizer.Text("Settings.CodexExecutable"), 98));
+        _codexPath.Bounds = new Rectangle(0, 130, 534, 28);
         _codexPath.BackColor = Theme.SurfaceRaised;
         _codexPath.ForeColor = Theme.Text;
         _codexPath.BorderStyle = BorderStyle.FixedSingle;
         page.Controls.Add(_codexPath);
+        var diagnose = UiFactory.TextButton(
+            _localizer.Text("Settings.ConnectionDiagnostic"),
+            new Rectangle(282, 176, 252, 30));
+        diagnose.Click += (_, _) =>
+            ConnectionDiagnosticRequested?.Invoke(this, EventArgs.Empty);
+        _connectionStatus.Bounds = new Rectangle(0, 222, 534, 54);
+        _connectionStatus.Font = Theme.Ui(8.3F);
+        _connectionStatus.ForeColor = Theme.Muted;
+        _connectionStatus.BackColor = Theme.Window;
+        _connectionStatus.Text = _localizer.Text("Settings.ConnectionStatusHint");
+        page.Controls.AddRange(
+        [
+            diagnose,
+            _connectionStatus,
+            Hint(_localizer.Text("Settings.CodexPathHint"), 0, 286, 534),
+        ]);
+        return page;
+    }
+
+    private Panel BuildQuotaResetPage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.QuotaReset")));
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.StoreQuotaState"),
+            _storeQuotaState,
+            52);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.DetectUnexpectedRecovery"),
+            _detectRecovery,
+            94);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ConfirmRecovery"),
+            _confirmRecovery,
+            136);
         page.Controls.Add(
-            UiFactory.Label(
-                _localizer.Text("Settings.CodexPathHint"),
-                new Point(0, 126),
-                8.3F,
-                FontStyle.Regular,
-                Theme.Muted));
+            RowLabel(_localizer.Text("Settings.RecentHistoryCount"), 178));
+        _recentHistoryCount.Bounds = new Rectangle(450, 178, 84, 27);
+        _recentHistoryCount.Minimum = 1;
+        _recentHistoryCount.Maximum = 100;
+        _recentHistoryCount.BackColor = Theme.SurfaceRaised;
+        _recentHistoryCount.ForeColor = Theme.Text;
+        page.Controls.Add(_recentHistoryCount);
+        var openHistory = UiFactory.TextButton(
+            _localizer.Text("Settings.OpenHistory"),
+            new Rectangle(282, 222, 252, 30));
+        openHistory.Click += (_, _) =>
+            OpenHistoryRequested?.Invoke(this, EventArgs.Empty);
+        page.Controls.Add(openHistory);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.ResetReadOnlyHint"),
+                0,
+                275,
+                534));
+        return page;
+    }
+
+    private Panel BuildUsageAcquisitionPage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.UsageAcquisition")));
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.EnableUsageCollection"),
+            _usageEnabled,
+            48);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.IncludeArchives"),
+            _includeArchives,
+            84);
+        AddToggleRow(page, _localizer.Text("Settings.CollectModel"), _collectModel, 120);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.CollectReasoning"),
+            _collectReasoning,
+            156);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTier"), _collectTier, 192);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTokens"), _collectTokens, 228);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.CollectElapsed"),
+            _collectElapsed,
+            264);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTurns"), _collectTurns, 300);
+        var rescan = UiFactory.TextButton(
+            _localizer.Text("Usage.Rescan"),
+            new Rectangle(282, 344, 122, 30));
+        rescan.Click += (_, _) => UsageRescanRequested?.Invoke(this, EventArgs.Empty);
+        var rebuild = UiFactory.TextButton(
+            _localizer.Text("Settings.RebuildUsageCache"),
+            new Rectangle(412, 344, 122, 30));
+        rebuild.Click += (_, _) =>
+            UsageCacheRebuildRequested?.Invoke(this, EventArgs.Empty);
+        page.Controls.AddRange([rescan, rebuild]);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.UsageKnownRoots"),
+                0,
+                384,
+                534));
+        _usageScanStatus.Bounds = new Rectangle(0, 430, 534, 38);
+        _usageScanStatus.Font = Theme.Ui(8.3F);
+        _usageScanStatus.ForeColor = Theme.Muted;
+        _usageScanStatus.BackColor = Theme.Window;
+        _usageScanStatus.Text = _localizer.Text("Settings.UsageNotScanned");
+        page.Controls.Add(_usageScanStatus);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.UsagePrivacyReadOnly"),
+                0,
+                476,
+                534));
+        return page;
+    }
+
+    private Panel BuildUsageDisplayPage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.UsageDisplay")));
+        ConfigureCombo(_usagePeriod, ["current-window", "7-days", "30-days", "90-days"]);
+        ConfigureCombo(_usageMetric, ["total-tokens", "elapsed-time", "turn-count"]);
+        ConfigureCombo(_chartStyle, ["horizontal-bar"]);
+        ConfigureCombo(_sortOrder, ["descending", "ascending", "model"]);
+        ConfigureCombo(_numberFormat, ["grouped", "compact"]);
+        AddControlRow(page, _localizer.Text("Usage.Period"), _usagePeriod, 46);
+        AddControlRow(page, _localizer.Text("Usage.Metric"), _usageMetric, 82);
+        AddControlRow(page, _localizer.Text("Settings.ChartStyle"), _chartStyle, 118);
+        AddControlRow(page, _localizer.Text("Settings.SortOrder"), _sortOrder, 154);
+        AddControlRow(page, _localizer.Text("Settings.NumberFormat"), _numberFormat, 190);
+        page.Controls.Add(RowLabel(_localizer.Text("Settings.MaximumModels"), 226));
+        _maximumModels.Bounds = new Rectangle(450, 226, 84, 27);
+        _maximumModels.Minimum = 1;
+        _maximumModels.Maximum = 5;
+        _maximumModels.BackColor = Theme.SurfaceRaised;
+        _maximumModels.ForeColor = Theme.Text;
+        page.Controls.Add(_maximumModels);
+        AddToggleRow(page, _localizer.Text("Usage.ElapsedTime"), _showElapsed, 266);
+        AddToggleRow(page, _localizer.Text("Usage.TurnCount"), _showTurns, 302);
+        AddToggleRow(
+            page,
+            _localizer.Text("Usage.ReasoningBreakdown"),
+            _showReasoning,
+            338);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ShowTierBreakdown"),
+            _showTier,
+            374);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.GroupOtherModels"),
+            _groupOtherModels,
+            410);
+        return page;
+    }
+
+    private Panel BuildUsageEstimatePage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.UsageEstimates")));
+        _usageEstimate.Enabled = false;
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.EnableUsageEstimate"),
+            _usageEstimate,
+            52);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.EstimateUnavailable"),
+                0,
+                104,
+                534));
+        return page;
+    }
+
+    private Panel BuildBackupPage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.Backup")));
+        var export = UiFactory.TextButton(
+            _localizer.Text("Settings.ExportSettings"),
+            new Rectangle(0, 54, 250, 34));
+        export.Click += async (_, _) => await ExportSettingsAsync();
+        var import = UiFactory.TextButton(
+            _localizer.Text("Settings.ImportSettings"),
+            new Rectangle(282, 54, 252, 34));
+        import.Click += async (_, _) => await ImportSettingsAsync();
+        var history = UiFactory.TextButton(
+            _localizer.Text("Settings.ExportHistoryJson"),
+            new Rectangle(0, 100, 250, 34));
+        history.Click += (_, _) =>
+            HistoryExportRequested?.Invoke(this, EventArgs.Empty);
+        var usageJson = UiFactory.TextButton(
+            _localizer.Text("Settings.ExportUsageJson"),
+            new Rectangle(282, 100, 122, 34));
+        usageJson.Click += (_, _) =>
+            UsageExportRequested?.Invoke(
+                this,
+                new UsageExportRequestedEventArgs("json"));
+        var usageCsv = UiFactory.TextButton(
+            _localizer.Text("Settings.ExportUsageCsv"),
+            new Rectangle(412, 100, 122, 34));
+        usageCsv.Click += (_, _) =>
+            UsageExportRequested?.Invoke(
+                this,
+                new UsageExportRequestedEventArgs("csv"));
+        page.Controls.AddRange(
+        [
+            export, import, history, usageJson, usageCsv,
+        ]);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.BackupHint"),
+                0,
+                158,
+                534));
+        return page;
+    }
+
+    private Panel BuildAdvancedPage()
+    {
+        var page = CreatePage();
+        page.Controls.Add(PageTitle(_localizer.Text("Settings.Advanced")));
+        ConfigureCombo(_logRetention, [7, 14, 30, 90]);
+        AddControlRow(
+            page,
+            _localizer.Text("Settings.LogRetention"),
+            _logRetention,
+            54);
+        var logs = UiFactory.TextButton(
+            _localizer.Text("Settings.OpenLogs"),
+            new Rectangle(0, 106, 166, 32));
+        logs.Click += (_, _) => OpenLogsRequested?.Invoke(this, EventArgs.Empty);
+        var cache = UiFactory.TextButton(
+            _localizer.Text("Settings.ClearLocalCache"),
+            new Rectangle(184, 106, 166, 32),
+            danger: true);
+        cache.Click += (_, _) =>
+        {
+            if (MessageBox.Show(
+                    this,
+                    _localizer.Text("Settings.ClearCacheConfirm"),
+                    _localizer.Text("Settings.ClearLocalCache"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                ClearCacheRequested?.Invoke(this, EventArgs.Empty);
+            }
+        };
+        var reconnect = UiFactory.TextButton(
+            _localizer.Text("Settings.ReconnectAppServer"),
+            new Rectangle(368, 106, 166, 32));
+        reconnect.Click += (_, _) =>
+            ReconnectRequested?.Invoke(this, EventArgs.Empty);
+        page.Controls.AddRange([logs, cache, reconnect]);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.AdvancedHint"),
+                0,
+                160,
+                534));
         return page;
     }
 
@@ -418,7 +854,7 @@ internal sealed class SettingsForm : FramelessForm
                 FontStyle.Bold));
         page.Controls.Add(
             UiFactory.Label(
-                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.1.3"}",
+                $"Version {typeof(SettingsForm).Assembly.GetName().Version?.ToString(3) ?? "0.2.0"}",
                 new Point(0, 86),
                 8.7F,
                 FontStyle.Regular,
@@ -430,6 +866,26 @@ internal sealed class SettingsForm : FramelessForm
                 8.5F,
                 FontStyle.Regular,
                 Theme.Muted));
+        var license = UiFactory.TextButton(
+            _localizer.Text("Settings.License"),
+            new Rectangle(0, 168, 166, 32));
+        license.Click += (_, _) =>
+            OpenDocumentRequested?.Invoke(
+                this,
+                new OpenDocumentRequestedEventArgs("LICENSE"));
+        var privacy = UiFactory.TextButton(
+            _localizer.Text("Settings.Privacy"),
+            new Rectangle(184, 168, 166, 32));
+        privacy.Click += (_, _) =>
+            OpenDocumentRequested?.Invoke(
+                this,
+                new OpenDocumentRequestedEventArgs("PRIVACY.md"));
+        var storage = UiFactory.TextButton(
+            _localizer.Text("Settings.OpenStorage"),
+            new Rectangle(368, 168, 166, 32));
+        storage.Click += (_, _) =>
+            OpenStorageRequested?.Invoke(this, EventArgs.Empty);
+        page.Controls.AddRange([license, privacy, storage]);
         return page;
     }
 
@@ -445,14 +901,15 @@ internal sealed class SettingsForm : FramelessForm
 
     private static Panel CreatePage() => new()
     {
-        Bounds = new Rectangle(0, 0, 293, 448),
+        Dock = DockStyle.Fill,
         BackColor = Theme.Window,
+        AutoScroll = true,
     };
 
     private static Label PageTitle(string text)
     {
         var label = UiFactory.Label(text, new Point(0, 2), 9F, FontStyle.Bold);
-        label.Size = new Size(270, 25);
+        label.Size = new Size(534, 25);
         label.AutoSize = false;
         return label;
     }
@@ -460,7 +917,7 @@ internal sealed class SettingsForm : FramelessForm
     private static Label RowLabel(string text, int y)
     {
         var label = UiFactory.Label(text, new Point(0, y), 8.8F);
-        label.Size = new Size(142, 25);
+        label.Size = new Size(340, 25);
         label.AutoSize = false;
         label.TextAlign = ContentAlignment.MiddleLeft;
         return label;
@@ -473,7 +930,7 @@ internal sealed class SettingsForm : FramelessForm
         int y)
     {
         page.Controls.Add(RowLabel(label, y));
-        toggle.Location = new Point(230, y + 1);
+        toggle.Location = new Point(494, y + 1);
         page.Controls.Add(toggle);
     }
 
@@ -484,8 +941,21 @@ internal sealed class SettingsForm : FramelessForm
         int y)
     {
         page.Controls.Add(RowLabel(label, y));
-        control.Bounds = new Rectangle(143, y - 1, 127, 28);
+        control.Bounds = new Rectangle(350, y - 1, 184, 28);
         page.Controls.Add(control);
+    }
+
+    private static Label Hint(string text, int x, int y, int width)
+    {
+        var label = UiFactory.Label(
+            text,
+            new Point(x, y),
+            8.3F,
+            FontStyle.Regular,
+            Theme.Muted);
+        label.AutoSize = false;
+        label.Size = new Size(width, 48);
+        return label;
     }
 
     private static void ConfigureCombo(ComboBox combo, object[] items)
@@ -499,6 +969,8 @@ internal sealed class SettingsForm : FramelessForm
     {
         _loadingControls = true;
         _launchAtStartup.Checked = settings.General.LaunchAtStartup;
+        _refreshOnOpen.Checked = settings.General.RefreshOnPanelOpen;
+        _showCachedOnFailure.Checked = settings.General.ShowCachedOnFailure;
         _startupMode.SelectedItem = settings.General.StartupMode;
         _startupMode.SelectedIndex = _startupMode.SelectedIndex < 0 ? 0 : _startupMode.SelectedIndex;
         _refreshInterval.SelectedItem = settings.General.RefreshIntervalSeconds;
@@ -514,6 +986,10 @@ internal sealed class SettingsForm : FramelessForm
         _rememberPosition.Checked = settings.Display.RememberPosition;
         _snapToEdge.Checked = settings.Display.SnapToEdge;
         _miniClickThrough.Checked = settings.Display.MiniClickThrough;
+        _rememberDetailHeight.Checked =
+            settings.Display.RememberDetailHeight;
+        _rememberSettingsHeight.Checked =
+            settings.Display.RememberSettingsHeight;
         _displayMode.SelectedIndex = _initialDisplayMode.ToLowerInvariant() switch
         {
             "mini" => 0,
@@ -524,14 +1000,74 @@ internal sealed class SettingsForm : FramelessForm
             ? "auto"
             : settings.Language.Locale;
         _locale.SelectedIndex = _locale.SelectedIndex < 0 ? 0 : _locale.SelectedIndex;
-        _historyDays.Value = Math.Clamp(settings.History.RetentionDays ?? 365, 1, 3650);
+        _retention.SelectedIndex = settings.History.RetentionDays switch
+        {
+            365 => 0,
+            1825 => 2,
+            null => 3,
+            _ => 1,
+        };
         _codexPath.Text = settings.Connection.CodexExecutablePath ?? string.Empty;
+        SelectOrFirst(_codexPathMode, settings.Connection.CodexPathMode);
+        _remaining30Notification.Checked =
+            settings.Notifications.Remaining30;
+        _remaining10Notification.Checked =
+            settings.Notifications.Remaining10;
+        _scheduledResetNotification.Checked =
+            settings.Notifications.ScheduledReset;
+        _unexpectedResetNotification.Checked =
+            settings.Notifications.UnexpectedResetCandidate;
+        _creditExpiryNotification.Checked =
+            settings.Notifications.ResetCreditExpiring;
+        _connectionFailureNotification.Checked =
+            settings.Notifications.PersistentConnectionFailure;
+        _storeQuotaState.Checked = settings.ResetDetection.StoreQuotaState;
+        _detectRecovery.Checked =
+            settings.ResetDetection.DetectUnexpectedRecovery;
+        _confirmRecovery.Checked = settings.ResetDetection.ConfirmRecovery;
+        _recentHistoryCount.Value = Math.Clamp(
+            settings.ResetDetection.RecentHistoryCount,
+            1,
+            100);
+        _usageEnabled.Checked = settings.UsageAnalytics.Enabled;
+        _includeArchives.Checked =
+            settings.UsageAnalytics.IncludeArchivedSessions;
+        _collectModel.Checked = settings.UsageAnalytics.CollectModel;
+        _collectReasoning.Checked =
+            settings.UsageAnalytics.CollectReasoningEffort;
+        _collectTier.Checked = settings.UsageAnalytics.CollectServiceTier;
+        _collectTokens.Checked = settings.UsageAnalytics.CollectTokens;
+        _collectElapsed.Checked =
+            settings.UsageAnalytics.CollectElapsedTime;
+        _collectTurns.Checked = settings.UsageAnalytics.CollectTurnCount;
+        SelectOrFirst(_usagePeriod, settings.UsageAnalytics.DefaultPeriod);
+        SelectOrFirst(_usageMetric, settings.UsageAnalytics.DefaultMetric);
+        SelectOrFirst(_chartStyle, settings.UsageAnalytics.ChartStyle);
+        SelectOrFirst(_sortOrder, settings.UsageAnalytics.SortOrder);
+        SelectOrFirst(_numberFormat, settings.UsageAnalytics.NumberFormat);
+        _maximumModels.Value = Math.Clamp(
+            settings.UsageAnalytics.MaxIndividualModels,
+            1,
+            5);
+        _showElapsed.Checked = settings.UsageAnalytics.ShowElapsedTime;
+        _showTurns.Checked = settings.UsageAnalytics.ShowTurnCount;
+        _showReasoning.Checked =
+            settings.UsageAnalytics.ShowReasoningBreakdown;
+        _showTier.Checked =
+            settings.UsageAnalytics.ShowServiceTierBreakdown;
+        _groupOtherModels.Checked =
+            settings.UsageAnalytics.GroupOtherModels;
+        _usageEstimate.Checked =
+            settings.UsageAnalytics.ShowEstimatedConsumption;
+        SelectOrFirst(_logRetention, settings.Diagnostics.LogRetentionDays);
         _loadingControls = false;
     }
 
     private void ApplyControls()
     {
         _settings.General.LaunchAtStartup = _launchAtStartup.Checked;
+        _settings.General.RefreshOnPanelOpen = _refreshOnOpen.Checked;
+        _settings.General.ShowCachedOnFailure = _showCachedOnFailure.Checked;
         _settings.General.StartupMode = _startupMode.SelectedItem?.ToString() ?? "tray-only";
         _settings.General.RefreshIntervalSeconds =
             (int?)_refreshInterval.SelectedItem ?? 60;
@@ -543,29 +1079,88 @@ internal sealed class SettingsForm : FramelessForm
         _settings.Display.RememberPosition = _rememberPosition.Checked;
         _settings.Display.SnapToEdge = _snapToEdge.Checked;
         _settings.Display.MiniClickThrough = _miniClickThrough.Checked;
+        _settings.Display.RememberDetailHeight =
+            _rememberDetailHeight.Checked;
+        _settings.Display.RememberSettingsHeight =
+            _rememberSettingsHeight.Checked;
         var locale = _locale.SelectedItem?.ToString() ?? "auto";
         _settings.Language.Mode = locale == "auto" ? "auto" : "manual";
         if (locale != "auto")
         {
             _settings.Language.Locale = locale;
         }
-        _settings.History.RetentionDays = (int)_historyDays.Value;
+        _settings.History.RetentionDays = _retention.SelectedIndex switch
+        {
+            0 => 365,
+            2 => 1825,
+            3 => null,
+            _ => 1095,
+        };
         _settings.Connection.CodexExecutablePath =
             string.IsNullOrWhiteSpace(_codexPath.Text) ? null : _codexPath.Text.Trim();
         _settings.Connection.CodexPathMode =
-            _settings.Connection.CodexExecutablePath is null ? "auto" : "manual";
+            _codexPathMode.SelectedItem?.ToString() ?? "auto";
+        if (_settings.Connection.CodexPathMode == "auto")
+        {
+            _settings.Connection.CodexExecutablePath = null;
+        }
+        _settings.Notifications.Remaining30 =
+            _remaining30Notification.Checked;
+        _settings.Notifications.Remaining10 =
+            _remaining10Notification.Checked;
+        _settings.Notifications.ScheduledReset =
+            _scheduledResetNotification.Checked;
+        _settings.Notifications.UnexpectedResetCandidate =
+            _unexpectedResetNotification.Checked;
+        _settings.Notifications.ResetCreditExpiring =
+            _creditExpiryNotification.Checked;
+        _settings.Notifications.PersistentConnectionFailure =
+            _connectionFailureNotification.Checked;
+        _settings.ResetDetection.StoreQuotaState = _storeQuotaState.Checked;
+        _settings.ResetDetection.DetectUnexpectedRecovery =
+            _detectRecovery.Checked;
+        _settings.ResetDetection.ConfirmRecovery = _confirmRecovery.Checked;
+        _settings.ResetDetection.RecentHistoryCount =
+            (int)_recentHistoryCount.Value;
+        _settings.UsageAnalytics.Enabled = _usageEnabled.Checked;
+        _settings.UsageAnalytics.IncludeArchivedSessions =
+            _includeArchives.Checked;
+        _settings.UsageAnalytics.CollectModel = _collectModel.Checked;
+        _settings.UsageAnalytics.CollectReasoningEffort =
+            _collectReasoning.Checked;
+        _settings.UsageAnalytics.CollectServiceTier = _collectTier.Checked;
+        _settings.UsageAnalytics.CollectTokens = _collectTokens.Checked;
+        _settings.UsageAnalytics.CollectElapsedTime = _collectElapsed.Checked;
+        _settings.UsageAnalytics.CollectTurnCount = _collectTurns.Checked;
+        _settings.UsageAnalytics.DefaultPeriod =
+            _usagePeriod.SelectedItem?.ToString() ?? "current-window";
+        _settings.UsageAnalytics.DefaultMetric =
+            _usageMetric.SelectedItem?.ToString() ?? "total-tokens";
+        _settings.UsageAnalytics.ChartStyle =
+            _chartStyle.SelectedItem?.ToString() ?? "horizontal-bar";
+        _settings.UsageAnalytics.SortOrder =
+            _sortOrder.SelectedItem?.ToString() ?? "descending";
+        _settings.UsageAnalytics.NumberFormat =
+            _numberFormat.SelectedItem?.ToString() ?? "grouped";
+        _settings.UsageAnalytics.MaxIndividualModels =
+            (int)_maximumModels.Value;
+        _settings.UsageAnalytics.ShowElapsedTime = _showElapsed.Checked;
+        _settings.UsageAnalytics.ShowTurnCount = _showTurns.Checked;
+        _settings.UsageAnalytics.ShowReasoningBreakdown =
+            _showReasoning.Checked;
+        _settings.UsageAnalytics.ShowServiceTierBreakdown = _showTier.Checked;
+        _settings.UsageAnalytics.GroupOtherModels =
+            _groupOtherModels.Checked;
+        _settings.UsageAnalytics.ShowEstimatedConsumption =
+            _usageEstimate.Enabled && _usageEstimate.Checked;
+        _settings.Diagnostics.LogRetentionDays =
+            (int?)_logRetention.SelectedItem ?? 14;
     }
 
     private void ResetAllSettings()
     {
         var defaults = new AppSettings();
-        _settings.SchemaVersion = defaults.SchemaVersion;
-        _settings.General = defaults.General;
-        _settings.Display = defaults.Display;
-        _settings.Language = defaults.Language;
-        _settings.Notifications = defaults.Notifications;
-        _settings.History = defaults.History;
-        _settings.Connection = defaults.Connection;
+        _settings.CopyFrom(defaults);
         LoadControls(_settings);
     }
 
@@ -580,6 +1175,85 @@ internal sealed class SettingsForm : FramelessForm
         SettingsPreviewChanged?.Invoke(
             this,
             new SettingsPreviewChangedEventArgs(kind));
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs eventArgs)
+    {
+        if (!_saved)
+        {
+            _settings.CopyFrom(_originalSettings);
+            SettingsPreviewChanged?.Invoke(
+                this,
+                new SettingsPreviewChangedEventArgs(
+                    SettingsPreviewKind.Appearance));
+        }
+        base.OnFormClosed(eventArgs);
+    }
+
+    private async Task ExportSettingsAsync()
+    {
+        ApplyControls();
+        using var dialog = new SaveFileDialog
+        {
+            Title = _localizer.Text("Settings.ExportSettings"),
+            Filter = "JSON (*.json)|*.json",
+            FileName = "QuantaTray-settings.json",
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        var json = JsonSerializer.Serialize(
+            _settings,
+            new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(dialog.FileName, json);
+    }
+
+    private async Task ImportSettingsAsync()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = _localizer.Text("Settings.ImportSettings"),
+            Filter = "JSON (*.json)|*.json",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        try
+        {
+            var json = await File.ReadAllTextAsync(dialog.FileName);
+            var imported = JsonSerializer.Deserialize<AppSettings>(json);
+            if (imported is null)
+            {
+                throw new JsonException("The settings file is empty.");
+            }
+            _settings.CopyFrom(SettingsMigration.Upgrade(imported));
+            LoadControls(_settings);
+            NotifyPreviewChanged(SettingsPreviewKind.Appearance);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+            JsonException)
+        {
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "QuantaTray",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private static void SelectOrFirst(ComboBox combo, object value)
+    {
+        combo.SelectedItem = value;
+        if (combo.SelectedIndex < 0 && combo.Items.Count > 0)
+        {
+            combo.SelectedIndex = 0;
+        }
     }
 
 }

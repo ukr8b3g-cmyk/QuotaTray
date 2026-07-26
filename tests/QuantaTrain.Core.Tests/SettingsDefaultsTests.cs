@@ -18,7 +18,49 @@ public sealed class SettingsDefaultsTests
         Assert.False(settings.Display.RememberPosition);
         Assert.False(settings.Display.SnapToEdge);
         Assert.False(settings.Display.MiniClickThrough);
+        Assert.True(settings.Display.RememberDetailHeight);
+        Assert.Equal(600, settings.Display.DetailWindowHeightLogical);
+        Assert.True(settings.Display.RememberSettingsHeight);
+        Assert.Equal(600, settings.Display.SettingsWindowHeightLogical);
         Assert.Null(settings.Display.PanelPosition.X);
         Assert.Null(settings.Display.PanelPosition.Y);
+        Assert.Equal(1095, settings.History.RetentionDays);
+        Assert.False(settings.UsageAnalytics.Enabled);
+        Assert.True(settings.UsageAnalytics.IncludeArchivedSessions);
+        Assert.Equal("current-window", settings.UsageAnalytics.DefaultPeriod);
+        Assert.Equal("total-tokens", settings.UsageAnalytics.DefaultMetric);
+        Assert.Equal(5, settings.UsageAnalytics.MaxIndividualModels);
+        Assert.Equal(14, settings.Diagnostics.LogRetentionDays);
+    }
+
+    [Fact]
+    public void MigrationPreservesExistingOneYearRetention()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = 1,
+            History = new HistorySettings { RetentionDays = 365 },
+        };
+
+        var migrated = SettingsMigration.Upgrade(settings);
+
+        Assert.Equal(2, migrated.SchemaVersion);
+        Assert.Equal(365, migrated.History.RetentionDays);
+        Assert.False(migrated.UsageAnalytics.Enabled);
+    }
+
+    [Fact]
+    public void CloneKeepsLiveSettingsIndependent()
+    {
+        var settings = new AppSettings();
+        var copy = settings.Clone();
+
+        copy.Display.Theme = "light";
+        copy.Display.PanelPosition.X = 120;
+        copy.UsageAnalytics.Enabled = true;
+
+        Assert.Equal("dark", settings.Display.Theme);
+        Assert.Null(settings.Display.PanelPosition.X);
+        Assert.False(settings.UsageAnalytics.Enabled);
     }
 }

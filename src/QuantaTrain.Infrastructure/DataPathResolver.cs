@@ -5,6 +5,8 @@ public sealed record DataPaths(
     string SettingsFile,
     string StateFile,
     string HistoryDirectory,
+    string UsageDirectory,
+    string CacheDirectory,
     string LogsDirectory,
     bool IsPortable);
 
@@ -26,14 +28,20 @@ public static class DataPathResolver
 
         EnsureWritable(root, portable);
         var history = Path.Combine(root, "history");
+        var usage = Path.Combine(root, "usage");
+        var cache = Path.Combine(root, "cache");
         var logs = Path.Combine(root, "logs");
         Directory.CreateDirectory(history);
+        Directory.CreateDirectory(usage);
+        Directory.CreateDirectory(cache);
         Directory.CreateDirectory(logs);
         return new DataPaths(
             root,
             Path.Combine(root, "settings.json"),
             Path.Combine(root, "state.json"),
             history,
+            usage,
+            cache,
             logs,
             portable);
     }

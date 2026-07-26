@@ -20,7 +20,7 @@ If Inno Setup is used, comply with its license and retain any required notices.
 
 ## Other production dependencies
 
-QuantaTray v0.1.3 has no third-party runtime package dependencies beyond the
+QuantaTray v0.2.0 has no third-party runtime package dependencies beyond the
 .NET runtime libraries included by self-contained publish. xUnit,
 Microsoft.NET.Test.Sdk, coverlet.collector, and xunit.runner.visualstudio are
 development/test-only dependencies and are not distributed with the app.

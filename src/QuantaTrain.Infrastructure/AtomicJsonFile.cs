@@ -1,9 +1,8 @@
 using System.Text.Json;
-using QuantaTrain.Core;
 
 namespace QuantaTrain.Infrastructure;
 
-public sealed class JsonSettingsStore
+internal static class AtomicJsonFile
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -12,46 +11,47 @@ public sealed class JsonSettingsStore
         AllowTrailingCommas = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
     };
-    private readonly string _path;
 
-    public JsonSettingsStore(string path)
+    public static async Task<T?> ReadAsync<T>(
+        string path,
+        CancellationToken cancellationToken)
     {
-        _path = path;
-    }
-
-    public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken)
-    {
-        if (!File.Exists(_path))
+        if (!File.Exists(path))
         {
-            return SettingsMigration.Upgrade(new AppSettings());
+            return default;
         }
 
         try
         {
-            await using var stream = File.OpenRead(_path);
-            var settings = await JsonSerializer.DeserializeAsync<AppSettings>(
+            await using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                16 * 1024,
+                useAsync: true);
+            return await JsonSerializer.DeserializeAsync<T>(
                 stream,
                 SerializerOptions,
                 cancellationToken).ConfigureAwait(false);
-            return SettingsMigration.Upgrade(settings ?? new AppSettings());
         }
         catch (JsonException)
         {
-            var backup = $"{_path}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.bak";
-            File.Move(_path, backup);
-            return SettingsMigration.Upgrade(new AppSettings());
+            return default;
         }
     }
 
-    public async Task SaveAsync(
-        AppSettings settings,
+    public static async Task WriteAsync<T>(
+        string path,
+        T value,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(settings);
-        var directory = Path.GetDirectoryName(_path)
-            ?? throw new InvalidOperationException("Settings path has no directory.");
+        var directory = Path.GetDirectoryName(path)
+            ?? throw new InvalidOperationException("JSON path has no directory.");
         Directory.CreateDirectory(directory);
-        var temporary = $"{_path}.{Guid.NewGuid():N}.tmp";
+        var temporary = Path.Combine(
+            directory,
+            $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
         try
         {
             await using (var stream = new FileStream(
@@ -59,18 +59,18 @@ public sealed class JsonSettingsStore
                              FileMode.CreateNew,
                              FileAccess.Write,
                              FileShare.None,
-                             4096,
-                             FileOptions.WriteThrough))
+                             16 * 1024,
+                             FileOptions.Asynchronous | FileOptions.WriteThrough))
             {
                 await JsonSerializer.SerializeAsync(
                     stream,
-                    settings,
+                    value,
                     SerializerOptions,
                     cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                stream.Flush(flushToDisk: true);
             }
-
-            File.Move(temporary, _path, overwrite: true);
+            File.Move(temporary, path, overwrite: true);
         }
         finally
         {

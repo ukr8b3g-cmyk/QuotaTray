@@ -118,6 +118,72 @@ internal class FramelessForm : Form
     private static extern nint SendMessage(nint handle, int message, int wParam, int lParam);
 }
 
+internal abstract class FixedWidthResizableForm : FramelessForm
+{
+    private const int WmNcHitTest = 0x0084;
+    private const int WmDpiChanged = 0x02E0;
+    private const int HtClient = 1;
+    private const int HtBottom = 15;
+    private int _fixedWidth;
+
+    protected void ConfigureFixedLogicalWidth(
+        int logicalWidth,
+        int logicalHeight,
+        int minimumLogicalHeight)
+    {
+        AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(logicalWidth, logicalHeight);
+        MinimumSize = new Size(logicalWidth, minimumLogicalHeight);
+        MaximumSize = new Size(logicalWidth, 2160);
+        _fixedWidth = Width;
+    }
+
+    protected override void SetBoundsCore(
+        int x,
+        int y,
+        int width,
+        int height,
+        BoundsSpecified specified)
+    {
+        if (_fixedWidth > 0 && (specified & BoundsSpecified.Width) != 0)
+        {
+            width = _fixedWidth;
+        }
+        base.SetBoundsCore(x, y, width, height, specified);
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == WmDpiChanged)
+        {
+            _fixedWidth = 0;
+            base.WndProc(ref message);
+            _fixedWidth = Width;
+            MinimumSize = new Size(_fixedWidth, MinimumSize.Height);
+            MaximumSize = new Size(_fixedWidth, MaximumSize.Height);
+            return;
+        }
+
+        base.WndProc(ref message);
+        if (message.Msg != WmNcHitTest ||
+            message.Result.ToInt32() != HtClient)
+        {
+            return;
+        }
+
+        var packed = message.LParam.ToInt64();
+        var screenPoint = new Point(
+            unchecked((short)(packed & 0xffff)),
+            unchecked((short)((packed >> 16) & 0xffff)));
+        var clientPoint = PointToClient(screenPoint);
+        const int grip = 7;
+        if (clientPoint.Y >= ClientSize.Height - grip)
+        {
+            message.Result = HtBottom;
+        }
+    }
+}
+
 internal sealed class RoundedPanel : Panel
 {
     private Color _borderColor = Theme.Border;

@@ -29,6 +29,15 @@ When generated mockups disagree with written specifications, the written specifi
 - Never call `account/rateLimitResetCredit/consume` or expose any reset-consumption button.
 - No telemetry, analytics, ads, crash upload, or developer-operated backend.
 - Do not access Codex conversations, threads, project files, or source repositories for runtime operation.
+- Optional local usage analytics is the only exception:
+  - It is disabled by default and runs only after explicit user opt-in.
+  - It may read JSONL metadata only from known Codex session roots selected by the user.
+  - It must pre-filter and parse only usage/context metadata needed for model, reasoning effort,
+    service tier, token counts, turn timing, and turn count.
+  - It must not persist or display prompts, responses, commands, diffs, conversation titles,
+    project paths, repository details, email addresses, account IDs, or raw session rows.
+  - It must not scan project directories or arbitrary filesystem roots.
+  - It must not transmit session data or aggregates to any external service.
 - Default polling interval is 60 seconds; opening the panel triggers a coalesced immediate refresh.
 - Persist history only when state changes, on reset events, or at a bounded checkpoint interval.
 - Default startup state is tray-only; left-click opens compact weekly-quota view.

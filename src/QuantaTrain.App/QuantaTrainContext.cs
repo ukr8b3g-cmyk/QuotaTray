@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using QuantaTrain.Core;
 using QuantaTrain.Infrastructure;
 
@@ -7,7 +8,7 @@ namespace QuantaTrain.App;
 internal sealed class QuantaTrainContext : ApplicationContext
 {
     private static readonly string ProductVersion =
-        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.1.3";
+        typeof(QuantaTrainContext).Assembly.GetName().Version?.ToString(3) ?? "0.2.0";
 
     private static readonly TimeSpan[] RestartBackoff =
     [
@@ -28,6 +29,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly DataPaths _paths;
     private readonly JsonSettingsStore _settingsStore;
     private readonly JsonlHistoryStore _historyStore;
+    private readonly JsonQuotaStateStore _quotaStateStore;
+    private readonly RetentionMaintenance _retentionMaintenance;
+    private readonly CodexSessionScanner _sessionScanner;
+    private readonly UsageAggregateStore _usageStore;
     private readonly RedactedLogger _logger;
     private readonly LocalizationService _localizer;
     private readonly AppSettings _settings;
@@ -41,7 +46,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private CodexInstallation? _codex;
     private WeeklyQuotaState? _previousState;
     private IReadOnlyList<string> _historyItems = [];
+    private UsageAnalysisSnapshot? _usageSnapshot;
     private bool _confirmationPending;
+    private bool _usageScanPending;
+    private int _connectionFailureCount;
+    private readonly HashSet<string> _notifiedCreditExpiries =
+        new(StringComparer.Ordinal);
     private SettingsForm? _settingsForm;
     private int _restartAttempt;
     private bool _exiting;
@@ -57,7 +67,15 @@ internal sealed class QuantaTrainContext : ApplicationContext
             ? PanelPlacement.Clone(_settings.Display.PanelPosition)
             : new PanelPositionSettings();
         _historyStore = new JsonlHistoryStore(_paths.HistoryDirectory);
-        _historyStore.Prune(_settings.History.RetentionDays);
+        _quotaStateStore = new JsonQuotaStateStore(_paths.StateFile);
+        _retentionMaintenance = new RetentionMaintenance(
+            _paths.HistoryDirectory,
+            _paths.UsageDirectory,
+            _paths.LogsDirectory);
+        _usageStore = new UsageAggregateStore(_paths.UsageDirectory);
+        _sessionScanner = new CodexSessionScanner(
+            Path.Combine(_paths.CacheDirectory, "session-scan-index.json"),
+            _usageStore);
         _logger = new RedactedLogger(_paths.LogsDirectory);
         _localizer = new LocalizationService(Path.Combine(AppContext.BaseDirectory, "locales"));
         _localizer.Load(_settings.Language);
@@ -193,7 +211,20 @@ internal sealed class QuantaTrainContext : ApplicationContext
     {
         try
         {
-            _historyItems = await _historyStore.ReadRecentAsync(5, _lifetime.Token);
+            if (_settings.ResetDetection.StoreQuotaState)
+            {
+                var persistedState = await _quotaStateStore.ReadAsync(
+                    _lifetime.Token);
+                _previousState = persistedState?.State;
+            }
+            await _retentionMaintenance.RunIfDueAsync(
+                _settings.History.RetentionDays,
+                _settings.Diagnostics.LogRetentionDays,
+                DateTimeOffset.UtcNow,
+                _lifetime.Token);
+            _historyItems = await _historyStore.ReadRecentAsync(
+                _settings.ResetDetection.RecentHistoryCount,
+                _lifetime.Token);
             var background = Environment.GetCommandLineArgs()
                 .Any(argument => string.Equals(
                     argument,
@@ -215,6 +246,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 }
             }
             UpdateViews(null, true, null);
+            await RefreshUsageAsync();
             await ConnectAsync(_lifetime.Token);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -301,25 +333,79 @@ internal sealed class QuantaTrainContext : ApplicationContext
         await _polling.RefreshAsync(cancellationToken);
     }
 
+    private async Task RestartPollingAsync()
+    {
+        if (_polling is null || _accountClient is null)
+        {
+            return;
+        }
+        _polling.StateChanged -= HandlePollingStateChanged;
+        await _polling.DisposeAsync();
+        _polling = null;
+        await StartPollingAsync(_lifetime.Token);
+    }
+
     private void HandlePollingStateChanged(
         object? sender,
         PollingStateChangedEventArgs eventArgs)
     {
         PostToUi(async () =>
         {
-            UpdateViews(eventArgs.State, eventArgs.IsUpdating, eventArgs.Error);
+            var visibleState = eventArgs.Error is not null &&
+                               !_settings.General.ShowCachedOnFailure
+                ? null
+                : eventArgs.State;
+            UpdateViews(
+                visibleState,
+                eventArgs.IsUpdating,
+                eventArgs.Error);
+            if (!eventArgs.IsUpdating && eventArgs.Error is not null)
+            {
+                _connectionFailureCount++;
+                if (_connectionFailureCount == 3 &&
+                    _settings.Notifications.PersistentConnectionFailure)
+                {
+                    _notifyIcon.ShowBalloonTip(
+                        5000,
+                        "QuantaTray",
+                        _localizer.Text("Notification.ConnectionFailure"),
+                        ToolTipIcon.Warning);
+                }
+            }
             if (!eventArgs.IsUpdating &&
                 eventArgs.Error is null &&
                 eventArgs.State is not null)
             {
-                var before = _previousState;
-                _previousState = eventArgs.State;
-                if (before is not null &&
-                    ResetClassifier.Classify(before, eventArgs.State, confirmed: false) is not null &&
-                    !_confirmationPending)
+                _connectionFailureCount = 0;
+                if (_confirmationPending)
                 {
-                    await ConfirmResetAsync(before);
+                    return;
                 }
+                var before = _previousState;
+                HandleQuotaNotifications(before, eventArgs.State);
+                var recovery = before is not null &&
+                    _settings.ResetDetection.DetectUnexpectedRecovery &&
+                    ResetClassifier.Classify(
+                        before,
+                        eventArgs.State,
+                        confirmed: false) is not null;
+                if (recovery && _settings.ResetDetection.ConfirmRecovery)
+                {
+                    await ConfirmResetAsync(before!);
+                    return;
+                }
+                if (recovery)
+                {
+                    var resetEvent = ResetClassifier.Classify(
+                        before!,
+                        eventArgs.State,
+                        confirmed: true);
+                    if (resetEvent is not null)
+                    {
+                        await RecordResetAsync(resetEvent);
+                    }
+                }
+                await SetQuotaBaselineAsync(eventArgs.State);
             }
         });
     }
@@ -334,7 +420,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _confirmationPending = true;
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(20), _lifetime.Token);
+            await Task.Delay(
+                TimeSpan.FromSeconds(
+                    _settings.ResetDetection.ConfirmationSeconds),
+                _lifetime.Token);
             var confirmedState = await _polling.RefreshAsync(_lifetime.Token);
             if (confirmedState is null)
             {
@@ -342,15 +431,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
             }
 
             var resetEvent = ResetClassifier.Classify(before, confirmedState, confirmed: true);
-            if (resetEvent is null)
+            if (resetEvent is not null)
             {
-                return;
+                await RecordResetAsync(resetEvent);
             }
-
-            await _historyStore.AppendAsync(resetEvent, _lifetime.Token);
-            _historyItems = await _historyStore.ReadRecentAsync(5, _lifetime.Token);
+            await SetQuotaBaselineAsync(confirmedState);
             UpdateViews(confirmedState, false, null);
-            ShowResetNotification(resetEvent);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -358,6 +444,25 @@ internal sealed class QuantaTrainContext : ApplicationContext
         finally
         {
             _confirmationPending = false;
+        }
+    }
+
+    private async Task RecordResetAsync(ResetEvent resetEvent)
+    {
+        await _historyStore.AppendAsync(resetEvent, _lifetime.Token);
+        _historyItems = await _historyStore.ReadRecentAsync(
+            _settings.ResetDetection.RecentHistoryCount,
+            _lifetime.Token);
+        ShowResetNotification(resetEvent);
+        await RefreshUsageAsync();
+    }
+
+    private async Task SetQuotaBaselineAsync(WeeklyQuotaState state)
+    {
+        _previousState = state;
+        if (_settings.ResetDetection.StoreQuotaState)
+        {
+            await _quotaStateStore.WriteAsync(state, _lifetime.Token);
         }
     }
 
@@ -500,11 +605,36 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _detailForm = new DetailForm(
                 _localizer,
                 () => !_settings.Display.LockPosition);
+            _detailForm.Height = Math.Clamp(
+                (int)Math.Round(
+                    _settings.Display.DetailWindowHeightLogical *
+                    _detailForm.DeviceDpi / 96d),
+                _detailForm.MinimumSize.Height,
+                _detailForm.MaximumSize.Height);
             _detailForm.RefreshRequested += async (_, _) => await RefreshAsync();
+            _detailForm.UsageRefreshRequested += async (_, _) =>
+                await RefreshUsageAsync();
+            _detailForm.UsageFilterChanged += async (_, eventArgs) =>
+            {
+                _settings.UsageAnalytics.DefaultPeriod = eventArgs.Period;
+                _settings.UsageAnalytics.DefaultMetric = eventArgs.Metric;
+                await SaveSettingsAsync();
+                await RefreshUsageAsync();
+            };
             _detailForm.CompactRequested += (_, _) => ShowCompact();
             _detailForm.SettingsRequested += (_, _) => QueueShowSettings();
             _detailForm.MoveCompleted += async (_, _) =>
+            {
+                if (_settings.Display.RememberDetailHeight)
+                {
+                    _settings.Display.DetailWindowHeightLogical = Math.Clamp(
+                        (int)Math.Round(
+                            _detailForm.Height * 96d / _detailForm.DeviceDpi),
+                        520,
+                        2160);
+                }
                 await HandlePanelMoveCompletedAsync(_detailForm);
+            };
             ApplyDisplaySettings();
         }
         return _detailForm;
@@ -587,6 +717,25 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _localizer,
             initialPage: 1,
             initialDisplayMode: displayMode);
+        form.Height = Math.Clamp(
+            (int)Math.Round(
+                _settings.Display.SettingsWindowHeightLogical *
+                form.DeviceDpi / 96d),
+            form.MinimumSize.Height,
+            form.MaximumSize.Height);
+        form.SetConnectionStatus(
+            _codex is null
+                ? _localizer.Text("Status.Stale")
+                : $"{_localizer.Text("Status.Latest")}  Codex {_codex.Version}");
+        if (_usageSnapshot is not null)
+        {
+            form.SetUsageScanStatus(
+                _localizer.Text(
+                    "Usage.FileResult",
+                    _usageSnapshot.ScannedFileCount,
+                    _usageSnapshot.SkippedFileCount,
+                    _usageSnapshot.ErrorFileCount));
+        }
         _settingsForm = form;
         form.FormClosed += (_, _) =>
         {
@@ -604,6 +753,58 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         form.PositionResetRequested += async (_, _) =>
             await ResetPanelPositionAsync();
+        form.UsageRescanRequested += async (_, _) =>
+            await RefreshUsageAsync();
+        form.UsageCacheRebuildRequested += async (_, _) =>
+        {
+            await _sessionScanner.ResetCacheAsync(_lifetime.Token);
+            await RefreshUsageAsync();
+        };
+        form.ConnectionDiagnosticRequested += async (_, _) =>
+        {
+            await RefreshAsync();
+            form.SetConnectionStatus(
+                _polling?.Current is null
+                    ? _localizer.Text("Status.Failed")
+                    : $"{_localizer.Text("Status.Latest")}  Codex {_codex?.Version ?? "—"}");
+        };
+        form.OpenHistoryRequested += (_, _) =>
+            OpenDirectory(_paths.HistoryDirectory);
+        form.HistoryExportRequested += async (_, _) =>
+            await ExportHistoryAsync();
+        form.UsageExportRequested += async (_, eventArgs) =>
+            await ExportUsageAsync(eventArgs.Format);
+        form.OpenLogsRequested += (_, _) =>
+            OpenDirectory(_paths.LogsDirectory);
+        form.ClearCacheRequested += async (_, _) =>
+        {
+            await _sessionScanner.ResetCacheAsync(_lifetime.Token);
+            form.SetUsageScanStatus(_localizer.Text("Settings.UsageNotScanned"));
+        };
+        form.ReconnectRequested += async (_, _) =>
+        {
+            await DisposeConnectionAsync();
+            await ConnectAsync(_lifetime.Token);
+            form.SetConnectionStatus(
+                _codex is null
+                    ? _localizer.Text("Status.Failed")
+                    : $"{_localizer.Text("Status.Latest")}  Codex {_codex.Version}");
+        };
+        form.OpenStorageRequested += (_, _) =>
+            OpenDirectory(_paths.Root);
+        form.OpenDocumentRequested += (_, eventArgs) =>
+            OpenLocalDocument(eventArgs.FileName);
+        form.MoveCompleted += async (_, _) =>
+        {
+            if (_settings.Display.RememberSettingsHeight)
+            {
+                _settings.Display.SettingsWindowHeightLogical = Math.Clamp(
+                    (int)Math.Round(form.Height * 96d / form.DeviceDpi),
+                    520,
+                    2160);
+                await SaveSettingsAsync();
+            }
+        };
         form.AllSettingsResetRequested += async (_, _) =>
         {
             _panelPosition = new PanelPositionSettings();
@@ -652,6 +853,14 @@ internal sealed class QuantaTrainContext : ApplicationContext
                     ApplyDisplaySettings();
                     ApplyPanelBehavior();
                     await SaveSettingsAsync();
+                    await _retentionMaintenance.RunIfDueAsync(
+                        _settings.History.RetentionDays,
+                        _settings.Diagnostics.LogRetentionDays,
+                        DateTimeOffset.UtcNow,
+                        _lifetime.Token,
+                        force: true);
+                    await RestartPollingAsync();
+                    await RefreshUsageAsync();
                 }
                 finally
                 {
@@ -686,7 +895,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 {
                     RebuildTrayMenu();
                 }
-                await SaveSettingsAsync();
                 return;
             }
 
@@ -698,7 +906,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
             RebuildViews();
             ApplyDisplaySettings();
             UpdateViews(_polling?.Current, false, null);
-            await SaveSettingsAsync();
         }
         finally
         {
@@ -771,6 +978,158 @@ internal sealed class QuantaTrainContext : ApplicationContext
         }
     }
 
+    private void HandleQuotaNotifications(
+        WeeklyQuotaState? before,
+        WeeklyQuotaState current)
+    {
+        if (_settings.Notifications.Remaining30 &&
+            before is not null &&
+            before.RemainingPercent > 30 &&
+            current.RemainingPercent <= 30)
+        {
+            ShowQuotaNotification(30);
+        }
+        if (_settings.Notifications.Remaining10 &&
+            before is not null &&
+            before.RemainingPercent > 10 &&
+            current.RemainingPercent <= 10)
+        {
+            ShowQuotaNotification(10);
+        }
+
+        if (!_settings.Notifications.ResetCreditExpiring)
+        {
+            return;
+        }
+        var limit = DateTimeOffset.UtcNow.AddHours(24);
+        foreach (var credit in current.ResetCredits ?? [])
+        {
+            if (credit.ExpiresAtUtc is null ||
+                credit.ExpiresAtUtc <= DateTimeOffset.UtcNow ||
+                credit.ExpiresAtUtc > limit)
+            {
+                continue;
+            }
+            var key = credit.ExpiresAtUtc.Value.ToUniversalTime().ToString("O");
+            if (_notifiedCreditExpiries.Add(key))
+            {
+                _notifyIcon.ShowBalloonTip(
+                    5000,
+                    "QuantaTray",
+                    _localizer.Text(
+                        "Notification.CreditExpiring",
+                        credit.ExpiresAtUtc.Value.ToLocalTime().ToString("g")),
+                    ToolTipIcon.Warning);
+            }
+        }
+    }
+
+    private void ShowQuotaNotification(int threshold)
+    {
+        _notifyIcon.ShowBalloonTip(
+            5000,
+            "QuantaTray",
+            _localizer.Text("Notification.Remaining", threshold),
+            ToolTipIcon.Warning);
+    }
+
+    private async Task RefreshUsageAsync()
+    {
+        if (_usageScanPending)
+        {
+            return;
+        }
+
+        var resetEvents = await _historyStore.ReadRecentEventsAsync(
+            32,
+            _lifetime.Token);
+        var period = UsagePeriodResolver.Resolve(
+            _settings.UsageAnalytics.DefaultPeriod,
+            DateTimeOffset.UtcNow,
+            _polling?.Current ?? _previousState,
+            resetEvents);
+        if (!_settings.UsageAnalytics.Enabled)
+        {
+            _usageSnapshot = UsageAnalysisSnapshot.Empty(
+                period.FromUtc,
+                period.ToUtc);
+            _detailForm?.UpdateUsage(
+                _usageSnapshot,
+                _settings.UsageAnalytics,
+                scanning: false);
+            _settingsForm?.SetUsageScanStatus(
+                _localizer.Text("Usage.Disabled"));
+            return;
+        }
+
+        _usageScanPending = true;
+        _detailForm?.UpdateUsage(
+            _usageSnapshot,
+            _settings.UsageAnalytics,
+            scanning: true);
+        _settingsForm?.SetUsageScanStatus(
+            _localizer.Text("Usage.Scanning"));
+        try
+        {
+            var result = await _sessionScanner.ScanAsync(
+                _settings.UsageAnalytics,
+                null,
+                _lifetime.Token);
+            var fromDate = DateOnly.FromDateTime(
+                period.FromUtc.LocalDateTime.Date);
+            var toDate = DateOnly.FromDateTime(
+                period.ToUtc.LocalDateTime.Date);
+            var rows = result.Rows
+                .Where(row =>
+                    row.Key.LocalDate >= fromDate &&
+                    row.Key.LocalDate <= toDate)
+                .ToArray();
+            _usageSnapshot = new UsageAnalysisSnapshot(
+                period.FromUtc,
+                period.ToUtc,
+                period.IsStartEstimated,
+                rows,
+                DateTimeOffset.UtcNow,
+                result.ScannedFileCount,
+                result.SkippedFileCount,
+                result.ErrorFileCount);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+            FormatException or System.Text.Json.JsonException)
+        {
+            await _logger.WarningAsync(
+                exception.Message,
+                CancellationToken.None);
+            _usageSnapshot = new UsageAnalysisSnapshot(
+                period.FromUtc,
+                period.ToUtc,
+                period.IsStartEstimated,
+                [],
+                DateTimeOffset.UtcNow,
+                0,
+                0,
+                1);
+        }
+        finally
+        {
+            _usageScanPending = false;
+            _detailForm?.UpdateUsage(
+                _usageSnapshot,
+                _settings.UsageAnalytics,
+                scanning: false);
+            if (_usageSnapshot is not null)
+            {
+                _settingsForm?.SetUsageScanStatus(
+                    _localizer.Text(
+                        "Usage.FileResult",
+                        _usageSnapshot.ScannedFileCount,
+                        _usageSnapshot.SkippedFileCount,
+                        _usageSnapshot.ErrorFileCount));
+            }
+        }
+    }
+
     private void SetSignedIn(bool signedIn)
     {
         _compactForm?.SetSignedIn(signedIn);
@@ -781,6 +1140,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _miniForm?.UpdateState(state);
         _compactForm?.UpdateState(state, updating, error);
         _detailForm?.UpdateState(state, updating, error, _historyItems);
+        _detailForm?.UpdateUsage(
+            _usageSnapshot,
+            _settings.UsageAnalytics,
+            _usageScanPending);
 
         var oldIcon = _notifyIcon.Icon;
         _notifyIcon.Icon = IconFactory.Create(state?.RemainingPercent);
@@ -996,6 +1359,131 @@ internal sealed class QuantaTrainContext : ApplicationContext
         catch (Exception exception)
         {
             await _logger.WarningAsync(exception.Message, CancellationToken.None);
+        }
+    }
+
+    private async Task ExportHistoryAsync()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Title = _localizer.Text("Settings.ExportHistoryJson"),
+            Filter = "JSON (*.json)|*.json",
+            FileName = $"QuantaTray-history-{DateTime.Now:yyyyMMdd}.json",
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog() != DialogResult.OK)
+        {
+            return;
+        }
+
+        var temporary = $"{dialog.FileName}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using var stream = new FileStream(
+                temporary,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                64 * 1024,
+                FileOptions.Asynchronous);
+            using var writer = new Utf8JsonWriter(
+                stream,
+                new JsonWriterOptions { Indented = true });
+            writer.WriteStartArray();
+            foreach (var path in Directory.EnumerateFiles(
+                         _paths.HistoryDirectory,
+                         "*.jsonl").OrderBy(item => item, StringComparer.Ordinal))
+            {
+                await foreach (var line in File.ReadLinesAsync(
+                                   path,
+                                   _lifetime.Token))
+                {
+                    try
+                    {
+                        using var document = JsonDocument.Parse(line);
+                        document.RootElement.WriteTo(writer);
+                    }
+                    catch (JsonException)
+                    {
+                        // Damaged rows are omitted from an otherwise valid export.
+                    }
+                }
+            }
+            writer.WriteEndArray();
+            await writer.FlushAsync(_lifetime.Token);
+            await stream.FlushAsync(_lifetime.Token);
+            File.Move(temporary, dialog.FileName, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+    }
+
+    private async Task ExportUsageAsync(string format)
+    {
+        var isCsv = string.Equals(
+            format,
+            "csv",
+            StringComparison.OrdinalIgnoreCase);
+        using var dialog = new SaveFileDialog
+        {
+            Title = isCsv
+                ? _localizer.Text("Settings.ExportUsageCsv")
+                : _localizer.Text("Settings.ExportUsageJson"),
+            Filter = isCsv ? "CSV (*.csv)|*.csv" : "JSON (*.json)|*.json",
+            FileName =
+                $"QuantaTray-usage-{DateTime.Now:yyyyMMdd}." +
+                (isCsv ? "csv" : "json"),
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog() != DialogResult.OK)
+        {
+            return;
+        }
+
+        var rows = await _usageStore.ReadAsync(
+            DateTimeOffset.UtcNow.AddYears(-100),
+            DateTimeOffset.UtcNow,
+            _lifetime.Token);
+        var exporter = new UsageExportService();
+        if (isCsv)
+        {
+            await exporter.ExportCsvAsync(
+                dialog.FileName,
+                rows,
+                _lifetime.Token);
+        }
+        else
+        {
+            await exporter.ExportJsonAsync(
+                dialog.FileName,
+                rows,
+                _lifetime.Token);
+        }
+    }
+
+    private static void OpenDirectory(string path)
+    {
+        Directory.CreateDirectory(path);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"")
+        {
+            UseShellExecute = true,
+        });
+    }
+
+    private static void OpenLocalDocument(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, fileName);
+        if (File.Exists(path))
+        {
+            Process.Start(new ProcessStartInfo(path)
+            {
+                UseShellExecute = true,
+            });
         }
     }
 

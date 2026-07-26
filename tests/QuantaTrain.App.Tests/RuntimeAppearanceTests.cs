@@ -218,7 +218,8 @@ public sealed class RuntimeAppearanceTests
             form.ShowDialog();
 
             Assert.Equal(choices.Length, selected);
-            Assert.Equal("auto", settings.Language.Mode);
+            Assert.Equal("manual", settings.Language.Mode);
+            Assert.Equal("en-US", settings.Language.Locale);
         });
     }
 
@@ -606,6 +607,163 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
+    public void DetailAndSettingsUseFixed800WidthAndThirteenSettingsPages()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var detail = new DetailForm(localizer);
+            using var settings = new SettingsForm(new AppSettings(), localizer);
+            detail.UpdateState(
+                new WeeklyQuotaState(
+                    "weekly",
+                    BucketRole.Secondary,
+                    58,
+                    42,
+                    10080,
+                    DateTimeOffset.Now.AddDays(3),
+                    3,
+                    [
+                        new ResetCredit(DateTimeOffset.Now.AddDays(17)),
+                        new ResetCredit(DateTimeOffset.Now.AddDays(41)),
+                        new ResetCredit(DateTimeOffset.Now.AddDays(76)),
+                    ],
+                    "ChatGPT Pro",
+                    DateTimeOffset.Now,
+                    "0.145.0"),
+                false,
+                null,
+                ["2026/07/26 09:00  scheduled-reset"]);
+            detail.Show();
+            settings.Show();
+            Application.DoEvents();
+
+            Assert.Equal(800, detail.ClientSize.Width);
+            Assert.Equal(800, settings.ClientSize.Width);
+            Assert.Equal(520, detail.MinimumSize.Height);
+            Assert.Equal(520, settings.MinimumSize.Height);
+            Assert.Equal(AutoScaleMode.Dpi, detail.AutoScaleMode);
+            Assert.Equal(AutoScaleMode.Dpi, settings.AutoScaleMode);
+            var detailHeight = detail.Height;
+            detail.Size = new Size(940, detailHeight + 40);
+            settings.Size = new Size(940, settings.Height + 40);
+            Assert.Equal(800, detail.Width);
+            Assert.Equal(800, settings.Width);
+            Assert.Equal(detailHeight + 40, detail.Height);
+            Assert.Equal(
+                13,
+                Descendants(settings).OfType<NavButton>().Count());
+            SaveSnapshotIfRequested(detail, "overview.png");
+            SaveSnapshotIfRequested(settings, "settings.png");
+        });
+    }
+
+    [Fact]
+    public void SettingsCancelRestoresPreviewAndSaveCommitsIt()
+    {
+        RunSta(() =>
+        {
+            var appSettings = new AppSettings();
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(appSettings.Language);
+            using (var cancelled = new SettingsForm(appSettings, localizer))
+            {
+                cancelled.Show();
+                Application.DoEvents();
+                GetField<ComboBox>(cancelled, "_theme").SelectedItem = "light";
+                Assert.Equal("light", appSettings.Display.Theme);
+                cancelled.Close();
+                Application.DoEvents();
+            }
+            Assert.Equal("dark", appSettings.Display.Theme);
+
+            using var saved = new SettingsForm(appSettings, localizer);
+            GetField<ComboBox>(saved, "_theme").SelectedItem = "light";
+            var save = Descendants(saved)
+                .OfType<Button>()
+                .Single(button => button.Text == localizer.Text("Common.Save"));
+            save.PerformClick();
+            Assert.Equal("light", appSettings.Display.Theme);
+        });
+    }
+
+    [Fact]
+    public void UsagePageHandlesDisabledAndPopulatedSnapshotsWithoutErrors()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var form = new DetailForm(localizer);
+            var settings = new UsageAnalyticsSettings();
+            form.UpdateUsage(null, settings, false);
+            Assert.Contains(
+                Descendants(form).OfType<Label>(),
+                label => label.Text == localizer.Text("Usage.Disabled"));
+
+            settings.Enabled = true;
+            var key = new UsageAggregateKey(
+                new DateOnly(2026, 7, 26),
+                "gpt-5.6-sol",
+                "high",
+                "fast");
+            var row = new UsageAggregate(
+                key,
+                new UsageTokenTotals(100, 20, 0, 50, 10, 150),
+                1,
+                12_000,
+                0,
+                1,
+                0,
+                0);
+            var snapshot = new UsageAnalysisSnapshot(
+                DateTimeOffset.Parse("2026-07-22T00:00:00Z"),
+                DateTimeOffset.Parse("2026-07-29T00:00:00Z"),
+                false,
+                [row],
+                DateTimeOffset.Parse("2026-07-26T01:30:45Z"),
+                1,
+                0,
+                0);
+            form.UpdateUsage(snapshot, settings, false);
+            form.Show();
+            Application.DoEvents();
+            var usageTab = Descendants(form)
+                .OfType<Button>()
+                .Single(button =>
+                    button.Text == localizer.Text("Detail.UsageTab"));
+            usageTab.PerformClick();
+            Application.DoEvents();
+            SaveSnapshotIfRequested(form, "usage-analysis.png");
+
+            Assert.Contains(
+                Descendants(form).OfType<Label>(),
+                label => label.Text == "gpt-5.6-sol");
+            Assert.Contains(
+                Descendants(form).OfType<Label>(),
+                label => label.Text.Contains(
+                    localizer.Text("Usage.Effort.high"),
+                    StringComparison.Ordinal));
+        });
+    }
+
+    [Fact]
+    public void MiniAndCompactDimensionsRemainUnchanged()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var mini = new MiniForm(localizer);
+            using var compact = new CompactForm(localizer);
+
+            Assert.Equal(new Size(232, 126), mini.ClientSize);
+            Assert.Equal(new Size(240, 180), compact.ClientSize);
+        });
+    }
+
+    [Fact]
     public void AboutDialogIncludesGitHubRepositoryLink()
     {
         RunSta(() =>
@@ -643,6 +801,22 @@ public sealed class RuntimeAppearanceTests
             directory = directory.Parent;
         }
         throw new DirectoryNotFoundException("Source locales directory was not found.");
+    }
+
+    private static void SaveSnapshotIfRequested(Form form, string fileName)
+    {
+        var directory = Environment.GetEnvironmentVariable(
+            "QUANTATRAY_QA_OUTPUT");
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+        Directory.CreateDirectory(directory);
+        using var bitmap = new Bitmap(
+            form.ClientSize.Width,
+            form.ClientSize.Height);
+        form.DrawToBitmap(bitmap, form.ClientRectangle);
+        bitmap.Save(Path.Combine(directory, fileName));
     }
 
     private static void RunSta(Action action)

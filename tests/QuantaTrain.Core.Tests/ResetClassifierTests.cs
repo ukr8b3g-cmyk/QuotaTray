@@ -18,7 +18,11 @@ public sealed class ResetClassifierTests
     [Fact]
     public void DetectsLikelyResetCreditUse()
     {
-        var before = State(80, 2, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(2));
+        var before = State(
+            80,
+            2,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddDays(2));
         var after = State(0, 1, before.ObservedAtUtc.AddMinutes(1), before.ResetsAtUtc);
 
         var reset = ResetClassifier.Classify(before, after);
@@ -42,7 +46,8 @@ public sealed class ResetClassifierTests
     {
         var before = State(80, 2, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(2));
         var after = State(0, 2, before.ObservedAtUtc.AddMinutes(1), before.ResetsAtUtc)
-            with { PlanType = "pro" };
+            with
+        { PlanType = "pro" };
 
         var reset = ResetClassifier.Classify(before, after);
 
@@ -56,6 +61,45 @@ public sealed class ResetClassifierTests
         var after = State(40, 2, before.ObservedAtUtc.AddMinutes(1), before.ResetsAtUtc);
 
         Assert.Null(ResetClassifier.Classify(before, after));
+    }
+
+    [Fact]
+    public void ScheduledResetWinsAcrossThreeDayOfflineInterval()
+    {
+        var observed = DateTimeOffset.UtcNow;
+        var before = State(80, 2, observed, observed.AddDays(2));
+        var after = State(0, 2, observed.AddDays(3), before.ResetsAtUtc);
+
+        var reset = ResetClassifier.Classify(before, after);
+
+        Assert.Equal(ResetClassification.ScheduledReset, reset?.Classification);
+    }
+
+    [Fact]
+    public void UnexpectedRecoverySurvivesEightHourOfflineInterval()
+    {
+        var observed = DateTimeOffset.UtcNow;
+        var before = State(58, 2, observed, observed.AddDays(2));
+        var after = State(0, 2, observed.AddHours(8), before.ResetsAtUtc);
+
+        var reset = ResetClassifier.Classify(before, after);
+
+        Assert.Equal(
+            ResetClassification.UnexpectedResetCandidate,
+            reset?.Classification);
+    }
+
+    [Fact]
+    public void TwentyDayGapIsUncertainWhenNoScheduledResetIsInside()
+    {
+        var observed = DateTimeOffset.UtcNow;
+        var before = State(80, 2, observed, observed.AddDays(30));
+        var after = State(0, 2, observed.AddDays(20), before.ResetsAtUtc);
+
+        var reset = ResetClassifier.Classify(before, after);
+
+        Assert.Equal(ResetClassification.UncertainChange, reset?.Classification);
+        Assert.Contains("observation-interval-too-long", reset?.ReasonCodes ?? []);
     }
 
     private static WeeklyQuotaState State(

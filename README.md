@@ -1,6 +1,6 @@
 # QuantaTray
 
-[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[English](#english) · [Windows Installer (.exe)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 OpenAI非公式の、Codex利用枠を確認するWindowsタスクトレイ常駐モニターです。
 
@@ -16,8 +16,8 @@ QuantaTrayはOpenAIの公式製品ではなく、OpenAIによる承認、提携�
 
 ## ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
@@ -32,6 +32,9 @@ QuantaTrayは、公式Codex App Serverの読み取り専用APIを使用し、次
 - 定期リセット、リセット券使用の可能性、予定外リセット候補のローカル履歴
 - Codexプランと接続状態
 - 60秒ごとの自動更新と手動更新
+- 幅800px固定・高さのみ変更できる詳細画面（概要／使用分析の2タブ）
+- モデル別のトークン、推論レベル、標準／高速、使用時間、ターン数のローカル集計（初期OFF）
+- 13カテゴリの統合設定、3年既定の履歴・集計保持、JSON／CSVエクスポート
 
 QuantaTrayは利用枠を表示するだけで、リセット券を使用したり、利用枠を変更したりしません。
 
@@ -48,7 +51,7 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 
 ### Installer版
 
-1. `QuantaTray-v0.1.3-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.0-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行し、画面の案内に従います。
 3. 更新インストール時は、常駐中のQuantaTrayが自動的に終了します。
 4. インストール後、QuantaTrayがタスクトレイに常駐します。
@@ -61,7 +64,7 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 
 ### Portable ZIP版
 
-1. `QuantaTray-v0.1.3-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.0-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -77,6 +80,15 @@ QuantaTrayがバックグラウンドで `codex app-server --stdio` を起動す
 - コンパクト画面の3点メニュー：ミニ／詳細表示、更新、設定
 - 詳細画面の更新アイコン：最新情報を取得
 - 詳細画面の歯車アイコン：設定画面
+
+### 詳細画面
+
+詳細画面と設定画面は幅800 logical px固定、初期高さ600 logical pxです。横幅は変更できず、下端から高さだけを変更できます。概要／使用分析を切り替えてもウィンドウサイズは変わりません。
+
+- **概要**：週間利用枠、次回リセット、リセット券、プラン・接続情報、最近のリセット履歴
+- **使用分析**：モデル別割合、総トークン、使用時間、ターン数、推論レベル内訳、標準／高速利用率
+
+使用分析は初期状態で無効です。設定の「使用状況の取得」で有効化した場合だけ、既知のCodexセッションフォルダーを読み取り専用で走査します。本文、コマンド、差分、作業パス、ID、アカウント情報は保存しません。
 
 <img width="198" height="327" alt="QuantaTrayのトレイメニュー" src="docs/images/tray-menu-ja.png" />
 
@@ -97,9 +109,11 @@ QuantaTrayはCodex App Serverへローカルstdioで接続します。OpenAIへ�
 
 - ブラウザCookie、保存パスワード、Codex認証ファイルを直接読み取りません。
 - パスワード、アクセストークン、メールアドレス、アカウントIDを保存しません。
-- 会話内容、ソースコード、プロジェクトファイルを収集しません。
-- テレメトリー、広告、利用解析、開発者運営サーバーはありません。
+- 会話内容、ソースコード、プロジェクトファイルを保存・外部送信しません。
+- テレメトリー、広告、外部送信型の利用解析、開発者運営サーバーはありません。
 - リセット券を使用する書き込みAPIは呼び出しません。
+
+任意のローカル使用分析は初期OFFで、集計結果を外部送信しません。対象は `CODEX_HOME\sessions` と、設定時の `CODEX_HOME\archived_sessions` だけです。
 
 詳細：
 
@@ -121,7 +135,7 @@ Portable版：
 <展開フォルダー>\data\
 ```
 
-保存対象は設定、リセット履歴、機密情報を除いた限定・マスキング済み診断ログです。履歴の既定保持期間は365日です。
+保存対象は設定、直前の利用枠状態、リセット履歴、任意の使用集計、差分走査キャッシュ、機密情報を除いた限定・マスキング済み診断ログです。新規インストールの履歴・集計の既定保持期間は3年です（既存の365日設定は維持）。
 
 ## 対応言語
 
@@ -184,8 +198,8 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ## Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.1.3-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.0-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the file against `SHA256SUMS.txt`.
@@ -198,6 +212,10 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 - Local history of scheduled resets, possible reset-credit use, and unexpected reset candidates
 - Mini, compact, and detailed views
 - Automatic polling every 60 seconds and manual refresh
+- Fixed 800-logical-pixel detail/settings width with vertically resizable layouts
+- Overview and per-model usage-analysis tabs
+- Opt-in local-only model/reasoning/tier/token/time/turn aggregation
+- Thirteen settings categories, bounded retention, and JSON/CSV exports
 
 ## Requirements
 
@@ -214,9 +232,11 @@ QuantaTray communicates with OpenAI only through the separately installed offici
 
 - It does not directly read browser cookies, saved passwords, or Codex credential files.
 - It does not store passwords, access tokens, email addresses, or account IDs.
-- It does not collect conversations, source code, or project files.
+- It does not store or transmit conversations, source code, or project files.
 - It has no telemetry, ads, analytics, or developer-operated backend.
 - It never calls the reset-credit consumption API.
+
+Optional local usage analysis is off by default, scans only known Codex session roots, stores aggregate metadata plus path hashes, and never sends the aggregates to the developer.
 
 See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 

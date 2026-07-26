@@ -3,8 +3,8 @@
 ## 1. 必須成果物
 
 ```text
-QuantaTray-v0.1.3-win-x64-setup.exe
-QuantaTray-v0.1.3-win-x64-portable.zip
+QuantaTray-v0.2.0-win-x64-setup.exe
+QuantaTray-v0.2.0-win-x64-portable.zip
 SHA256SUMS.txt
 ```
 

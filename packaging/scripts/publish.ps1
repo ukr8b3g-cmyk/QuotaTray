@@ -46,7 +46,8 @@ Copy-Item -LiteralPath (Join-Path $publish 'QuantaTray.exe') -Destination $porta
 Copy-Item -LiteralPath (Join-Path $publish 'locales') -Destination $portable -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'packaging\README-portable.txt') -Destination (Join-Path $portable 'README.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination (Join-Path $portable 'README.md')
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination (Join-Path $portable 'LICENSE.txt')
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination (Join-Path $portable 'LICENSE')
+Copy-Item -LiteralPath (Join-Path $repo 'PRIVACY.md') -Destination (Join-Path $portable 'PRIVACY.md')
 Copy-Item -LiteralPath (Join-Path $repo 'THIRD-PARTY-NOTICES.md') -Destination (Join-Path $portable 'THIRD-PARTY-NOTICES.txt')
 New-Item -ItemType File -Path (Join-Path $portable 'portable.flag') -Force | Out-Null
 

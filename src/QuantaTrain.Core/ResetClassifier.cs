@@ -3,7 +3,7 @@ namespace QuantaTrain.Core;
 public static class ResetClassifier
 {
     private static readonly TimeSpan ScheduledTolerance = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan LongOfflineInterval = TimeSpan.FromHours(24);
+    private static readonly TimeSpan MinimumUncertainInterval = TimeSpan.FromDays(14);
 
     public static ResetEvent? Classify(
         WeeklyQuotaState before,
@@ -34,10 +34,6 @@ public static class ResetClassifier
             classification = ResetClassification.LimitPolicyChange;
             reasons.Add("limit-configuration-changed");
         }
-        else if (after.ObservedAtUtc - before.ObservedAtUtc > LongOfflineInterval)
-        {
-            reasons.Add("long-offline-interval");
-        }
         else if (IsScheduled(before, after))
         {
             classification = ResetClassification.ScheduledReset;
@@ -51,8 +47,17 @@ public static class ResetClassifier
         }
         else if (confirmed)
         {
-            classification = ResetClassification.UnexpectedResetCandidate;
-            reasons.Add("no-reset-credit-decrease");
+            if (ObservationIntervalTooLong(before, after))
+            {
+                classification = ResetClassification.UncertainChange;
+                confidence = Confidence.Low;
+                reasons.Add("observation-interval-too-long");
+            }
+            else
+            {
+                classification = ResetClassification.UnexpectedResetCandidate;
+                reasons.Add("no-reset-credit-decrease");
+            }
         }
         else
         {
@@ -68,6 +73,21 @@ public static class ResetClassifier
             after,
             reasons,
             confirmed);
+    }
+
+    private static bool ObservationIntervalTooLong(
+        WeeklyQuotaState before,
+        WeeklyQuotaState after)
+    {
+        var windowDuration = before.WindowDurationMinutes is > 0
+            ? TimeSpan.FromMinutes(before.WindowDurationMinutes.Value)
+            : TimeSpan.Zero;
+        var threshold = windowDuration > TimeSpan.Zero
+            ? TimeSpan.FromTicks(Math.Max(
+                MinimumUncertainInterval.Ticks,
+                windowDuration.Ticks * 2))
+            : MinimumUncertainInterval;
+        return after.ObservedAtUtc - before.ObservedAtUtc > threshold;
     }
 
     private static bool IsScheduled(WeeklyQuotaState before, WeeklyQuotaState after)

@@ -2,10 +2,19 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-07-26
+
+- Rebuilt the detailed view as a fixed-width overview and per-model usage-analysis dashboard.
+- Added opt-in, read-only local Codex session aggregation for model, reasoning level, service tier, token breakdown, elapsed time, and turn count.
+- Added persistent offline reset detection, 20-second confirmation, classification, and restart-safe deduplication.
+- Expanded Settings to thirteen categories with cancelable live previews, separate height persistence, retention, exports, diagnostics, and cache controls.
+- Added atomic state, settings, aggregate, and scan-index storage with incremental append scanning and bounded retention.
+- Preserved mini and compact behavior and added regression coverage for sizing, click-through, theme, accent, opacity, and localization.
+- Updated the portable and installer release version to 0.2.0.
+
 ## 0.1.3 - 2026-07-25
 
 - Expanded the Japanese README with contextual settings screenshots, recovery guidance, reset-history behavior, and issue-reporting instructions.
-- Changed the project license from MIT to CC0 1.0 Universal.
 - Added an opt-in titleless mini view with compact/detail recovery actions.
 - Added an opt-in mini-view click-through mode recoverable from the tray.
 - Fixed click-through mini panels becoming faint, disappearing behind other windows, or failing to return after Settings closes.
