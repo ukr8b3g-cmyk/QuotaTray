@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-07-26
+
+- Finalized the overview and usage-analysis layouts, compact presentation, colors, icons, and spacing.
+- Restricted the shipped UI languages to Japanese and English, with Windows-language auto selection and English fallback.
+- Added localized mouse-over help to view controls, tabs, usage-analysis fields, and key settings.
+- Fixed mini click-through previews becoming transparent or visually lost while switching views or opening Settings.
+- Increased and migrated the settings-window height, derived its content area from the runtime client size, and prevented initial scrollbars and overlapping controls.
+- Added regression coverage for language choices, localized help, layered-window opacity, settings migration, scrolling, spacing, and overlap.
+
 ## 0.2.0 - 2026-07-26
 
 - Rebuilt the detailed view as a fixed-width overview and per-model usage-analysis dashboard.
