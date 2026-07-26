@@ -21,7 +21,7 @@ public sealed class SettingsDefaultsTests
         Assert.True(settings.Display.RememberDetailHeight);
         Assert.Equal(600, settings.Display.DetailWindowHeightLogical);
         Assert.True(settings.Display.RememberSettingsHeight);
-        Assert.Equal(650, settings.Display.SettingsWindowHeightLogical);
+        Assert.Equal(680, settings.Display.SettingsWindowHeightLogical);
         Assert.Null(settings.Display.PanelPosition.X);
         Assert.Null(settings.Display.PanelPosition.Y);
         Assert.Equal(1095, settings.History.RetentionDays);
@@ -53,10 +53,28 @@ public sealed class SettingsDefaultsTests
 
         var migrated = SettingsMigration.Upgrade(settings);
 
-        Assert.Equal(3, migrated.SchemaVersion);
-        Assert.Equal(650, migrated.Display.SettingsWindowHeightLogical);
+        Assert.Equal(4, migrated.SchemaVersion);
+        Assert.Equal(680, migrated.Display.SettingsWindowHeightLogical);
         Assert.Equal(365, migrated.History.RetentionDays);
         Assert.False(migrated.UsageAnalytics.Enabled);
+    }
+
+    [Fact]
+    public void MigrationRaisesPreviouslySaved650SettingsHeight()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = 3,
+            Display = new DisplaySettings
+            {
+                SettingsWindowHeightLogical = 650,
+            },
+        };
+
+        var migrated = SettingsMigration.Upgrade(settings);
+
+        Assert.Equal(4, migrated.SchemaVersion);
+        Assert.Equal(680, migrated.Display.SettingsWindowHeightLogical);
     }
 
     [Fact]

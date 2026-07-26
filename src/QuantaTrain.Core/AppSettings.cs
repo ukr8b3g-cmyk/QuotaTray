@@ -68,7 +68,7 @@ public sealed class DisplaySettings
     public bool RememberDetailHeight { get; set; } = true;
     public int DetailWindowHeightLogical { get; set; } = 600;
     public bool RememberSettingsHeight { get; set; } = true;
-    public int SettingsWindowHeightLogical { get; set; } = 650;
+    public int SettingsWindowHeightLogical { get; set; } = 680;
     public PanelPositionSettings PanelPosition { get; set; } = new();
 
     internal DisplaySettings Clone()

@@ -6,6 +6,7 @@ internal sealed class CompactForm : FramelessForm
 {
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
+    private readonly ToolTip _help = UiHelp.Create();
     private readonly RoundedPanel _quotaCard = new();
     private readonly Label _remainingPrefix = new();
     private readonly Label _remainingPercent = new();
@@ -63,6 +64,10 @@ internal sealed class CompactForm : FramelessForm
             Bounds = new Rectangle(206, 8, 26, 30),
         };
         close.Click += (_, _) => Hide();
+        _help.SetToolTip(refresh, _localizer.Text("Help.Refresh"));
+        _help.SetToolTip(mini, _localizer.Text("Help.ShowMini"));
+        _help.SetToolTip(settings, _localizer.Text("Help.Settings"));
+        _help.SetToolTip(close, _localizer.Text("Help.Close"));
 
         var menu = BuildCompactMenu();
         ContextMenuStrip = menu;
@@ -342,5 +347,14 @@ internal sealed class CompactForm : FramelessForm
         return remaining.TotalDays >= 1
             ? $"{(int)remaining.TotalDays}D{remaining.Hours}H"
             : $"{(int)remaining.TotalHours}H{remaining.Minutes}M";
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _help.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

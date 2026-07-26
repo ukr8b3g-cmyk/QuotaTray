@@ -8,8 +8,14 @@ public sealed class LocalizationTests
     public void EveryLocaleHasTheEnglishKeySetAndMatchingPlaceholders()
     {
         var source = FindLocalesDirectory();
-        var files = Directory.GetFiles(source, "*.json");
-        Assert.Equal(10, files.Length);
+        var files = new[]
+        {
+            Path.Combine(source, "en-US.json"),
+            Path.Combine(source, "ja-JP.json"),
+        };
+        Assert.All(
+            files,
+            path => Assert.True(File.Exists(path), $"Missing locale: {path}"));
         var english = Read(Path.Combine(source, "en-US.json"));
 
         foreach (var file in files)

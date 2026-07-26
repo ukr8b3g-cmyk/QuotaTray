@@ -28,7 +28,8 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 - 詳細画面の概要／使用分析タブ
 - モデル、推論レベル、サービスタイプ、トークン、使用時間、ターン数のローカル集計
 - 9カテゴリに整理した設定、3年既定の履歴・集計保持、JSON／CSV出力
-- 日本語、英語、中国語、韓国語、ドイツ語、フランス語、スペイン語、ポルトガル語、ロシア語
+- 日本語、英語（自動選択ではWindowsが日本語なら日本語、それ以外は英語）
+- タブ、表示切り替え、使用分析、主要設定のマウスオーバーヘルプ
 
 QuantaTrayは利用状況を読み取って表示するだけで、リセット券の使用や利用枠の変更は行いません。
 
@@ -57,6 +58,8 @@ QuantaTrayは利用状況を読み取って表示するだけで、リセット�
 モデル別使用状況、トークン内訳、時間・ターン概要、推論レベル内訳を表示します。
 
 ![QuantaTray 詳細表示の使用分析画面](docs/images/usage-analysis-ja.png)
+
+> **`codex-auto-review`について：** Codexが権限判断のために自動実行する内部処理で、ユーザーが選択したメインモデルとは別に記録される場合があります。公開情報からGPT-5.4の軽い推論（low）が使用されている可能性がありますが、内部ルーティングのため確定情報ではありません。
 
 使用分析は初期状態で無効です。設定の「使用状況の取得」で有効化した場合だけ、既知のCodexセッションフォルダーを読み取り専用で走査します。
 
@@ -213,6 +216,8 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 - Local-only aggregation of model, reasoning effort, service tier, tokens, elapsed time, and turns
 - Nine consolidated settings categories, three-year default retention, and JSON/CSV exports
 - Automatic 60-second quota refresh and manual refresh
+- Japanese and English UI; Auto uses Japanese for Japanese Windows display language and English otherwise
+- Mouse-over help for tabs, view switching, usage analysis, and key settings
 
 Usage analysis is disabled by default. When enabled, it scans metadata only from known Codex session roots in read-only mode. It can scan every 1, 5, 15, or 30 minutes (5 minutes by default), or manually. Opening the usage tab can trigger an immediate scan; scans do not overlap and normally process only appended data.
 

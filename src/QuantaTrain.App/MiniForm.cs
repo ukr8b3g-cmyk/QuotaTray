@@ -8,6 +8,7 @@ internal sealed class MiniForm : FramelessForm
     private const int GwlExStyle = -20;
     private const long WsExLayered = 0x00080000L;
     private const long WsExTransparent = 0x00000020L;
+    private const uint LwaAlpha = 0x00000002;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoActivate = 0x0010;
@@ -145,13 +146,11 @@ internal sealed class MiniForm : FramelessForm
 
     public void SetClickThrough(bool enabled)
     {
-        if (_clickThrough == enabled)
-        {
-            return;
-        }
-
         _clickThrough = enabled;
-        _clickThroughItem.Checked = enabled;
+        if (_clickThroughItem.Checked != enabled)
+        {
+            _clickThroughItem.Checked = enabled;
+        }
         ApplyClickThrough();
     }
 
@@ -168,6 +167,7 @@ internal sealed class MiniForm : FramelessForm
         }
 
         _ = Handle;
+        ApplyClickThrough();
         SetWindowPos(
             Handle,
             alwaysOnTop ? HwndTopMost : nint.Zero,
@@ -252,10 +252,27 @@ internal sealed class MiniForm : FramelessForm
         }
 
         var style = GetWindowLongPtr(Handle, GwlExStyle).ToInt64();
-        style = _clickThrough
-            ? style | WsExLayered | WsExTransparent
-            : style & ~WsExTransparent;
+        if (_clickThrough)
+        {
+            style |= WsExLayered | WsExTransparent;
+        }
+        else
+        {
+            style &= ~WsExTransparent;
+            if (Opacity >= 1d)
+            {
+                style &= ~WsExLayered;
+            }
+        }
         SetWindowLongPtr(Handle, GwlExStyle, new nint(style));
+        if (_clickThrough)
+        {
+            var alpha = (byte)Math.Clamp(
+                (int)Math.Round(Opacity * byte.MaxValue),
+                byte.MinValue,
+                byte.MaxValue);
+            SetLayeredWindowAttributes(Handle, 0, alpha, LwaAlpha);
+        }
         SetWindowPos(
             Handle,
             nint.Zero,
@@ -321,6 +338,14 @@ internal sealed class MiniForm : FramelessForm
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern nint SetWindowLongPtr(nint window, int index, nint value);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetLayeredWindowAttributes(
+        nint window,
+        uint colorKey,
+        byte alpha,
+        uint flags);
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(

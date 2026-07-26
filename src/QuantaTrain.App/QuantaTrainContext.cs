@@ -751,11 +751,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         RenderPanel(form);
         if (_settings.Display.MiniClickThrough)
         {
-            if (activate || _settingsForm is null)
-            {
-                form.EnsureVisibleWithoutActivation(
-                    _settings.Display.AlwaysOnTop);
-            }
+            form.EnsureVisibleWithoutActivation(
+                _settings.Display.AlwaysOnTop);
         }
         else if (activate)
         {

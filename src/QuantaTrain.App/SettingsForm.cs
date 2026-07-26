@@ -34,6 +34,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
     private readonly AppSettings _settings;
     private readonly AppSettings _originalSettings;
     private readonly LocalizationService _localizer;
+    private readonly ToolTip _help = UiHelp.Create();
     private readonly Panel _contentHost = new();
     private readonly List<NavButton> _navButtons = [];
     private readonly List<Panel> _pages = [];
@@ -110,9 +111,12 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _localizer = localizer;
         _initialDisplayMode = initialDisplayMode;
         Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
-        ConfigureFixedLogicalWidth(800, 650, 520);
+        ConfigureFixedLogicalWidth(800, 680, 680);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray settings";
+        var contentHeight = ClientSize.Height - 122;
+        var footerTop = ClientSize.Height - 59;
+        var footerButtonTop = ClientSize.Height - 45;
 
         var title = UiFactory.Label(
             _localizer.Text("Common.Settings"),
@@ -130,22 +134,23 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
         closeIcon.Click += (_, _) => Close();
+        _help.SetToolTip(closeIcon, _localizer.Text("Help.Close"));
 
         var sidebar = new Panel
         {
-            Bounds = new Rectangle(14, 55, 190, 528),
+            Bounds = new Rectangle(14, 55, 190, contentHeight),
             BackColor = Theme.Window,
             Anchor = AnchorStyles.Left | AnchorStyles.Top |
                 AnchorStyles.Bottom,
         };
         var divider = new Panel
         {
-            Bounds = new Rectangle(210, 55, 1, 528),
+            Bounds = new Rectangle(210, 55, 1, contentHeight),
             BackColor = Theme.Border,
             Anchor = AnchorStyles.Left | AnchorStyles.Top |
                 AnchorStyles.Bottom,
         };
-        _contentHost.Bounds = new Rectangle(228, 55, 552, 528);
+        _contentHost.Bounds = new Rectangle(228, 55, 552, contentHeight);
         _contentHost.BackColor = Theme.Window;
         _contentHost.Anchor = AnchorStyles.Left | AnchorStyles.Top |
             AnchorStyles.Right | AnchorStyles.Bottom;
@@ -173,16 +178,19 @@ internal sealed class SettingsForm : FixedWidthResizableForm
 
         var footerLine = new Panel
         {
-            Bounds = new Rectangle(0, 591, 800, 1),
+            Bounds = new Rectangle(0, footerTop, 800, 1),
             BackColor = Theme.Border,
             Anchor = AnchorStyles.Left | AnchorStyles.Right |
                 AnchorStyles.Bottom,
         };
         var defaults = UiFactory.TextButton(
             _localizer.Text("Settings.RestoreDefaults"),
-            new Rectangle(18, 605, 174, 32),
+            new Rectangle(18, footerButtonTop, 174, 32),
             danger: true);
         defaults.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+        _help.SetToolTip(
+            defaults,
+            _localizer.Text("Help.RestoreDefaults"));
         defaults.Click += (_, _) =>
         {
             if (MessageBox.Show(
@@ -203,13 +211,13 @@ internal sealed class SettingsForm : FixedWidthResizableForm
 
         var cancel = UiFactory.TextButton(
             _localizer.Text("Common.Cancel"),
-            new Rectangle(570, 605, 96, 32));
+            new Rectangle(570, footerButtonTop, 96, 32));
         cancel.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         cancel.Click += (_, _) => Close();
 
         var done = UiFactory.TextButton(
             _localizer.Text("Common.Save"),
-            new Rectangle(680, 605, 102, 32),
+            new Rectangle(680, footerButtonTop, 102, 32),
             primary: true);
         done.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         done.Click += (_, _) =>
@@ -230,6 +238,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         MakeDraggable(title);
 
         LoadControls(_settings);
+        ConfigureHelp();
         SelectPage(Math.Clamp(initialPage, 0, _pages.Count - 1));
         PanelPlacement.CenterOnPrimary(this);
     }
@@ -323,8 +332,9 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         ConfigureCombo(
             _locale,
             [
-                "auto", "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
-                "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU",
+                _localizer.Text("Settings.LanguageAuto"),
+                _localizer.Text("Settings.LanguageJapanese"),
+                _localizer.Text("Settings.LanguageEnglish"),
             ]);
         _locale.Bounds = new Rectangle(350, 284, 184, 28);
         page.Controls.Add(_locale);
@@ -466,7 +476,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.ResetSettingsHeight"),
             new Rectangle(412, 518, 122, 28));
         resetSettingsHeight.Click += (_, _) =>
-            _settings.Display.SettingsWindowHeightLogical = 650;
+            _settings.Display.SettingsWindowHeightLogical = 680;
         page.Controls.AddRange(
         [
             resetPosition, resetDetailHeight, resetSettingsHeight,
@@ -688,6 +698,10 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             new Rectangle(412, 372, 122, 30));
         rebuild.Click += (_, _) =>
             UsageCacheRebuildRequested?.Invoke(this, EventArgs.Empty);
+        _help.SetToolTip(rescan, _localizer.Text("Help.Rescan"));
+        _help.SetToolTip(
+            rebuild,
+            _localizer.Text("Help.RebuildCache"));
         page.Controls.AddRange([rescan, rebuild]);
         var roots = Hint(
             _localizer.Text("Settings.UsageKnownRoots"),
@@ -1023,10 +1037,14 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             "detail" => 2,
             _ => 1,
         };
-        _locale.SelectedItem = settings.Language.Mode == "auto"
-            ? "auto"
-            : settings.Language.Locale;
-        _locale.SelectedIndex = _locale.SelectedIndex < 0 ? 0 : _locale.SelectedIndex;
+        _locale.SelectedIndex = settings.Language.Mode == "auto"
+            ? 0
+            : string.Equals(
+                settings.Language.Locale,
+                "ja-JP",
+                StringComparison.OrdinalIgnoreCase)
+                ? 1
+                : 2;
         _retention.SelectedIndex = settings.History.RetentionDays switch
         {
             365 => 0,
@@ -1101,6 +1119,43 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _loadingControls = false;
     }
 
+    private void ConfigureHelp()
+    {
+        _help.SetToolTip(_locale, _localizer.Text("Help.Language"));
+        _help.SetToolTip(_opacity, _localizer.Text("Help.Opacity"));
+        _help.SetToolTip(_alwaysOnTop, _localizer.Text("Help.AlwaysOnTop"));
+        _help.SetToolTip(_lockPosition, _localizer.Text("Help.LockPosition"));
+        _help.SetToolTip(
+            _rememberPosition,
+            _localizer.Text("Help.RememberPosition"));
+        _help.SetToolTip(_snapToEdge, _localizer.Text("Help.SnapToEdge"));
+        _help.SetToolTip(
+            _miniClickThrough,
+            _localizer.Text("Help.MiniClickThrough"));
+        _help.SetToolTip(_displayMode, _localizer.Text("Help.DisplayMode"));
+        _help.SetToolTip(
+            _usageEnabled,
+            _localizer.Text("Help.UsageEnabled"));
+        _help.SetToolTip(
+            _usageRefreshInterval,
+            _localizer.Text("Help.UsageInterval"));
+        _help.SetToolTip(
+            _usageRefreshWhenOpened,
+            _localizer.Text("Help.UsageOnOpen"));
+        _help.SetToolTip(
+            _includeArchives,
+            _localizer.Text("Help.IncludeArchives"));
+        _help.SetToolTip(
+            _usagePeriod,
+            _localizer.Text("Help.UsagePeriodDefault"));
+        _help.SetToolTip(
+            _usageMetric,
+            _localizer.Text("Help.UsageMetricDefault"));
+        _help.SetToolTip(
+            _groupOtherModels,
+            _localizer.Text("Help.GroupOther"));
+    }
+
     private void ApplyControls()
     {
         _settings.General.LaunchAtStartup = _launchAtStartup.Checked;
@@ -1121,11 +1176,14 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _rememberDetailHeight.Checked;
         _settings.Display.RememberSettingsHeight =
             _rememberSettingsHeight.Checked;
-        var locale = _locale.SelectedItem?.ToString() ?? "auto";
-        _settings.Language.Mode = locale == "auto" ? "auto" : "manual";
-        if (locale != "auto")
+        _settings.Language.Mode = _locale.SelectedIndex == 0
+            ? "auto"
+            : "manual";
+        if (_locale.SelectedIndex != 0)
         {
-            _settings.Language.Locale = locale;
+            _settings.Language.Locale = _locale.SelectedIndex == 1
+                ? "ja-JP"
+                : "en-US";
         }
         _settings.History.RetentionDays = _retention.SelectedIndex switch
         {
@@ -1303,6 +1361,15 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         {
             combo.SelectedIndex = 0;
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _help.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
 }

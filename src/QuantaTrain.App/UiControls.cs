@@ -4,6 +4,18 @@ using System.Runtime.InteropServices;
 
 namespace QuantaTrain.App;
 
+internal static class UiHelp
+{
+    public static ToolTip Create() =>
+        new()
+        {
+            InitialDelay = 500,
+            ReshowDelay = 100,
+            AutoPopDelay = 8000,
+            ShowAlways = true,
+        };
+}
+
 internal static class FluentSymbol
 {
     public const string More = "\uE712";

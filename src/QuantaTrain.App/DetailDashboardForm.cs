@@ -9,6 +9,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
     private readonly Func<int> _refreshIntervalSeconds;
+    private readonly ToolTip _help = UiHelp.Create();
     private readonly Panel _overviewPage;
     private readonly Panel _usagePage;
     private readonly Button _overviewTab;
@@ -91,6 +92,11 @@ internal sealed class DetailForm : FixedWidthResizableForm
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var close = HeaderButton("×", 748, 34);
         close.Click += (_, _) => Hide();
+        _help.SetToolTip(mini, _localizer.Text("Help.ShowMini"));
+        _help.SetToolTip(compact, _localizer.Text("Help.ShowCompact"));
+        _help.SetToolTip(refresh, _localizer.Text("Help.Refresh"));
+        _help.SetToolTip(settings, _localizer.Text("Help.Settings"));
+        _help.SetToolTip(close, _localizer.Text("Help.Close"));
         header.Controls.AddRange(
         [
             brand, title, mini, compact, refresh, settings, close,
@@ -120,6 +126,12 @@ internal sealed class DetailForm : FixedWidthResizableForm
             SelectTab(usage: true);
             UsageViewRequested?.Invoke(this, EventArgs.Empty);
         };
+        _help.SetToolTip(
+            _overviewTab,
+            _localizer.Text("Help.OverviewTab"));
+        _help.SetToolTip(
+            _usageTab,
+            _localizer.Text("Help.UsageTab"));
         _tabUnderline = new Panel
         {
             Bounds = new Rectangle(18, 40, 130, 3),
@@ -412,6 +424,9 @@ internal sealed class DetailForm : FixedWidthResizableForm
         var refresh = ActionButton(_localizer.Text("Usage.Rescan"));
         refresh.Bounds = new Rectangle(580, 7, 170, 31);
         refresh.Click += (_, _) => UsageRefreshRequested?.Invoke(this, EventArgs.Empty);
+        _help.SetToolTip(_period, _localizer.Text("Help.UsagePeriod"));
+        _help.SetToolTip(_metric, _localizer.Text("Help.UsageMetric"));
+        _help.SetToolTip(refresh, _localizer.Text("Help.Rescan"));
         filters.Controls.AddRange(
         [
             periodLabel, _period, metricLabel, _metric, refresh,
@@ -425,17 +440,30 @@ internal sealed class DetailForm : FixedWidthResizableForm
             Bounds = new Rectangle(16, 38, 718, 24),
             BackColor = Theme.Surface,
         };
-        AddHeader(modelHeader, _localizer.Text("Usage.Model"), 0, 115);
-        AddHeader(modelHeader, _localizer.Text("Usage.Share"), 270, 52);
-        AddHeader(modelHeader, _localizer.Text("Usage.TotalTokens"), 326, 96);
-        AddHeader(modelHeader, _localizer.Text("Usage.ElapsedTime"), 428, 72);
-        AddHeader(modelHeader, _localizer.Text("Usage.TurnCount"), 504, 42);
-        AddHeader(
+        var modelHeaderLabel = AddHeader(
+            modelHeader, _localizer.Text("Usage.Model"), 0, 115);
+        var shareHeader = AddHeader(
+            modelHeader, _localizer.Text("Usage.Share"), 270, 52);
+        var tokensHeader = AddHeader(
+            modelHeader, _localizer.Text("Usage.TotalTokens"), 326, 96);
+        var elapsedHeader = AddHeader(
+            modelHeader, _localizer.Text("Usage.ElapsedTime"), 428, 72);
+        var turnsHeader = AddHeader(
+            modelHeader, _localizer.Text("Usage.TurnCount"), 504, 42);
+        var reasoningHeader = AddHeader(
             modelHeader,
             _localizer.Text("Usage.ReasoningBreakdown"),
             550,
             132);
-        AddHeader(modelHeader, _localizer.Text("Usage.FastRate"), 686, 32);
+        var fastHeader = AddHeader(
+            modelHeader, _localizer.Text("Usage.FastRate"), 686, 32);
+        _help.SetToolTip(modelHeaderLabel, _localizer.Text("Help.Model"));
+        _help.SetToolTip(shareHeader, _localizer.Text("Help.Share"));
+        _help.SetToolTip(tokensHeader, _localizer.Text("Help.TotalTokens"));
+        _help.SetToolTip(elapsedHeader, _localizer.Text("Help.ElapsedTime"));
+        _help.SetToolTip(turnsHeader, _localizer.Text("Help.TurnCount"));
+        _help.SetToolTip(reasoningHeader, _localizer.Text("Help.Reasoning"));
+        _help.SetToolTip(fastHeader, _localizer.Text("Help.FastRate"));
         _modelRows.Bounds = new Rectangle(16, 63, 718, 167);
         models.Controls.AddRange([modelHeader, _modelRows]);
 
@@ -758,7 +786,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
             BackColor = Color.Transparent,
         };
 
-    private static void AddHeader(
+    private static Label AddHeader(
         Control parent,
         string text,
         int x,
@@ -769,6 +797,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         label.AutoSize = false;
         label.Size = new Size(width, 20);
         parent.Controls.Add(label);
+        return label;
     }
 
     private static Button ActionButton(string text) =>
@@ -865,6 +894,15 @@ internal sealed class DetailForm : FixedWidthResizableForm
             panel.Controls.Add(row);
         }
         panel.ResumeLayout();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _help.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     private static (string Symbol, Color Color) HistoryVisual(string value)

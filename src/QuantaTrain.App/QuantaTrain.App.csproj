@@ -20,7 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="locales\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="locales\en-US.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="locales\ja-JP.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\LICENSE" Link="LICENSE"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\PRIVACY.md" Link="PRIVACY.md"

@@ -56,30 +56,12 @@ internal sealed class LocalizationService
 
     private static string NormalizeLocale(string locale)
     {
-        var supported = new[]
+        if (string.Equals(locale, "ja-JP", StringComparison.OrdinalIgnoreCase) ||
+            locale.StartsWith("ja-", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(locale, "ja", StringComparison.OrdinalIgnoreCase))
         {
-            "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
-            "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU",
-        };
-        var exact = supported.FirstOrDefault(
-            item => string.Equals(item, locale, StringComparison.OrdinalIgnoreCase));
-        if (exact is not null)
-        {
-            return exact;
+            return "ja-JP";
         }
-
-        return locale.Split('-')[0].ToLowerInvariant() switch
-        {
-            "ja" => "ja-JP",
-            "zh" when locale.Contains("Hant", StringComparison.OrdinalIgnoreCase) => "zh-Hant",
-            "zh" => "zh-Hans",
-            "ko" => "ko-KR",
-            "de" => "de-DE",
-            "fr" => "fr-FR",
-            "es" => "es-ES",
-            "pt" => "pt-BR",
-            "ru" => "ru-RU",
-            _ => FallbackLocale,
-        };
+        return FallbackLocale;
     }
 }

@@ -70,6 +70,22 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
+    public void UnsupportedManualLocaleFallsBackToEnglish()
+    {
+        var localizer = new LocalizationService(FindLocalesDirectory());
+
+        localizer.Load(
+            new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = "fr-FR",
+            });
+
+        Assert.Equal("en-US", localizer.CurrentLocale);
+        Assert.Equal("Settings", localizer.Text("Common.Settings"));
+    }
+
+    [Fact]
     public void OpacitySliderUpdatesPanelsButKeepsSettingsOpaque()
     {
         RunSta(() =>
@@ -133,7 +149,7 @@ public sealed class RuntimeAppearanceTests
             };
             var locale = GetField<ComboBox>(languageForm, "_locale");
             Assert.Equal(DrawMode.OwnerDrawFixed, locale.DrawMode);
-            locale.SelectedItem = "ja-JP";
+            locale.SelectedIndex = 1;
 
             Assert.Equal("manual", settings.Language.Mode);
             Assert.Equal("ja-JP", settings.Language.Locale);
@@ -173,7 +189,7 @@ public sealed class RuntimeAppearanceTests
                 () => snapToEdge.Checked = true,
                 () => miniClickThrough.Checked = true,
                 () => displayMode.SelectedIndex = 0,
-                () => locale.SelectedItem = "en-US",
+                () => locale.SelectedIndex = 2,
             ];
             var changed = 0;
             var remainedOpen = true;
@@ -200,7 +216,7 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
-    public void EveryLanguageCanBeSelectedInsideDialogLoopWithoutClosingIt()
+    public void SupportedLanguagesCanBeSelectedInsideDialogLoopWithoutClosingIt()
     {
         RunSta(() =>
         {
@@ -216,18 +232,22 @@ public sealed class RuntimeAppearanceTests
             localizer.Load(settings.Language);
             using var form = new SettingsForm(settings, localizer, 2);
             var locale = GetField<ComboBox>(form, "_locale");
-            string[] choices =
-            {
-                "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
-                "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU", "auto",
-            };
+            int[] choices = [0, 1, 2];
+            Assert.Equal(3, locale.Items.Count);
+            Assert.Equal(
+                [
+                    "Auto (Windows display language)",
+                    "Japanese",
+                    "English",
+                ],
+                locale.Items.Cast<string>().ToArray());
             var selected = 0;
             using var timer = new System.Windows.Forms.Timer { Interval = 25 };
             timer.Tick += (_, _) =>
             {
                 if (selected < choices.Length)
                 {
-                    locale.SelectedItem = choices[selected++];
+                    locale.SelectedIndex = choices[selected++];
                     return;
                 }
 
@@ -241,6 +261,44 @@ public sealed class RuntimeAppearanceTests
             Assert.Equal(choices.Length, selected);
             Assert.Equal("manual", settings.Language.Mode);
             Assert.Equal("en-US", settings.Language.Locale);
+        });
+    }
+
+    [Fact]
+    public void KeySettingsAndDetailControlsHaveLocalizedHelp()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(
+                new LanguageSettings
+                {
+                    Mode = "manual",
+                    Locale = "ja-JP",
+                });
+            using var settings = new SettingsForm(
+                new AppSettings(),
+                localizer);
+            using var detail = new DetailForm(localizer);
+            var settingsHelp = GetField<ToolTip>(settings, "_help");
+            var detailHelp = GetField<ToolTip>(detail, "_help");
+
+            Assert.Equal(
+                localizer.Text("Help.Language"),
+                settingsHelp.GetToolTip(
+                    GetField<ComboBox>(settings, "_locale")));
+            Assert.Equal(
+                localizer.Text("Help.MiniClickThrough"),
+                settingsHelp.GetToolTip(
+                    GetField<ToggleSwitch>(settings, "_miniClickThrough")));
+            Assert.Equal(
+                localizer.Text("Help.OverviewTab"),
+                detailHelp.GetToolTip(
+                    GetField<Button>(detail, "_overviewTab")));
+            Assert.Equal(
+                localizer.Text("Help.UsagePeriod"),
+                detailHelp.GetToolTip(
+                    GetField<ComboBox>(detail, "_period")));
         });
     }
 
@@ -279,6 +337,12 @@ public sealed class RuntimeAppearanceTests
 
             form.SetClickThrough(true);
             var enabledStyle = GetWindowLongPtr(handle, -20).ToInt64();
+            Assert.True(
+                GetLayeredWindowAttributes(
+                    handle,
+                    out _,
+                    out var alpha,
+                    out var flags));
             form.SetClickThrough(false);
             var disabledStyle = GetWindowLongPtr(handle, -20).ToInt64();
 
@@ -286,6 +350,8 @@ public sealed class RuntimeAppearanceTests
             Assert.Equal(new Size(220, 95), form.ClientSize);
             Assert.NotEqual(0, enabledStyle & 0x20L);
             Assert.Equal(0, disabledStyle & 0x20L);
+            Assert.Equal(byte.MaxValue, alpha);
+            Assert.NotEqual(0u, flags & 0x2u);
         });
     }
 
@@ -304,8 +370,16 @@ public sealed class RuntimeAppearanceTests
             Application.DoEvents();
 
             var style = GetWindowLongPtr(form.Handle, -20).ToInt64();
+            var attributesAvailable = GetLayeredWindowAttributes(
+                form.Handle,
+                out _,
+                out var alpha,
+                out var flags);
             Assert.True(form.Visible);
             Assert.NotEqual(0, style & 0x20L);
+            Assert.True(attributesAvailable);
+            Assert.Equal(byte.MaxValue, alpha);
+            Assert.NotEqual(0u, flags & 0x2u);
         });
     }
 
@@ -476,15 +550,7 @@ public sealed class RuntimeAppearanceTests
     [Theory]
     [InlineData("ja-JP")]
     [InlineData("en-US")]
-    [InlineData("zh-Hans")]
-    [InlineData("zh-Hant")]
-    [InlineData("ko-KR")]
-    [InlineData("de-DE")]
-    [InlineData("fr-FR")]
-    [InlineData("es-ES")]
-    [InlineData("pt-BR")]
-    [InlineData("ru-RU")]
-    public void QuotaHeaderDoesNotOverlapInAnyLanguage(string locale)
+    public void QuotaHeaderDoesNotOverlapInSupportedLanguages(string locale)
     {
         RunSta(() =>
         {
@@ -663,9 +729,9 @@ public sealed class RuntimeAppearanceTests
 
             Assert.Equal(800, detail.ClientSize.Width);
             Assert.Equal(800, settings.ClientSize.Width);
-            Assert.Equal(650, settings.ClientSize.Height);
+            Assert.Equal(680, settings.ClientSize.Height);
             Assert.Equal(520, detail.MinimumSize.Height);
-            Assert.Equal(520, settings.MinimumSize.Height);
+            Assert.Equal(680, settings.MinimumSize.Height);
             Assert.Equal(AutoScaleMode.Dpi, detail.AutoScaleMode);
             Assert.Equal(AutoScaleMode.Dpi, settings.AutoScaleMode);
             var detailHeight = detail.Height;
@@ -697,6 +763,10 @@ public sealed class RuntimeAppearanceTests
                 new AppSettings(),
                 localizer,
                 initialPage: 6);
+            using var display = new SettingsForm(
+                new AppSettings(),
+                localizer,
+                initialPage: 1);
             var generalSettings = new AppSettings();
             generalSettings.General.StartupMode = "compact";
             generalSettings.Language.Mode = "manual";
@@ -718,16 +788,19 @@ public sealed class RuntimeAppearanceTests
                 localizer,
                 initialPage: 7);
             usage.Show();
+            display.Show();
             general.Show();
             notifications.Show();
             acquisition.Show();
             advanced.Show();
             Application.DoEvents();
 
-            Assert.Equal(650, usage.ClientSize.Height);
-            Assert.Equal(650, acquisition.ClientSize.Height);
-            Assert.Equal(650, advanced.ClientSize.Height);
+            Assert.Equal(680, usage.ClientSize.Height);
+            Assert.Equal(680, acquisition.ClientSize.Height);
+            Assert.Equal(680, advanced.ClientSize.Height);
             var usagePage = GetField<List<Panel>>(usage, "_pages")
+                .Single(page => page.Visible);
+            var displayPage = GetField<List<Panel>>(display, "_pages")
                 .Single(page => page.Visible);
             var generalPage = GetField<List<Panel>>(general, "_pages")
                 .Single(page => page.Visible);
@@ -741,6 +814,32 @@ public sealed class RuntimeAppearanceTests
             Assert.False(
                 usagePage.VerticalScroll.Visible,
                 $"usage client={usagePage.ClientSize} display={usagePage.DisplayRectangle} maxBottom={usagePage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            Assert.False(
+                displayPage.VerticalScroll.Visible,
+                $"display client={displayPage.ClientSize} display={displayPage.DisplayRectangle} maxBottom={displayPage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            var displayMaxBottom = displayPage.Controls
+                .Cast<Control>()
+                .Max(control => control.Bottom);
+            Assert.True(
+                displayPage.ClientSize.Height - displayMaxBottom >= 8,
+                $"display bottom margin was insufficient: client={displayPage.ClientSize.Height}, maxBottom={displayMaxBottom}");
+            var displayStateLabel = displayPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text == localizer.Text("Settings.DisplayState"));
+            var rememberSettingsHeightLabel = displayPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text ==
+                    localizer.Text("Settings.RememberSettingsHeight"));
+            AssertNoOverlap(
+                rememberSettingsHeightLabel,
+                displayStateLabel,
+                "remember settings height / display state");
+            AssertNoOverlap(
+                displayStateLabel,
+                GetField<ComboBox>(display, "_displayMode"),
+                "display state label / display mode");
             Assert.False(
                 generalPage.VerticalScroll.Visible,
                 $"general client={generalPage.ClientSize} display={generalPage.DisplayRectangle} maxBottom={generalPage.Controls.Cast<Control>().Max(control => control.Bottom)}");
@@ -783,7 +882,7 @@ public sealed class RuntimeAppearanceTests
                 FlatStyle.Standard,
                 locale.FlatStyle);
             Assert.Equal(
-                "ja-JP",
+                localizer.Text("Settings.LanguageJapanese"),
                 locale.SelectedItem);
             Assert.Same(
                 advancedPage,
@@ -1407,4 +1506,12 @@ public sealed class RuntimeAppearanceTests
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint window, int index);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetLayeredWindowAttributes(
+        nint window,
+        out uint colorKey,
+        out byte alpha,
+        out uint flags);
 }

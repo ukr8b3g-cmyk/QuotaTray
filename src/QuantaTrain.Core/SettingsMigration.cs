@@ -2,7 +2,7 @@ namespace QuantaTrain.Core;
 
 public static class SettingsMigration
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public static AppSettings Upgrade(AppSettings settings)
     {
@@ -21,10 +21,10 @@ public static class SettingsMigration
 
         settings.Display.DetailWindowHeightLogical =
             Math.Clamp(settings.Display.DetailWindowHeightLogical, 520, 2160);
-        if (settings.SchemaVersion < 3 &&
-            settings.Display.SettingsWindowHeightLogical == 600)
+        if (settings.SchemaVersion < 4 &&
+            settings.Display.SettingsWindowHeightLogical < 680)
         {
-            settings.Display.SettingsWindowHeightLogical = 650;
+            settings.Display.SettingsWindowHeightLogical = 680;
         }
         settings.Display.SettingsWindowHeightLogical =
             Math.Clamp(settings.Display.SettingsWindowHeightLogical, 520, 2160);
