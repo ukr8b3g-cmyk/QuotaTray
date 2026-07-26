@@ -13,6 +13,11 @@ internal sealed class CompactForm : FramelessForm
     private readonly Label _reset = new();
     private readonly Label _countdown = new();
     private readonly Label _status = new();
+    private readonly RoundedPanel _creditsCard = new();
+    private readonly Label _creditCount = new();
+    private readonly Label _creditExpiry = new();
+    private readonly RoundedPanel _historyCard = new();
+    private readonly Label _historyValue = new();
     private readonly Button _signIn;
 
     public CompactForm(LocalizationService localizer, Func<bool>? canDrag = null)
@@ -20,7 +25,7 @@ internal sealed class CompactForm : FramelessForm
         _localizer = localizer;
         _canDrag = canDrag ?? (() => true);
         Text = "QuantaTray";
-        ClientSize = new Size(240, 180);
+        ClientSize = new Size(240, 338);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray compact quota panel";
 
@@ -30,26 +35,39 @@ internal sealed class CompactForm : FramelessForm
             new Point(42, 11),
             10F,
             FontStyle.Bold);
-        title.Size = new Size(116, 25);
+        title.Size = new Size(86, 25);
         title.AutoSize = false;
         title.TextAlign = ContentAlignment.MiddleLeft;
 
-        var more = new IconButton(FluentSymbol.More)
+        var refresh = new IconButton(FluentSymbol.Refresh)
+        {
+            AccessibleName = _localizer.Text("Common.Refresh"),
+            Bounds = new Rectangle(128, 8, 26, 30),
+        };
+        refresh.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
+        var mini = new IconButton(FluentSymbol.Compact)
+        {
+            AccessibleName = _localizer.Text("Menu.ShowMini"),
+            Bounds = new Rectangle(154, 8, 26, 30),
+        };
+        mini.Click += (_, _) => MiniRequested?.Invoke(this, EventArgs.Empty);
+        var settings = new IconButton(FluentSymbol.Settings)
         {
             AccessibleName = _localizer.Text("Common.Settings"),
-            Bounds = new Rectangle(167, 8, 29, 30),
+            Bounds = new Rectangle(180, 8, 26, 30),
         };
+        settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var close = new IconButton(FluentSymbol.Close)
         {
             AccessibleName = _localizer.Text("Common.Close"),
-            Bounds = new Rectangle(201, 8, 29, 30),
+            Bounds = new Rectangle(206, 8, 26, 30),
         };
         close.Click += (_, _) => Hide();
 
         var menu = BuildCompactMenu();
-        more.Click += (_, _) => menu.Show(more, new Point(-100, more.Height + 2));
+        ContextMenuStrip = menu;
 
-        _quotaCard.Bounds = new Rectangle(10, 48, 220, 122);
+        _quotaCard.Bounds = new Rectangle(10, 44, 220, 112);
         var weekly = UiFactory.Label(
             _localizer.Text("Quota.Weekly"),
             new Point(10, 4),
@@ -70,28 +88,29 @@ internal sealed class CompactForm : FramelessForm
         _remainingPercent.BackColor = Color.Transparent;
         _remainingPercent.Text = "—";
 
-        _progress.Bounds = new Rectangle(10, 54, 200, 10);
-        _reset = UiFactory.Label(string.Empty, new Point(10, 72), 7.8F);
+        _progress.Bounds = new Rectangle(10, 58, 200, 9);
+        _reset = UiFactory.Label(string.Empty, new Point(10, 72), 7.7F);
         _reset.AutoSize = false;
-        _reset.Size = new Size(200, 17);
+        _reset.Size = new Size(200, 16);
         _reset.AutoEllipsis = true;
-        _countdown = UiFactory.Label(string.Empty, new Point(10, 90), 7.8F);
+        _countdown = UiFactory.Label(string.Empty, new Point(10, 86), 7.1F);
         _countdown.AutoSize = false;
-        _countdown.Size = new Size(200, 16);
+        _countdown.Size = new Size(200, 15);
         _countdown.TextAlign = ContentAlignment.TopCenter;
         _status = UiFactory.Label(
             string.Empty,
-            new Point(10, 106),
+            new Point(10, 92),
             7.2F,
             FontStyle.Regular,
             Theme.Muted);
         _status.AutoSize = false;
-        _status.Size = new Size(200, 14);
+        _status.Size = new Size(200, 18);
+        _status.TextAlign = ContentAlignment.MiddleLeft;
         _status.AutoEllipsis = true;
 
         _signIn = UiFactory.TextButton(
             _localizer.Text("Auth.SignIn"),
-            new Rectangle(10, 72, 200, 29),
+            new Rectangle(10, 68, 200, 29),
             primary: true);
         _signIn.Visible = false;
         _signIn.Click += (_, _) => SignInRequested?.Invoke(this, EventArgs.Empty);
@@ -101,7 +120,14 @@ internal sealed class CompactForm : FramelessForm
             weekly, _remainingPrefix, _remainingPercent, _progress,
             _reset, _countdown, _status, _signIn,
         ]);
-        Controls.AddRange([brand, title, more, close, _quotaCard]);
+
+        BuildCreditsCard();
+        BuildHistoryCard();
+        Controls.AddRange(
+        [
+            brand, title, refresh, mini, settings, close,
+            _quotaCard, _creditsCard, _historyCard,
+        ]);
 
         MakeDraggable(this);
         MakeDraggable(brand);
@@ -126,7 +152,11 @@ internal sealed class CompactForm : FramelessForm
         _countdown.Visible = signedIn;
     }
 
-    public void UpdateState(WeeklyQuotaState? state, bool updating, string? error)
+    public void UpdateState(
+        WeeklyQuotaState? state,
+        bool updating,
+        string? error,
+        IReadOnlyList<string>? history = null)
     {
         if (state is null)
         {
@@ -136,6 +166,8 @@ internal sealed class CompactForm : FramelessForm
             _progress.Value = 0;
             _reset.Text = _localizer.Text("Quota.Unavailable");
             _countdown.Text = string.Empty;
+            _creditCount.Text = "—";
+            _creditExpiry.Text = _localizer.Text("Credits.DetailsUnavailable");
         }
         else
         {
@@ -148,22 +180,103 @@ internal sealed class CompactForm : FramelessForm
             _progress.Value = (int)Math.Round(Math.Clamp(remaining, 0d, 100d));
             _reset.Text = state.ResetsAtUtc is null
                 ? _localizer.Text("Quota.NextReset", "—")
-                : _localizer.Text(
+                : $"{_localizer.Text(
                     "Quota.NextReset",
-                    state.ResetsAtUtc.Value.ToLocalTime().ToString("g"));
-            _countdown.Text = state.ResetsAtUtc is null
-                ? string.Empty
+                    state.ResetsAtUtc.Value.ToLocalTime()
+                        .ToString("yyyy/MM/dd HH:mm"))} " +
+                  $"({FormatCountdown(state.ResetsAtUtc.Value)})";
+            _countdown.Text = string.Empty;
+            _creditCount.Text = state.ResetCreditCount is > 0
+                ? _localizer.Text(
+                    "Credits.Available",
+                    state.ResetCreditCount.Value)
+                : _localizer.Text("Credits.None");
+            var earliestExpiry = state.ResetCredits?
+                .Where(credit => credit.ExpiresAtUtc is not null)
+                .MinBy(credit => credit.ExpiresAtUtc)
+                ?.ExpiresAtUtc;
+            _creditExpiry.Text = earliestExpiry is null
+                ? _localizer.Text("Credits.DetailsUnavailable")
                 : _localizer.Text(
-                    "Quota.Countdown",
-                    FormatCountdown(state.ResetsAtUtc.Value));
+                    "Credits.Expires",
+                    earliestExpiry.Value.ToLocalTime()
+                        .ToString("yyyy/MM/dd HH:mm"));
         }
 
+        _historyValue.Text = CompactHistory(
+            history?.FirstOrDefault() ??
+            _localizer.Text("History.Empty"));
         _status.Text = updating
             ? _localizer.Text("Status.Updating")
             : error is not null
                 ? _localizer.Text("Status.Failed")
                 : string.Empty;
         AlignRemaining();
+    }
+
+    private void BuildCreditsCard()
+    {
+        _creditsCard.Bounds = new Rectangle(10, 164, 220, 76);
+        var heading = UiFactory.Label(
+            _localizer.Text("Credits.Title"),
+            new Point(10, 7),
+            8.4F,
+            FontStyle.Bold);
+        heading.AutoSize = false;
+        heading.Size = new Size(90, 22);
+        _creditCount.Bounds = new Rectangle(99, 7, 111, 22);
+        _creditCount.Font = Theme.Ui(7.8F);
+        _creditCount.ForeColor = Theme.Text;
+        _creditCount.BackColor = Color.Transparent;
+        _creditCount.TextAlign = ContentAlignment.MiddleRight;
+        _creditCount.AutoEllipsis = true;
+        _creditExpiry.Bounds = new Rectangle(10, 38, 200, 21);
+        _creditExpiry.Font = Theme.Ui(8F);
+        _creditExpiry.ForeColor = Theme.Text;
+        _creditExpiry.BackColor = Color.Transparent;
+        _creditExpiry.AutoEllipsis = true;
+        _creditsCard.Controls.AddRange(
+        [
+            heading, _creditCount, _creditExpiry,
+        ]);
+    }
+
+    private void BuildHistoryCard()
+    {
+        _historyCard.Bounds = new Rectangle(10, 248, 220, 80);
+        var heading = UiFactory.Label(
+            _localizer.Text("History.Title"),
+            new Point(10, 7),
+            7.8F,
+            FontStyle.Regular);
+        heading.AutoSize = false;
+        heading.Size = new Size(130, 22);
+        var showAll = UiFactory.TextButton(
+            _localizer.Text("History.ShowAll"),
+            new Rectangle(140, 4, 70, 25));
+        showAll.FlatAppearance.BorderSize = 0;
+        showAll.BackColor = Theme.Surface;
+        showAll.ForeColor = Theme.Blue;
+        showAll.Font = Theme.Ui(7.1F);
+        showAll.Click += (_, _) => DetailRequested?.Invoke(this, EventArgs.Empty);
+        _historyValue.Bounds = new Rectangle(10, 35, 200, 36);
+        _historyValue.Font = Theme.Ui(8F);
+        _historyValue.ForeColor = Theme.Text;
+        _historyValue.BackColor = Color.Transparent;
+        _historyValue.AutoEllipsis = false;
+        _historyCard.Controls.AddRange(
+        [
+            heading, showAll, _historyValue,
+        ]);
+    }
+
+    private static string CompactHistory(string value)
+    {
+        var separator = value.IndexOf("  ", StringComparison.Ordinal);
+        return separator > 0
+            ? $"{value[..separator]}{Environment.NewLine}" +
+              value[(separator + 2)..].Trim()
+            : value;
     }
 
     public void PositionNearTray()
@@ -223,11 +336,11 @@ internal sealed class CompactForm : FramelessForm
         var remaining = resetAtUtc - DateTimeOffset.UtcNow;
         if (remaining <= TimeSpan.Zero)
         {
-            return "0m";
+            return "0M";
         }
 
         return remaining.TotalDays >= 1
-            ? $"{(int)remaining.TotalDays}d {remaining.Hours}h"
-            : $"{(int)remaining.TotalHours}h {remaining.Minutes}m";
+            ? $"{(int)remaining.TotalDays}D{remaining.Hours}H"
+            : $"{(int)remaining.TotalHours}H{remaining.Minutes}M";
     }
 }

@@ -21,11 +21,16 @@ public sealed class SettingsDefaultsTests
         Assert.True(settings.Display.RememberDetailHeight);
         Assert.Equal(600, settings.Display.DetailWindowHeightLogical);
         Assert.True(settings.Display.RememberSettingsHeight);
-        Assert.Equal(600, settings.Display.SettingsWindowHeightLogical);
+        Assert.Equal(650, settings.Display.SettingsWindowHeightLogical);
         Assert.Null(settings.Display.PanelPosition.X);
         Assert.Null(settings.Display.PanelPosition.Y);
         Assert.Equal(1095, settings.History.RetentionDays);
+        Assert.True(settings.Notifications.Remaining30);
+        Assert.True(settings.Notifications.Remaining10);
+        Assert.True(settings.Notifications.ScheduledReset);
         Assert.False(settings.UsageAnalytics.Enabled);
+        Assert.Equal(5, settings.UsageAnalytics.RefreshIntervalMinutes);
+        Assert.True(settings.UsageAnalytics.RefreshWhenOpened);
         Assert.True(settings.UsageAnalytics.IncludeArchivedSessions);
         Assert.Equal("current-window", settings.UsageAnalytics.DefaultPeriod);
         Assert.Equal("total-tokens", settings.UsageAnalytics.DefaultMetric);
@@ -39,12 +44,17 @@ public sealed class SettingsDefaultsTests
         var settings = new AppSettings
         {
             SchemaVersion = 1,
+            Display = new DisplaySettings
+            {
+                SettingsWindowHeightLogical = 600,
+            },
             History = new HistorySettings { RetentionDays = 365 },
         };
 
         var migrated = SettingsMigration.Upgrade(settings);
 
-        Assert.Equal(2, migrated.SchemaVersion);
+        Assert.Equal(3, migrated.SchemaVersion);
+        Assert.Equal(650, migrated.Display.SettingsWindowHeightLogical);
         Assert.Equal(365, migrated.History.RetentionDays);
         Assert.False(migrated.UsageAnalytics.Enabled);
     }

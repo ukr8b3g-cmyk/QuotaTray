@@ -32,8 +32,28 @@ public sealed class RuntimeAppearanceTests
 
         Assert.NotEqual(green, Theme.Accent);
         Assert.Equal(Theme.Accent, Theme.QuotaColor(98.4));
-        Assert.Equal(Theme.Yellow, Theme.QuotaColor(30));
+        Assert.Equal(Theme.Orange, Theme.QuotaColor(30));
         Assert.Equal(Theme.Red, Theme.QuotaColor(10));
+    }
+
+    [Theory]
+    [InlineData("blue")]
+    [InlineData("cyan")]
+    public void BlueFamilyAccentsUseGreenForUsedQuota(string accent)
+    {
+        Theme.Configure("dark", accent);
+        try
+        {
+            Assert.Equal(Theme.Green, Theme.UsedQuota);
+            Assert.NotEqual(Theme.Accent, Theme.UsedQuota);
+            Assert.Equal(Theme.Accent, Theme.QuotaColor(82));
+            Assert.Equal(Theme.Orange, Theme.QuotaColor(30));
+            Assert.Equal(Theme.Red, Theme.QuotaColor(10));
+        }
+        finally
+        {
+            Theme.Configure("dark", "green");
+        }
     }
 
     [Fact]
@@ -112,6 +132,7 @@ public sealed class RuntimeAppearanceTests
                 }
             };
             var locale = GetField<ComboBox>(languageForm, "_locale");
+            Assert.Equal(DrawMode.OwnerDrawFixed, locale.DrawMode);
             locale.SelectedItem = "ja-JP";
 
             Assert.Equal("manual", settings.Language.Mode);
@@ -262,7 +283,7 @@ public sealed class RuntimeAppearanceTests
             var disabledStyle = GetWindowLongPtr(handle, -20).ToInt64();
 
             Assert.Equal(handle, form.Handle);
-            Assert.Equal(new Size(232, 126), form.ClientSize);
+            Assert.Equal(new Size(220, 95), form.ClientSize);
             Assert.NotEqual(0, enabledStyle & 0x20L);
             Assert.Equal(0, disabledStyle & 0x20L);
         });
@@ -499,17 +520,17 @@ public sealed class RuntimeAppearanceTests
     public void PanelPlacementClampsAndSnapsWithinWorkingArea()
     {
         var area = new Rectangle(100, 50, 1000, 700);
-        var size = new Size(232, 126);
+        var size = new Size(220, 95);
 
         Assert.Equal(
             new Point(100, 50),
             PanelPlacement.ClampToWorkingArea(area, size, new Point(-50, -50)));
         Assert.Equal(
-            new Point(868, 624),
+            new Point(880, 655),
             PanelPlacement.SnapToWorkingArea(
                 area,
                 size,
-                new Point(860, 620),
+                new Point(888, 648),
                 16));
     }
 
@@ -526,10 +547,10 @@ public sealed class RuntimeAppearanceTests
             using var compact = new Form
             {
                 StartPosition = FormStartPosition.Manual,
-                Size = new Size(232, 126),
+                Size = new Size(220, 95),
                 Location = new Point(
-                    secondary.WorkingArea.Right - 232,
-                    secondary.WorkingArea.Bottom - 126),
+                    secondary.WorkingArea.Right - 220,
+                    secondary.WorkingArea.Bottom - 95),
             };
             using var detail = new Form
             {
@@ -607,10 +628,11 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
-    public void DetailAndSettingsUseFixed800WidthAndThirteenSettingsPages()
+    public void DetailAndSettingsUseFixed800WidthAndNineSettingsPages()
     {
         RunSta(() =>
         {
+            Theme.Configure("dark", "green");
             var localizer = new LocalizationService(FindLocalesDirectory());
             localizer.Load(new LanguageSettings());
             using var detail = new DetailForm(localizer);
@@ -641,6 +663,7 @@ public sealed class RuntimeAppearanceTests
 
             Assert.Equal(800, detail.ClientSize.Width);
             Assert.Equal(800, settings.ClientSize.Width);
+            Assert.Equal(650, settings.ClientSize.Height);
             Assert.Equal(520, detail.MinimumSize.Height);
             Assert.Equal(520, settings.MinimumSize.Height);
             Assert.Equal(AutoScaleMode.Dpi, detail.AutoScaleMode);
@@ -652,10 +675,304 @@ public sealed class RuntimeAppearanceTests
             Assert.Equal(800, settings.Width);
             Assert.Equal(detailHeight + 40, detail.Height);
             Assert.Equal(
-                13,
+                9,
                 Descendants(settings).OfType<NavButton>().Count());
             SaveSnapshotIfRequested(detail, "overview.png");
             SaveSnapshotIfRequested(settings, "settings.png");
+        });
+    }
+
+    [Fact]
+    public void SettingsOpensAtReadableHeightWithoutInitialPageScroll()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = "ja-JP",
+            });
+            using var usage = new SettingsForm(
+                new AppSettings(),
+                localizer,
+                initialPage: 6);
+            var generalSettings = new AppSettings();
+            generalSettings.General.StartupMode = "compact";
+            generalSettings.Language.Mode = "manual";
+            generalSettings.Language.Locale = "ja-JP";
+            using var general = new SettingsForm(
+                generalSettings,
+                localizer,
+                initialPage: 0);
+            using var notifications = new SettingsForm(
+                new AppSettings(),
+                localizer,
+                initialPage: 2);
+            using var acquisition = new SettingsForm(
+                new AppSettings(),
+                localizer,
+                initialPage: 5);
+            using var advanced = new SettingsForm(
+                new AppSettings(),
+                localizer,
+                initialPage: 7);
+            usage.Show();
+            general.Show();
+            notifications.Show();
+            acquisition.Show();
+            advanced.Show();
+            Application.DoEvents();
+
+            Assert.Equal(650, usage.ClientSize.Height);
+            Assert.Equal(650, acquisition.ClientSize.Height);
+            Assert.Equal(650, advanced.ClientSize.Height);
+            var usagePage = GetField<List<Panel>>(usage, "_pages")
+                .Single(page => page.Visible);
+            var generalPage = GetField<List<Panel>>(general, "_pages")
+                .Single(page => page.Visible);
+            var notificationsPage =
+                GetField<List<Panel>>(notifications, "_pages")
+                    .Single(page => page.Visible);
+            var acquisitionPage = GetField<List<Panel>>(acquisition, "_pages")
+                .Single(page => page.Visible);
+            var advancedPage = GetField<List<Panel>>(advanced, "_pages")
+                .Single(page => page.Visible);
+            Assert.False(
+                usagePage.VerticalScroll.Visible,
+                $"usage client={usagePage.ClientSize} display={usagePage.DisplayRectangle} maxBottom={usagePage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            Assert.False(
+                generalPage.VerticalScroll.Visible,
+                $"general client={generalPage.ClientSize} display={generalPage.DisplayRectangle} maxBottom={generalPage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            Assert.False(notificationsPage.VerticalScroll.Visible);
+            Assert.False(
+                acquisitionPage.VerticalScroll.Visible,
+                $"acquisition client={acquisitionPage.ClientSize} display={acquisitionPage.DisplayRectangle} maxBottom={acquisitionPage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            Assert.False(
+                advancedPage.VerticalScroll.Visible,
+                $"advanced client={advancedPage.ClientSize} display={advancedPage.DisplayRectangle} maxBottom={advancedPage.Controls.Cast<Control>().Max(control => control.Bottom)}");
+            var navigation = Descendants(usage)
+                .OfType<NavButton>()
+                .Select(button => button.AccessibleName)
+                .ToArray();
+            Assert.DoesNotContain(
+                localizer.Text("Settings.UsageEstimates"),
+                navigation);
+            Assert.DoesNotContain(
+                localizer.Text("Settings.Backup"),
+                navigation);
+            Assert.DoesNotContain(
+                localizer.Text("Settings.Language"),
+                navigation);
+            Assert.DoesNotContain(
+                localizer.Text("Settings.Connection"),
+                navigation);
+            Assert.Same(
+                generalPage,
+                GetField<ComboBox>(general, "_locale").Parent);
+            var locale = GetField<ComboBox>(general, "_locale");
+            var languageHeading = generalPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text == localizer.Text("Settings.Language"));
+            AssertNoOverlap(
+                languageHeading,
+                locale,
+                "language heading / locale");
+            Assert.Equal(
+                FlatStyle.Standard,
+                locale.FlatStyle);
+            Assert.Equal(
+                "ja-JP",
+                locale.SelectedItem);
+            Assert.Same(
+                advancedPage,
+                GetField<ComboBox>(advanced, "_codexPathMode").Parent);
+            var codexPath = GetField<TextBox>(advanced, "_codexPath");
+            var codexLabel = advancedPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text == localizer.Text("Settings.CodexExecutable"));
+            var backupHint = advancedPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text == localizer.Text("Settings.BackupHint"));
+            var logRetentionLabel = advancedPage.Controls
+                .OfType<Label>()
+                .Single(label =>
+                    label.Text == localizer.Text("Settings.LogRetention"));
+            var logRetention = GetField<ComboBox>(advanced, "_logRetention");
+            AssertNoOverlap(
+                codexLabel,
+                codexPath,
+                "Codex executable label / path");
+            AssertNoOverlap(
+                backupHint,
+                logRetentionLabel,
+                "backup hint / log retention label");
+            AssertNoOverlap(
+                backupHint,
+                logRetention,
+                "backup hint / log retention combo");
+            Assert.True(
+                GetField<ToggleSwitch>(
+                    notifications,
+                    "_remaining30Notification").Checked);
+            Assert.True(
+                GetField<ToggleSwitch>(
+                    notifications,
+                    "_remaining10Notification").Checked);
+            Assert.True(
+                GetField<ToggleSwitch>(
+                    notifications,
+                    "_scheduledResetNotification").Checked);
+            SaveSnapshotIfRequested(usage, "settings-usage-display.png");
+            SaveSnapshotIfRequested(general, "settings-general.png");
+            SaveSnapshotIfRequested(
+                notifications,
+                "settings-notifications.png");
+            SaveSnapshotIfRequested(
+                acquisition,
+                "settings-usage-acquisition.png");
+            SaveSnapshotIfRequested(advanced, "settings-advanced.png");
+        });
+    }
+
+    [Fact]
+    public void DetailHeaderReturnsToMiniAndCompactAndOverviewUsesDashboardLayout()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = "ja-JP",
+            });
+            using var detail = new DetailForm(localizer);
+            var miniRequested = false;
+            var compactRequested = false;
+            var usageRequested = false;
+            detail.MiniRequested += (_, _) => miniRequested = true;
+            detail.CompactRequested += (_, _) => compactRequested = true;
+            detail.UsageViewRequested += (_, _) => usageRequested = true;
+            detail.UpdateState(
+                new WeeklyQuotaState(
+                    "weekly",
+                    BucketRole.Primary,
+                    7,
+                    93,
+                    10080,
+                    DateTimeOffset.Now.AddDays(6),
+                    3,
+                    [
+                        new ResetCredit(DateTimeOffset.Now.AddDays(17)),
+                        new ResetCredit(DateTimeOffset.Now.AddDays(41)),
+                        new ResetCredit(DateTimeOffset.Now.AddDays(76)),
+                    ],
+                    "ChatGPT Pro",
+                    DateTimeOffset.Now,
+                    "0.2.0"),
+                false,
+                null,
+                []);
+            detail.Show();
+            Application.DoEvents();
+
+            Descendants(detail)
+                .OfType<Button>()
+                .Single(button =>
+                    button.Text == localizer.Text("Menu.ShowMini"))
+                .PerformClick();
+            Descendants(detail)
+                .OfType<Button>()
+                .Single(button =>
+                    button.Text == localizer.Text("Menu.ShowCompact"))
+                .PerformClick();
+            Descendants(detail)
+                .OfType<Button>()
+                .Single(button =>
+                    button.Text == localizer.Text("Detail.UsageTab"))
+                .PerformClick();
+
+            Assert.True(miniRequested);
+            Assert.True(compactRequested);
+            Assert.True(usageRequested);
+            Assert.Equal(
+                3,
+                GetField<FlowLayoutPanel>(detail, "_credits")
+                    .Controls
+                    .OfType<RoundedPanel>()
+                    .Count());
+            Assert.True(GetField<Label>(detail, "_resetAt").Font.Bold);
+            var plan = GetField<Label>(detail, "_plan");
+            var connection = GetField<Label>(detail, "_connection");
+            var version = GetField<Label>(detail, "_version");
+            Assert.Equal(plan.Left, connection.Left);
+            Assert.Equal(plan.Left, version.Left);
+            Assert.StartsWith("● ", connection.Text);
+            Assert.Equal(Theme.Green, connection.ForeColor);
+            Assert.Contains(
+                localizer.Text("Detail.DataSource"),
+                GetField<Label>(detail, "_status").Text);
+            Assert.True(
+                GetField<Label>(detail, "_status").Parent!.Bottom <=
+                detail.ClientSize.Height - 96);
+            Assert.Contains(
+                "93%",
+                GetField<QuotaRingControl>(detail, "_quotaRing").Controls
+                    .OfType<Label>()
+                    .Select(label => label.Text));
+        });
+    }
+
+    [Fact]
+    public void BlueFamilyDashboardUsesDistinctGreenForUsedQuota()
+    {
+        RunSta(() =>
+        {
+            Theme.Configure("dark", "cyan");
+            try
+            {
+                var localizer = new LocalizationService(FindLocalesDirectory());
+                localizer.Load(new LanguageSettings
+                {
+                    Mode = "manual",
+                    Locale = "ja-JP",
+                });
+                using var detail = new DetailForm(localizer);
+                detail.UpdateState(
+                    new WeeklyQuotaState(
+                        "weekly",
+                        BucketRole.Primary,
+                        18,
+                        82,
+                        10080,
+                        DateTimeOffset.Now.AddDays(6),
+                        0,
+                        [],
+                        "ChatGPT Pro",
+                        DateTimeOffset.Now,
+                        "0.2.0"),
+                    false,
+                    null,
+                    []);
+                detail.Show();
+                Application.DoEvents();
+
+                Assert.Equal(
+                    Theme.Green,
+                    GetField<Label>(detail, "_usedShare").ForeColor);
+                Assert.Equal(
+                    Theme.Accent,
+                    GetField<Label>(detail, "_remainingShare").ForeColor);
+                Assert.NotEqual(Theme.UsedQuota, Theme.Accent);
+                SaveSnapshotIfRequested(detail, "overview-cyan.png");
+            }
+            finally
+            {
+                Theme.Configure("dark", "green");
+            }
         });
     }
 
@@ -679,12 +996,40 @@ public sealed class RuntimeAppearanceTests
             Assert.Equal("dark", appSettings.Display.Theme);
 
             using var saved = new SettingsForm(appSettings, localizer);
+            saved.Show();
+            Application.DoEvents();
             GetField<ComboBox>(saved, "_theme").SelectedItem = "light";
+            GetField<ComboBox>(saved, "_usageRefreshInterval").SelectedIndex = 0;
+            GetField<ToggleSwitch>(saved, "_usageRefreshWhenOpened").Checked = false;
             var save = Descendants(saved)
                 .OfType<Button>()
                 .Single(button => button.Text == localizer.Text("Common.Save"));
             save.PerformClick();
             Assert.Equal("light", appSettings.Display.Theme);
+            Assert.Equal(1, appSettings.UsageAnalytics.RefreshIntervalMinutes);
+            Assert.False(appSettings.UsageAnalytics.RefreshWhenOpened);
+        });
+    }
+
+    [Fact]
+    public void VisibleSettingsWindowClosesOnSecondSettingsRequest()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings());
+            using var settings = new SettingsForm(
+                new AppSettings(),
+                localizer);
+            settings.Show();
+            Application.DoEvents();
+
+            Assert.True(
+                QuantaTrainContext.TryCloseVisibleSettings(settings));
+            Application.DoEvents();
+            Assert.False(settings.Visible);
+            Assert.False(
+                QuantaTrainContext.TryCloseVisibleSettings(settings));
         });
     }
 
@@ -717,11 +1062,38 @@ public sealed class RuntimeAppearanceTests
                 1,
                 0,
                 0);
+            var terra = new UsageAggregate(
+                key with { Model = "gpt-5.6-terra", ReasoningEffort = "medium" },
+                new UsageTokenTotals(72, 10, 0, 28, 4, 100),
+                2,
+                8_000,
+                0,
+                2,
+                0,
+                0);
+            var luna = new UsageAggregate(
+                key with { Model = "gpt-5.6-luna", ReasoningEffort = "low" },
+                new UsageTokenTotals(40, 4, 0, 12, 2, 54),
+                1,
+                3_000,
+                0,
+                1,
+                0,
+                0);
+            var other = new UsageAggregate(
+                key with { Model = "other", ReasoningEffort = "maximum" },
+                new UsageTokenTotals(15, 0, 0, 5, 1, 20),
+                1,
+                1_000,
+                0,
+                1,
+                0,
+                0);
             var snapshot = new UsageAnalysisSnapshot(
                 DateTimeOffset.Parse("2026-07-22T00:00:00Z"),
                 DateTimeOffset.Parse("2026-07-29T00:00:00Z"),
                 false,
-                [row],
+                [row, terra, luna, other],
                 DateTimeOffset.Parse("2026-07-26T01:30:45Z"),
                 1,
                 0,
@@ -745,22 +1117,130 @@ public sealed class RuntimeAppearanceTests
                 label => label.Text.Contains(
                     localizer.Text("Usage.Effort.high"),
                     StringComparison.Ordinal));
+            Assert.Equal(
+                324,
+                GetField<UsageDonutControl>(form, "_reasoningDonut").Total);
+            Assert.Equal(
+                8,
+                Enumerable.Range(0, 8)
+                    .Select(index => UsageVisuals.ModelColor(index).ToArgb())
+                    .Distinct()
+                    .Count());
+            Assert.NotEqual(
+                UsageVisuals.ModelColor(0).ToArgb(),
+                UsageVisuals.ModelColor(0, isOther: true).ToArgb());
         });
     }
 
     [Fact]
-    public void MiniAndCompactDimensionsRemainUnchanged()
+    public void MiniRemainsUnchangedAndCompactUsesCondensedDashboard()
     {
         RunSta(() =>
         {
+            Theme.Configure("dark", "green");
             var localizer = new LocalizationService(FindLocalesDirectory());
-            localizer.Load(new LanguageSettings());
+            localizer.Load(new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = "ja-JP",
+            });
             using var mini = new MiniForm(localizer);
             using var compact = new CompactForm(localizer);
+            var state = new WeeklyQuotaState(
+                "weekly",
+                BucketRole.Primary,
+                9,
+                91,
+                10080,
+                DateTimeOffset.Now.AddDays(6).AddHours(2),
+                1,
+                [new ResetCredit(DateTimeOffset.Now.AddDays(12))],
+                "ChatGPT Pro",
+                DateTimeOffset.Now,
+                "0.2.0");
+            mini.UpdateState(state);
+            compact.UpdateState(
+                state,
+                false,
+                null,
+                ["2026/07/25 11:18  reset-credit-likely"]);
+            mini.Show();
+            compact.Show();
+            Application.DoEvents();
 
-            Assert.Equal(new Size(232, 126), mini.ClientSize);
-            Assert.Equal(new Size(240, 180), compact.ClientSize);
+            Assert.Equal(new Size(220, 95), mini.ClientSize);
+            Assert.Equal(new Size(240, 338), compact.ClientSize);
+            Assert.Equal(
+                3,
+                Descendants(compact).OfType<RoundedPanel>().Count());
+            Assert.Contains(
+                Descendants(compact).OfType<Label>(),
+                label => label.Text.Contains("(6D", StringComparison.Ordinal));
+            Assert.DoesNotContain(
+                Descendants(compact).OfType<Label>(),
+                label => label.Text == localizer.Text("Status.Latest"));
+            SaveSnapshotIfRequested(compact, "compact.png");
+            SaveSnapshotIfRequested(mini, "mini.png");
         });
+    }
+
+    [Fact]
+    public void CompactUpdatingStatusIsFullyVisible()
+    {
+        RunSta(() =>
+        {
+            Theme.Configure("dark", "green");
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = "ja-JP",
+            });
+            using var compact = new CompactForm(localizer);
+            var state = new WeeklyQuotaState(
+                "weekly",
+                BucketRole.Primary,
+                16,
+                84,
+                10080,
+                DateTimeOffset.Now.AddDays(6),
+                1,
+                [new ResetCredit(DateTimeOffset.Now.AddDays(12))],
+                "ChatGPT Pro",
+                DateTimeOffset.Now,
+                "0.2.0");
+            compact.UpdateState(
+                state,
+                updating: true,
+                error: null,
+                ["2026/07/25 11:18  reset-credit-likely"]);
+            compact.Show();
+            Application.DoEvents();
+
+            var card = GetField<RoundedPanel>(compact, "_quotaCard");
+            var status = GetField<Label>(compact, "_status");
+            Assert.Equal(localizer.Text("Status.Updating"), status.Text);
+            Assert.True(status.Top >= 0);
+            Assert.True(status.Bottom <= card.ClientSize.Height);
+            Assert.True(status.Height >= status.PreferredHeight);
+            SaveSnapshotIfRequested(compact, "compact-updating.png");
+        });
+    }
+
+    [Fact]
+    public void QuotaWarningColorsOverrideSelectedAccent()
+    {
+        Theme.Configure("dark", "purple");
+        try
+        {
+            Assert.Equal(Theme.Accent, Theme.QuotaColor(31));
+            Assert.Equal(Theme.Orange, Theme.QuotaColor(30));
+            Assert.Equal(Theme.Red, Theme.QuotaColor(10));
+        }
+        finally
+        {
+            Theme.Configure("dark", "green");
+        }
     }
 
     [Fact]
@@ -879,9 +1359,18 @@ public sealed class RuntimeAppearanceTests
         var percent = GetField<Label>(form, "_remainingPercent");
         var progress = GetField<QuotaProgressBar>(form, "_progress");
 
-        Assert.True(
-            weekly.Bottom <= percent.Top,
-            $"Weekly {weekly.Bounds} overlaps percent {percent.Bounds}.");
+        if (form is MiniForm)
+        {
+            Assert.True(
+                weekly.Right <= prefix.Left,
+                $"Weekly {weekly.Bounds} overlaps prefix {prefix.Bounds}.");
+        }
+        else
+        {
+            Assert.True(
+                weekly.Bottom <= percent.Top,
+                $"Weekly {weekly.Bounds} overlaps percent {percent.Bounds}.");
+        }
         Assert.True(prefix.Left >= 0, $"Prefix {prefix.Bounds} starts outside card {card.ClientRectangle}.");
         Assert.True(
             prefix.Right <= percent.Left,
@@ -892,6 +1381,28 @@ public sealed class RuntimeAppearanceTests
         Assert.True(
             percent.Bottom <= progress.Top,
             $"Percent {percent.Bounds} overlaps progress {progress.Bounds}.");
+        if (form is MiniForm)
+        {
+            var reset = GetField<Label>(form, "_reset");
+            var resetValue = GetField<Label>(form, "_countdown");
+            Assert.True(
+                reset.Right <= resetValue.Left,
+                $"Reset caption {reset.Bounds} overlaps value {resetValue.Bounds}.");
+            Assert.True(
+                resetValue.Right <= card.ClientSize.Width,
+                $"Reset value {resetValue.Bounds} exceeds card {card.ClientRectangle}.");
+        }
+    }
+
+    private static void AssertNoOverlap(
+        Control first,
+        Control second,
+        string description)
+    {
+        var overlap = Rectangle.Intersect(first.Bounds, second.Bounds);
+        Assert.True(
+            overlap.IsEmpty,
+            $"{description}: {first.Bounds} overlaps {second.Bounds} at {overlap}.");
     }
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]

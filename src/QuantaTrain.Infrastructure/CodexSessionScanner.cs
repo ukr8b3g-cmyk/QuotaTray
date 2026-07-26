@@ -138,7 +138,8 @@ public sealed class CodexSessionScanner
                 }
                 catch (Exception exception) when (
                     exception is IOException or UnauthorizedAccessException or
-                    JsonException or FormatException or OverflowException)
+                    JsonException or FormatException or OverflowException or
+                    InvalidOperationException)
                 {
                     errors++;
                     if (previous is not null)
@@ -297,11 +298,16 @@ public sealed class CodexSessionScanner
         ICollection<UsageTurnRecord> turns,
         UsageAnalyticsSettings settings)
     {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return state;
+        }
         var timestamp = ReadTimestamp(root, "timestamp") ?? DateTimeOffset.UtcNow;
         var rootType = ReadString(root, "type");
         if (string.Equals(rootType, "turn_context", StringComparison.Ordinal))
         {
-            if (!root.TryGetProperty("payload", out var payload))
+            if (!root.TryGetProperty("payload", out var payload) ||
+                payload.ValueKind != JsonValueKind.Object)
             {
                 return state;
             }
@@ -320,7 +326,8 @@ public sealed class CodexSessionScanner
         }
 
         if (!string.Equals(rootType, "event_msg", StringComparison.Ordinal) ||
-            !root.TryGetProperty("payload", out var eventPayload))
+            !root.TryGetProperty("payload", out var eventPayload) ||
+            eventPayload.ValueKind != JsonValueKind.Object)
         {
             return state;
         }
@@ -378,7 +385,8 @@ public sealed class CodexSessionScanner
         JsonElement payload,
         SessionParserContinuation state)
     {
-        if (!payload.TryGetProperty("info", out var info))
+        if (!payload.TryGetProperty("info", out var info) ||
+            info.ValueKind != JsonValueKind.Object)
         {
             return state;
         }
@@ -581,6 +589,7 @@ public sealed class CodexSessionScanner
     }
 
     private static string? ReadString(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(propertyName, out var value) &&
         value.ValueKind == JsonValueKind.String
             ? value.GetString()
@@ -588,7 +597,8 @@ public sealed class CodexSessionScanner
 
     private static long? ReadLong(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var value))
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var value))
         {
             return null;
         }
@@ -604,7 +614,8 @@ public sealed class CodexSessionScanner
         JsonElement element,
         string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var value))
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var value))
         {
             return null;
         }

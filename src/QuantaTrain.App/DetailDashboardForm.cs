@@ -8,12 +8,16 @@ internal sealed class DetailForm : FixedWidthResizableForm
 {
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
+    private readonly Func<int> _refreshIntervalSeconds;
     private readonly Panel _overviewPage;
     private readonly Panel _usagePage;
     private readonly Button _overviewTab;
     private readonly Button _usageTab;
     private readonly Panel _tabUnderline;
     private readonly QuotaRingControl _quotaRing = new();
+    private readonly QuotaSplitProgressBar _quotaSplitBar = new();
+    private readonly Label _usedShare = ValueLabel();
+    private readonly Label _remainingShare = ValueLabel();
     private readonly Label _resetAt = ValueLabel();
     private readonly Label _windowStart = ValueLabel();
     private readonly Label _plan = ValueLabel();
@@ -26,18 +30,22 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private readonly Label _status = ValueLabel();
     private readonly Label _usageStatus = ValueLabel();
     private readonly FlowLayoutPanel _modelRows = RowsPanel();
-    private readonly Label _tokenDetails = ValueLabel();
-    private readonly Label _timeDetails = ValueLabel();
+    private readonly Panel _tokenDetails = DetailsPanel();
+    private readonly Panel _timeDetails = DetailsPanel();
     private readonly UsageDonutControl _reasoningDonut = new();
-    private readonly Label _reasoningLegend = ValueLabel();
+    private readonly Panel _reasoningLegend = DetailsPanel();
     private readonly ComboBox _period = new();
     private readonly ComboBox _metric = new();
     private bool _syncingUsageFilters;
 
-    public DetailForm(LocalizationService localizer, Func<bool>? canDrag = null)
+    public DetailForm(
+        LocalizationService localizer,
+        Func<bool>? canDrag = null,
+        Func<int>? refreshIntervalSeconds = null)
     {
         _localizer = localizer;
         _canDrag = canDrag ?? (() => true);
+        _refreshIntervalSeconds = refreshIntervalSeconds ?? (() => 60);
         Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTray";
         ConfigureFixedLogicalWidth(800, 600, 520);
         StartPosition = FormStartPosition.Manual;
@@ -56,21 +64,37 @@ internal sealed class DetailForm : FixedWidthResizableForm
             11F,
             FontStyle.Bold);
         title.AutoSize = false;
-        title.Size = new Size(290, 30);
+        title.Size = new Size(278, 30);
         title.TextAlign = ContentAlignment.MiddleLeft;
+        var mini = HeaderButton(
+            _localizer.Text("Menu.ShowMini"),
+            334,
+            78);
+        mini.Click += (_, _) => MiniRequested?.Invoke(this, EventArgs.Empty);
+        var compact = HeaderButton(
+            _localizer.Text("Menu.ShowCompact"),
+            414,
+            116);
+        compact.Click += (_, _) =>
+            CompactRequested?.Invoke(this, EventArgs.Empty);
         var refresh = HeaderButton(
             _localizer.Text("Common.Refresh"),
-            558,
-            88);
+            532,
+            102,
+            FluentSymbol.Refresh);
         refresh.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
         var settings = HeaderButton(
             _localizer.Text("Common.Settings"),
-            650,
-            88);
+            636,
+            100,
+            FluentSymbol.Settings);
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var close = HeaderButton("×", 748, 34);
         close.Click += (_, _) => Hide();
-        header.Controls.AddRange([brand, title, refresh, settings, close]);
+        header.Controls.AddRange(
+        [
+            brand, title, mini, compact, refresh, settings, close,
+        ]);
         MakeDraggable(header);
         MakeDraggable(brand);
         MakeDraggable(title);
@@ -91,7 +115,11 @@ internal sealed class DetailForm : FixedWidthResizableForm
             150,
             130);
         _overviewTab.Click += (_, _) => SelectTab(usage: false);
-        _usageTab.Click += (_, _) => SelectTab(usage: true);
+        _usageTab.Click += (_, _) =>
+        {
+            SelectTab(usage: true);
+            UsageViewRequested?.Invoke(this, EventArgs.Empty);
+        };
         _tabUnderline = new Panel
         {
             Bounds = new Rectangle(18, 40, 130, 3),
@@ -117,6 +145,8 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
     public event EventHandler? RefreshRequested;
     public event EventHandler? UsageRefreshRequested;
+    public event EventHandler? UsageViewRequested;
+    public event EventHandler? MiniRequested;
     public event EventHandler? CompactRequested;
     public event EventHandler? SettingsRequested;
     public event EventHandler<UsageFilterChangedEventArgs>? UsageFilterChanged;
@@ -128,9 +158,31 @@ internal sealed class DetailForm : FixedWidthResizableForm
         IReadOnlyList<string> history)
     {
         _quotaRing.RemainingPercent = state?.RemainingPercent;
+        var remainingPercent = state?.RemainingPercent ?? 0d;
+        _quotaSplitBar.RemainingPercent = state?.RemainingPercent;
+        _usedShare.Text = state is null
+            ? "—"
+            : _localizer.Text(
+                "Quota.UsedShare",
+                Math.Round(100d - remainingPercent));
+        _remainingShare.Text = state is null
+            ? "—"
+            : _localizer.Text(
+                "Quota.RemainingShare",
+                Math.Round(remainingPercent));
+        _usedShare.ForeColor = state is null ? Theme.Muted : Theme.UsedQuota;
+        _remainingShare.ForeColor = state is null
+            ? Theme.Muted
+            : QuotaRingControl.RemainingColor(remainingPercent);
         _quotaRing.Caption = _localizer.Text("Common.Remaining", string.Empty)
             .Trim();
-        _resetAt.Text = state?.ResetsAtUtc?.ToLocalTime().ToString("g") ?? "—";
+        _quotaRing.Subcaption = state?.ResetsAtUtc is null
+            ? string.Empty
+            : _localizer.Text(
+                "Quota.ApproximateRemaining",
+                FormatCountdown(state.ResetsAtUtc.Value));
+        _resetAt.Text = state?.ResetsAtUtc?.ToLocalTime()
+            .ToString("yyyy/MM/dd (ddd) HH:mm") ?? "—";
         _windowStart.Text = state?.ResetsAtUtc is not null &&
                             state.WindowDurationMinutes is > 0
             ? state.ResetsAtUtc.Value
@@ -141,30 +193,38 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _plan.Text = string.IsNullOrWhiteSpace(state?.PlanType)
             ? "—"
             : state.PlanType;
-        _connection.Text = error is not null
+        var connectionText = error is not null
             ? _localizer.Text("Status.Failed")
             : updating
                 ? _localizer.Text("Status.Updating")
                 : state is null
                     ? _localizer.Text("Status.Stale")
-                    : _localizer.Text("Status.Latest");
+                    : _localizer.Text("Status.Healthy");
+        _connection.Text = $"● {connectionText}";
+        _connection.ForeColor = error is not null
+            ? Theme.Red
+            : updating
+                ? Theme.Yellow
+                : state is null
+                    ? Theme.Muted
+                    : Theme.Green;
         _lastUpdated.Text = state?.ObservedAtUtc.ToLocalTime().ToString("G") ?? "—";
         _nextRefresh.Text = updating
             ? _localizer.Text("Status.Updating")
-            : _localizer.Text("Detail.AutomaticRefresh");
+            : _localizer.Text(
+                "Detail.RefreshSeconds",
+                _refreshIntervalSeconds());
         _version.Text =
             typeof(DetailForm).Assembly.GetName().Version?.ToString(3) ?? "—";
-        _status.Text = _connection.Text;
-        PopulateRows(
-            _credits,
-            state?.ResetCredits?
-                .Take(3)
-                .Select((credit, index) =>
-                    $"{_localizer.Text("Credits.RemainingShort")} {index + 1}    " +
-                    $"{credit.ExpiresAtUtc?.ToLocalTime():yyyy/MM/dd}")
-                .ToArray() is { Length: > 0 } creditRows
-                ? creditRows
-                : [_localizer.Text("Credits.None")]);
+        _status.Text = string.Join(
+            "  |  ",
+            [
+                $"{_localizer.Text("Detail.DataSource")}: Codex App Server",
+                $"{_localizer.Text("Detail.LastUpdated")}: {_lastUpdated.Text}",
+                $"{_localizer.Text("Detail.AutoRefresh")}: {_nextRefresh.Text}",
+                $"{_localizer.Text("Detail.ConnectionLabel")}: {_connection.Text}",
+            ]);
+        PopulateCreditCards(state);
         PopulateRows(
             _history,
             history.Count == 0
@@ -196,9 +256,11 @@ internal sealed class DetailForm : FixedWidthResizableForm
         {
             _usageStatus.Text = _localizer.Text("Usage.Disabled");
             _modelRows.Controls.Clear();
-            _tokenDetails.Text = _localizer.Text("Usage.EnableInSettings");
-            _timeDetails.Text = "—";
-            _reasoningLegend.Text = "—";
+            PopulatePlaceholder(
+                _tokenDetails,
+                _localizer.Text("Usage.EnableInSettings"));
+            PopulatePlaceholder(_timeDetails, "—");
+            PopulatePlaceholder(_reasoningLegend, "—");
             _reasoningDonut.SetValues(
                 new Dictionary<string, long>(StringComparer.Ordinal));
             return;
@@ -225,41 +287,17 @@ internal sealed class DetailForm : FixedWidthResizableForm
         var tokens = summaries.Aggregate(
             UsageTokenTotals.Empty,
             (current, summary) => current + summary.Tokens);
-        _tokenDetails.Text = string.Join(
-            Environment.NewLine,
-            [
-                $"{_localizer.Text("Usage.InputTokens")}    {tokens.InputTokens:N0}",
-                $"{_localizer.Text("Usage.CachedInput")}    {tokens.CachedInputTokens:N0}",
-                $"{_localizer.Text("Usage.CacheWrite")}    {tokens.CacheWriteInputTokens:N0}",
-                $"{_localizer.Text("Usage.OutputTokens")}    {tokens.OutputTokens:N0}",
-                $"{_localizer.Text("Usage.ReasoningTokens")}    {tokens.ReasoningOutputTokens:N0}",
-                $"{_localizer.Text("Common.Total")}    {tokens.EffectiveTotalTokens:N0}",
-            ]);
+        PopulateTokenDetails(tokens);
         var elapsed = summaries.Sum(summary => summary.ElapsedMilliseconds);
         var turns = summaries.Sum(summary => summary.TurnCount);
-        _timeDetails.Text = string.Join(
-            Environment.NewLine,
-            [
-                $"{_localizer.Text("Usage.TotalTime")}    {FormatDuration(elapsed)}",
-                $"{_localizer.Text("Usage.AverageTurnTime")}    " +
-                $"{FormatDuration(turns == 0 ? 0 : elapsed / turns)}",
-                $"{_localizer.Text("Usage.TurnCount")}    {turns:N0}",
-                $"{_localizer.Text("Usage.AverageInput")}    " +
-                $"{(turns == 0 ? 0 : tokens.InputTokens / turns):N0}",
-                $"{_localizer.Text("Usage.AverageOutput")}    " +
-                $"{(turns == 0 ? 0 : tokens.OutputTokens / turns):N0}",
-            ]);
+        PopulateTimeDetails(elapsed, turns, tokens);
         var reasoning = summaries
             .SelectMany(summary => summary.ReasoningTokens)
             .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Sum(item => item.Value));
+        _reasoningDonut.CenterCaption = _localizer.Text("Common.Total");
         _reasoningDonut.SetValues(reasoning);
-        _reasoningLegend.Text = string.Join(
-            Environment.NewLine,
-            reasoning.OrderByDescending(item => item.Value)
-                .Select(item =>
-                    $"{DisplayEffort(item.Key)}  {item.Value:N0}  " +
-                    $"{Percent(item.Value, total):0}%"));
+        PopulateReasoningLegend(reasoning, total);
         _usageStatus.Text =
             $"{snapshot.RefreshedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm:ss}   " +
             $"{_localizer.Text("Usage.FileResult", snapshot.ScannedFileCount, snapshot.SkippedFileCount, snapshot.ErrorFileCount)}";
@@ -275,37 +313,46 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private Panel BuildOverviewPage()
     {
         var page = Page();
-        var quota = Card(new Rectangle(16, 10, 362, 210), "Quota.Weekly");
-        _quotaRing.Bounds = new Rectangle(18, 45, 132, 132);
+        var quota = Card(new Rectangle(16, 10, 362, 300), "Quota.Weekly");
+        _quotaRing.Bounds = new Rectangle(18, 55, 174, 174);
         quota.Controls.Add(_quotaRing);
-        AddKeyValue(quota, "Quota.NextResetAt", _resetAt, 174, 52);
-        AddKeyValue(quota, "Quota.WindowStartedAt", _windowStart, 174, 104);
-        var progress = new QuotaProgressBar
-        {
-            Bounds = new Rectangle(18, 184, 326, 10),
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-        };
-        _quotaRing.ValueChanged += (_, _) =>
-        {
-            progress.Value = (int)Math.Round(
-                Math.Clamp(100 - (_quotaRing.RemainingPercent ?? 100), 0, 100));
-            progress.ValueColor = Theme.Blue;
-        };
-        quota.Controls.Add(progress);
+        AddKeyValue(quota, "Quota.NextResetAt", _resetAt, 212, 64);
+        _resetAt.Font = Theme.Ui(11.5F, FontStyle.Bold);
+        _resetAt.Height = 34;
+        AddKeyValue(quota, "Quota.WindowStartedAt", _windowStart, 212, 142);
+        _usedShare.Bounds = new Rectangle(18, 244, 154, 19);
+        _usedShare.AutoSize = false;
+        _usedShare.Font = Theme.Ui(7.7F, FontStyle.Bold);
+        _remainingShare.Bounds = new Rectangle(172, 244, 172, 19);
+        _remainingShare.AutoSize = false;
+        _remainingShare.Font = Theme.Ui(7.7F, FontStyle.Bold);
+        _remainingShare.TextAlign = ContentAlignment.MiddleRight;
+        _quotaSplitBar.Bounds = new Rectangle(18, 270, 326, 12);
+        _quotaSplitBar.Anchor =
+            AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+        quota.Controls.AddRange(
+        [
+            _usedShare, _remainingShare, _quotaSplitBar,
+        ]);
 
         var info = Card(
-            new Rectangle(16, 230, 362, 224),
+            new Rectangle(16, 320, 362, 134),
             "Detail.PlanConnection");
-        AddKeyValue(info, "Detail.PlanLabel", _plan, 18, 48);
-        AddKeyValue(info, "Detail.ConnectionLabel", _connection, 18, 87);
-        AddKeyValue(info, "Detail.LastUpdated", _lastUpdated, 18, 126);
-        AddKeyValue(info, "Detail.NextAutomaticRefresh", _nextRefresh, 18, 165);
-        AddKeyValue(info, "Detail.AppVersion", _version, 18, 204);
+        AddInlineKeyValue(info, "Detail.PlanLabel", _plan, 18, 50, 116);
+        AddInlineKeyValue(
+            info,
+            "Detail.ConnectionLabel",
+            _connection,
+            18,
+            82,
+            116);
+        AddInlineKeyValue(info, "Detail.AppVersion", _version, 18, 108, 116);
 
         var credits = Card(
             new Rectangle(390, 10, 376, 164),
             "Credits.Title");
         _credits.Bounds = new Rectangle(18, 45, 340, 104);
+        _credits.FlowDirection = FlowDirection.LeftToRight;
         credits.Controls.Add(_credits);
 
         var history = Card(
@@ -320,7 +367,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         var footer = new Panel
         {
             Bounds = new Rectangle(16, 462, 750, 28),
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
             BackColor = Theme.Window,
         };
         _status.Bounds = new Rectangle(0, 3, 726, 22);
@@ -396,14 +443,12 @@ internal sealed class DetailForm : FixedWidthResizableForm
             new Rectangle(16, 314, 242, 160),
             "Usage.TokenBreakdown");
         _tokenDetails.Bounds = new Rectangle(16, 42, 210, 108);
-        _tokenDetails.AutoSize = false;
         token.Controls.Add(_tokenDetails);
 
         var time = Card(
             new Rectangle(268, 314, 228, 160),
             "Usage.TimeTurnSummary");
         _timeDetails.Bounds = new Rectangle(16, 42, 196, 108);
-        _timeDetails.AutoSize = false;
         time.Controls.Add(_timeDetails);
 
         var reasoning = Card(
@@ -411,7 +456,6 @@ internal sealed class DetailForm : FixedWidthResizableForm
             "Usage.ReasoningBreakdown");
         _reasoningDonut.Bounds = new Rectangle(16, 45, 112, 112);
         _reasoningLegend.Bounds = new Rectangle(138, 46, 106, 100);
-        _reasoningLegend.AutoSize = false;
         reasoning.Controls.AddRange([_reasoningDonut, _reasoningLegend]);
         _usageStatus.Bounds = new Rectangle(16, 478, 750, 20);
         _usageStatus.ForeColor = Theme.Muted;
@@ -435,12 +479,19 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 .Max());
         var metricTotal = summaries.Sum(
             item => MetricValue(item, settings.DefaultMetric));
-        foreach (var summary in summaries)
+        for (var index = 0; index < summaries.Count; index++)
         {
+            var summary = summaries[index];
+            var modelColor = UsageVisuals.ModelColor(
+                index,
+                string.Equals(
+                    summary.Model,
+                    "other",
+                    StringComparison.OrdinalIgnoreCase));
             var row = new Panel
             {
                 Width = 718,
-                Height = 23,
+                Height = 22,
                 Margin = Padding.Empty,
                 BackColor = Theme.Surface,
             };
@@ -461,7 +512,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
                         MetricValue(summary, settings.DefaultMetric) /
                         maximum),
                     10),
-                BackColor = Theme.Blue,
+                BackColor = modelColor,
             };
             barTrack.Controls.Add(fill);
             var share = Caption(
@@ -518,34 +569,39 @@ internal sealed class DetailForm : FixedWidthResizableForm
             var totalRow = new Panel
             {
                 Width = 718,
-                Height = 23,
-                Margin = Padding.Empty,
+                Height = 25,
+                Margin = new Padding(0, 3, 0, 0),
                 BackColor = Theme.SurfaceRaised,
             };
-            var totalLabel = Caption(_localizer.Text("Common.Total"), 0, 2);
+            var divider = new Panel
+            {
+                Bounds = new Rectangle(0, 0, 718, 1),
+                BackColor = Theme.Border,
+            };
+            var totalLabel = Caption(_localizer.Text("Common.Total"), 0, 4);
             totalLabel.Font = Theme.Ui(8.2F, FontStyle.Bold);
             totalLabel.Size = new Size(260, 19);
-            var share = Caption("100%", 270, 2);
+            var share = Caption("100%", 270, 4);
             share.Size = new Size(52, 19);
             var tokens = Caption(
                 $"{summaries.Sum(item => item.Tokens.EffectiveTotalTokens):N0}",
                 326,
-                2);
+                4);
             tokens.Size = new Size(96, 19);
             var elapsed = Caption(
                 FormatDuration(
                     summaries.Sum(item => item.ElapsedMilliseconds)),
                 428,
-                2);
+                4);
             elapsed.Size = new Size(72, 19);
             var turns = Caption(
                 $"{summaries.Sum(item => item.TurnCount):N0}",
                 504,
-                2);
+                4);
             turns.Size = new Size(42, 19);
             totalRow.Controls.AddRange(
             [
-                totalLabel, share, tokens, elapsed, turns,
+                divider, totalLabel, share, tokens, elapsed, turns,
             ]);
             _modelRows.Controls.Add(totalRow);
         }
@@ -638,6 +694,25 @@ internal sealed class DetailForm : FixedWidthResizableForm
         parent.Controls.AddRange([caption, value]);
     }
 
+    private void AddInlineKeyValue(
+        Control parent,
+        string key,
+        Label value,
+        int x,
+        int y,
+        int valueX)
+    {
+        var caption = Caption(_localizer.Text(key), x, y);
+        caption.ForeColor = Theme.Muted;
+        caption.AutoSize = false;
+        caption.Size = new Size(valueX - x - 8, 23);
+        value.Location = new Point(valueX, y);
+        value.Size = new Size(parent.Width - valueX - 16, 23);
+        value.AutoSize = false;
+        value.TextAlign = ContentAlignment.MiddleLeft;
+        parent.Controls.AddRange([caption, value]);
+    }
+
     private static Panel Page() =>
         new()
         {
@@ -652,6 +727,13 @@ internal sealed class DetailForm : FixedWidthResizableForm
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = false,
+            BackColor = Theme.Surface,
+            Margin = Padding.Empty,
+        };
+
+    private static Panel DetailsPanel() =>
+        new()
+        {
             BackColor = Theme.Surface,
             Margin = Padding.Empty,
         };
@@ -711,9 +793,15 @@ internal sealed class DetailForm : FixedWidthResizableForm
         return button;
     }
 
-    private Button HeaderButton(string text, int x, int width)
+    private Button HeaderButton(
+        string text,
+        int x,
+        int width,
+        string? symbol = null)
     {
-        var button = ActionButton(text);
+        var button = symbol is null
+            ? ActionButton(text)
+            : new IconTextButton(symbol, text);
         button.Bounds = new Rectangle(x, 10, width, 32);
         button.FlatAppearance.BorderSize = 0;
         button.BackColor = Theme.Window;
@@ -743,19 +831,347 @@ internal sealed class DetailForm : FixedWidthResizableForm
         panel.Controls.Clear();
         foreach (var value in values)
         {
-            panel.Controls.Add(new Label
+            var (symbol, color) = HistoryVisual(value);
+            var row = new Panel
+            {
+                BackColor = Theme.Surface,
+                Margin = new Padding(0, 0, 0, 4),
+                Size = new Size(panel.ClientSize.Width - 2, 39),
+            };
+            var icon = new Label
+            {
+                Text = symbol,
+                Font = new Font("Segoe Fluent Icons", 8.5F),
+                ForeColor = color,
+                BackColor = Theme.SurfaceRaised,
+                Bounds = new Rectangle(7, 6, 25, 25),
+                TextAlign = ContentAlignment.MiddleCenter,
+            };
+            var text = new Label
             {
                 Text = value,
                 Font = Theme.Ui(8.4F),
                 ForeColor = Theme.Text,
                 BackColor = Theme.Surface,
-                Margin = new Padding(0, 0, 0, 4),
-                Padding = new Padding(8, 6, 8, 0),
-                Size = new Size(panel.ClientSize.Width - 2, 29),
+                Bounds = new Rectangle(
+                    39,
+                    3,
+                    Math.Max(0, panel.ClientSize.Width - 48),
+                    33),
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoEllipsis = true,
+            };
+            row.Controls.AddRange([icon, text]);
+            panel.Controls.Add(row);
+        }
+        panel.ResumeLayout();
+    }
+
+    private static (string Symbol, Color Color) HistoryVisual(string value)
+    {
+        if (value.Contains(
+                "unexpected-reset-candidate",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return (FluentSymbol.Warning, Theme.Yellow);
+        }
+
+        if (value.Contains(
+                "reset-credit-likely",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return (FluentSymbol.Refresh, Theme.Blue);
+        }
+
+        if (value.Contains(
+                "scheduled-reset",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return (FluentSymbol.CheckMark, Theme.Green);
+        }
+
+        return (FluentSymbol.History, Theme.Muted);
+    }
+
+    private void PopulateTokenDetails(UsageTokenTotals tokens)
+    {
+        _tokenDetails.SuspendLayout();
+        _tokenDetails.Controls.Clear();
+        var rows = new (string Label, long Value, Color Color)[]
+        {
+            (_localizer.Text("Usage.InputTokens"), tokens.InputTokens, UsageVisuals.TokenColor(0)),
+            (_localizer.Text("Usage.CachedInput"), tokens.CachedInputTokens, UsageVisuals.TokenColor(1)),
+            (_localizer.Text("Usage.CacheWrite"), tokens.CacheWriteInputTokens, UsageVisuals.TokenColor(2)),
+            (_localizer.Text("Usage.OutputTokens"), tokens.OutputTokens, UsageVisuals.TokenColor(3)),
+            (_localizer.Text("Usage.ReasoningTokens"), tokens.ReasoningOutputTokens, UsageVisuals.TokenColor(4)),
+        };
+        for (var index = 0; index < rows.Length; index++)
+        {
+            AddLegendValueRow(
+                _tokenDetails,
+                rows[index].Label,
+                $"{rows[index].Value:N0}",
+                rows[index].Color,
+                index * 17,
+                210);
+        }
+
+        _tokenDetails.Controls.Add(new Panel
+        {
+            Bounds = new Rectangle(0, 86, 210, 1),
+            BackColor = Theme.Border,
+        });
+        AddValueRow(
+            _tokenDetails,
+            _localizer.Text("Common.Total"),
+            $"{tokens.EffectiveTotalTokens:N0}",
+            90,
+            210,
+            bold: true);
+        _tokenDetails.ResumeLayout();
+    }
+
+    private void PopulateTimeDetails(
+        long elapsed,
+        long turns,
+        UsageTokenTotals tokens)
+    {
+        _timeDetails.SuspendLayout();
+        _timeDetails.Controls.Clear();
+        var rows = new (string Symbol, string Label, string Value, Color Color)[]
+        {
+            (FluentSymbol.Clock, _localizer.Text("Usage.TotalTime"), FormatDuration(elapsed), Theme.Blue),
+            (FluentSymbol.Timer, _localizer.Text("Usage.AverageTurnTime"), FormatDuration(turns == 0 ? 0 : elapsed / turns), Theme.Blue),
+            (FluentSymbol.Turn, _localizer.Text("Usage.TurnCount"), $"{turns:N0}", Color.FromArgb(77, 169, 224)),
+            (FluentSymbol.Compact, _localizer.Text("Usage.AverageInput"), $"{(turns == 0 ? 0 : tokens.InputTokens / turns):N0}", Color.FromArgb(171, 94, 230)),
+            (FluentSymbol.Compact, _localizer.Text("Usage.AverageOutput"), $"{(turns == 0 ? 0 : tokens.OutputTokens / turns):N0}", Color.FromArgb(171, 94, 230)),
+        };
+        for (var index = 0; index < rows.Length; index++)
+        {
+            AddIconValueRow(
+                _timeDetails,
+                rows[index].Symbol,
+                rows[index].Label,
+                rows[index].Value,
+                rows[index].Color,
+                index * 21,
+                196);
+        }
+        _timeDetails.ResumeLayout();
+    }
+
+    private void PopulateReasoningLegend(
+        IReadOnlyDictionary<string, long> reasoning,
+        long total)
+    {
+        _reasoningLegend.SuspendLayout();
+        _reasoningLegend.Controls.Clear();
+        var rows = reasoning
+            .OrderByDescending(item => item.Value)
+            .Take(5)
+            .ToArray();
+        for (var index = 0; index < rows.Length; index++)
+        {
+            AddLegendValueRow(
+                _reasoningLegend,
+                DisplayEffort(rows[index].Key),
+                $"{Percent(rows[index].Value, total):0}%",
+                UsageVisuals.ReasoningColor(index),
+                index * 19,
+                106,
+                labelWidth: 54);
+        }
+        if (rows.Length == 0)
+        {
+            PopulatePlaceholder(_reasoningLegend, "—");
+        }
+        _reasoningLegend.ResumeLayout();
+    }
+
+    private static void PopulatePlaceholder(Control panel, string text)
+    {
+        panel.Controls.Clear();
+        panel.Controls.Add(new Label
+        {
+            Text = text,
+            Bounds = panel.ClientRectangle,
+            AutoSize = false,
+            ForeColor = Theme.Muted,
+            BackColor = Theme.Surface,
+            Font = Theme.Ui(8F),
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true,
+        });
+    }
+
+    private static void AddLegendValueRow(
+        Control parent,
+        string label,
+        string value,
+        Color color,
+        int y,
+        int width,
+        int labelWidth = 116)
+    {
+        parent.Controls.Add(new Panel
+        {
+            Bounds = new Rectangle(0, y + 5, 6, 8),
+            BackColor = color,
+        });
+        AddValueRow(
+            parent,
+            label,
+            value,
+            y,
+            width,
+            labelX: 13,
+            labelWidth: labelWidth);
+    }
+
+    private static void AddIconValueRow(
+        Control parent,
+        string symbol,
+        string label,
+        string value,
+        Color color,
+        int y,
+        int width)
+    {
+        parent.Controls.Add(new Label
+        {
+            Text = symbol,
+            Bounds = new Rectangle(0, y, 15, 18),
+            AutoSize = false,
+            Font = new Font("Segoe Fluent Icons", 8.3F),
+            ForeColor = color,
+            BackColor = Theme.Surface,
+            TextAlign = ContentAlignment.MiddleCenter,
+        });
+        AddValueRow(
+            parent,
+            label,
+            value,
+            y,
+            width,
+            labelX: 19,
+            labelWidth: 116);
+    }
+
+    private static void AddValueRow(
+        Control parent,
+        string label,
+        string value,
+        int y,
+        int width,
+        bool bold = false,
+        int labelX = 0,
+        int labelWidth = 124)
+    {
+        var style = bold ? FontStyle.Bold : FontStyle.Regular;
+        parent.Controls.Add(new Label
+        {
+            Text = label,
+            Bounds = new Rectangle(labelX, y, labelWidth, 18),
+            AutoSize = false,
+            Font = Theme.Ui(7.7F, style),
+            ForeColor = Theme.Text,
+            BackColor = Theme.Surface,
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true,
+        });
+        parent.Controls.Add(new Label
+        {
+            Text = value,
+            Bounds = new Rectangle(
+                labelX + labelWidth,
+                y,
+                Math.Max(0, width - labelX - labelWidth),
+                18),
+            AutoSize = false,
+            Font = Theme.Ui(7.7F, style),
+            ForeColor = Theme.Text,
+            BackColor = Theme.Surface,
+            TextAlign = ContentAlignment.MiddleRight,
+            AutoEllipsis = true,
+        });
+    }
+
+    private void PopulateCreditCards(WeeklyQuotaState? state)
+    {
+        _credits.SuspendLayout();
+        _credits.Controls.Clear();
+        var details = state?.ResetCredits?.Take(3).ToArray() ?? [];
+        if (details.Length > 0)
+        {
+            foreach (var credit in details)
+            {
+                _credits.Controls.Add(
+                    CreditCard(
+                        1,
+                        credit.ExpiresAtUtc?.ToLocalTime()));
+            }
+        }
+        else if (state?.ResetCreditCount is > 0)
+        {
+            _credits.Controls.Add(
+                CreditCard(state.ResetCreditCount.Value, null));
+        }
+        else
+        {
+            _credits.Controls.Add(new Label
+            {
+                Text = _localizer.Text("Credits.None"),
+                Font = Theme.Ui(8.4F),
+                ForeColor = Theme.Muted,
+                BackColor = Theme.Surface,
+                Margin = Padding.Empty,
+                Padding = new Padding(8, 9, 8, 0),
+                Size = new Size(338, 38),
                 AutoEllipsis = true,
             });
         }
-        panel.ResumeLayout();
+        _credits.ResumeLayout();
+    }
+
+    private RoundedPanel CreditCard(
+        long count,
+        DateTimeOffset? expiresAt)
+    {
+        var card = new RoundedPanel
+        {
+            Size = new Size(106, 96),
+            Margin = new Padding(0, 0, 8, 0),
+            BackColor = Theme.SurfaceRaised,
+        };
+        var available = UiFactory.Label(
+            _localizer.Text("Credits.Available", count),
+            new Point(9, 8),
+            8.4F,
+            FontStyle.Bold,
+            Theme.Yellow);
+        available.AutoSize = false;
+        available.Size = new Size(88, 21);
+        var expires = UiFactory.Label(
+            expiresAt is null
+                ? _localizer.Text("Credits.DetailsUnavailable")
+                : expiresAt.Value.ToString("yyyy/MM/dd"),
+            new Point(9, 34),
+            7.8F,
+            FontStyle.Regular,
+            Theme.Text);
+        expires.AutoSize = false;
+        expires.Size = new Size(88, 22);
+        expires.TextAlign = ContentAlignment.MiddleLeft;
+        var active = UiFactory.Label(
+            _localizer.Text("Credits.Active"),
+            new Point(9, 65),
+            7.7F,
+            FontStyle.Bold,
+            Theme.Green);
+        active.AutoSize = false;
+        active.Size = new Size(88, 20);
+        card.Controls.AddRange([available, expires, active]);
+        return card;
     }
 
     private static string FormatDuration(long milliseconds)
@@ -766,6 +1182,26 @@ internal sealed class DetailForm : FixedWidthResizableForm
             : duration.TotalMinutes >= 1
                 ? $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s"
                 : $"{duration.TotalSeconds:0}s";
+    }
+
+    private string FormatCountdown(DateTimeOffset resetAtUtc)
+    {
+        var remaining = resetAtUtc - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return "0m";
+        }
+
+        if (_localizer.CurrentLocale == "ja-JP")
+        {
+            return remaining.TotalDays >= 1
+                ? $"{(int)remaining.TotalDays}日 {remaining.Hours}時間"
+                : $"{(int)remaining.TotalHours}時間 {remaining.Minutes}分";
+        }
+
+        return remaining.TotalDays >= 1
+            ? $"{(int)remaining.TotalDays}d {remaining.Hours}h"
+            : $"{(int)remaining.TotalHours}h {remaining.Minutes}m";
     }
 
     private string DisplayEffort(string value) =>
@@ -793,10 +1229,56 @@ internal sealed class UsageFilterChangedEventArgs(
     public string Metric { get; } = metric;
 }
 
+internal static class UsageVisuals
+{
+    private static readonly Color[] ModelPalette =
+    [
+        Color.FromArgb(55, 132, 232),
+        Color.FromArgb(118, 67, 190),
+        Color.FromArgb(239, 143, 52),
+        Color.FromArgb(63, 177, 207),
+        Color.FromArgb(78, 190, 101),
+        Color.FromArgb(211, 92, 139),
+        Color.FromArgb(222, 187, 53),
+        Color.FromArgb(103, 126, 231),
+    ];
+
+    private static readonly Color[] TokenPalette =
+    [
+        Color.FromArgb(55, 132, 232),
+        Color.FromArgb(71, 183, 193),
+        Color.FromArgb(76, 180, 82),
+        Color.FromArgb(239, 143, 52),
+        Color.FromArgb(221, 98, 95),
+    ];
+
+    private static readonly Color[] ReasoningPalette =
+    [
+        Theme.Green,
+        Theme.Blue,
+        Color.FromArgb(235, 139, 53),
+        Color.FromArgb(165, 88, 213),
+        Color.FromArgb(211, 92, 139),
+        Color.FromArgb(71, 183, 193),
+    ];
+
+    public static Color ModelColor(int index, bool isOther = false) =>
+        isOther
+            ? Theme.Subtle
+            : ModelPalette[Math.Abs(index) % ModelPalette.Length];
+
+    public static Color TokenColor(int index) =>
+        TokenPalette[Math.Abs(index) % TokenPalette.Length];
+
+    public static Color ReasoningColor(int index) =>
+        ReasoningPalette[Math.Abs(index) % ReasoningPalette.Length];
+}
+
 internal sealed class QuotaRingControl : Control
 {
     private double? _remainingPercent;
     private readonly Label _valueLabel;
+    private readonly Label _subcaptionLabel;
 
     public QuotaRingControl()
     {
@@ -805,20 +1287,35 @@ internal sealed class QuotaRingControl : Control
         _valueLabel = new Label
         {
             AutoSize = false,
-            Bounds = new Rectangle(12, 43, 108, 42),
-            Font = Theme.Ui(17F, FontStyle.Bold),
+            Font = Theme.Ui(20F, FontStyle.Bold),
             ForeColor = Theme.Text,
             BackColor = Color.Transparent,
             Text = "—",
             TextAlign = ContentAlignment.MiddleCenter,
         };
-        Controls.Add(_valueLabel);
+        _subcaptionLabel = new Label
+        {
+            AutoSize = false,
+            Font = Theme.Ui(7.7F),
+            ForeColor = Theme.Muted,
+            BackColor = Color.Transparent,
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+        Controls.AddRange([_valueLabel, _subcaptionLabel]);
+        UpdateLabelBounds();
     }
 
     public event EventHandler? ValueChanged;
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string Caption { get; set; } = string.Empty;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string Subcaption
+    {
+        get => _subcaptionLabel.Text;
+        set => _subcaptionLabel.Text = value;
+    }
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public double? RemainingPercent
@@ -835,6 +1332,12 @@ internal sealed class QuotaRingControl : Control
         }
     }
 
+    protected override void OnSizeChanged(EventArgs eventArgs)
+    {
+        base.OnSizeChanged(eventArgs);
+        UpdateLabelBounds();
+    }
+
     protected override void OnPaint(PaintEventArgs eventArgs)
     {
         base.OnPaint(eventArgs);
@@ -848,43 +1351,61 @@ internal sealed class QuotaRingControl : Control
         eventArgs.Graphics.DrawArc(track, bounds, -90, 359.9F);
         if (RemainingPercent is not null)
         {
-            using var value = new Pen(
-                Theme.QuotaColor(RemainingPercent),
+            var remainingSweep = (float)(359.9 * Math.Clamp(
+                RemainingPercent.Value,
+                0,
+                100) / 100d);
+            using var remaining = new Pen(
+                RemainingColor(RemainingPercent.Value),
                 12)
             {
-                StartCap = LineCap.Round,
-                EndCap = LineCap.Round,
+                StartCap = LineCap.Flat,
+                EndCap = LineCap.Flat,
             };
             eventArgs.Graphics.DrawArc(
-                value,
+                remaining,
                 bounds,
                 -90,
-                (float)(359.9 * Math.Clamp(
-                    RemainingPercent.Value,
-                    0,
-                    100) / 100d));
+                remainingSweep);
+            using var used = new Pen(Theme.UsedQuota, 12)
+            {
+                StartCap = LineCap.Flat,
+                EndCap = LineCap.Flat,
+            };
+            eventArgs.Graphics.DrawArc(
+                used,
+                bounds,
+                -90 + remainingSweep,
+                359.9F - remainingSweep);
         }
-        var captionBounds = new Rectangle(0, Height / 2 - 38, Width, 18);
+        var captionBounds = new Rectangle(0, Height / 2 - 52, Width, 18);
+        using var captionFont = Theme.Ui(7.5F);
         TextRenderer.DrawText(
             eventArgs.Graphics,
             Caption,
-            Theme.Ui(7.5F),
+            captionFont,
             captionBounds,
             Theme.Muted,
             TextFormatFlags.HorizontalCenter);
     }
+
+    private void UpdateLabelBounds()
+    {
+        _valueLabel.Bounds = new Rectangle(12, Height / 2 - 25, Width - 24, 42);
+        _subcaptionLabel.Bounds =
+            new Rectangle(12, Height / 2 + 17, Width - 24, 24);
+    }
+
+    public static Color RemainingColor(double remainingPercent) =>
+        remainingPercent <= 10d
+            ? Theme.Red
+            : remainingPercent <= 30d
+                ? Theme.Orange
+                : Theme.Accent;
 }
 
 internal sealed class UsageDonutControl : Control
 {
-    private static readonly Color[] Palette =
-    [
-        Theme.Green,
-        Theme.Blue,
-        Color.FromArgb(235, 139, 53),
-        Color.FromArgb(165, 88, 213),
-        Theme.Subtle,
-    ];
     private IReadOnlyList<long> _values = [];
 
     public UsageDonutControl()
@@ -892,6 +1413,12 @@ internal sealed class UsageDonutControl : Control
         DoubleBuffered = true;
         BackColor = Theme.Surface;
     }
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string CenterCaption { get; set; } = string.Empty;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public long Total => _values.Sum();
 
     public void SetValues(IReadOnlyDictionary<string, long> values)
     {
@@ -919,9 +1446,32 @@ internal sealed class UsageDonutControl : Control
         for (var index = 0; index < _values.Count; index++)
         {
             var sweep = (float)(_values[index] * 360d / total);
-            using var pen = new Pen(Palette[index % Palette.Length], 14);
+            using var pen = new Pen(
+                UsageVisuals.ReasoningColor(index),
+                14);
             eventArgs.Graphics.DrawArc(pen, bounds, start, sweep);
             start += sweep;
         }
+
+        using var captionFont = Theme.Ui(6.7F);
+        TextRenderer.DrawText(
+            eventArgs.Graphics,
+            CenterCaption,
+            captionFont,
+            new Rectangle(18, Height / 2 - 17, Width - 36, 16),
+            Theme.Muted,
+            TextFormatFlags.HorizontalCenter |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.NoPadding);
+        using var totalFont = Theme.Ui(7.3F, FontStyle.Bold);
+        TextRenderer.DrawText(
+            eventArgs.Graphics,
+            total.ToString("N0"),
+            totalFont,
+            new Rectangle(12, Height / 2 - 1, Width - 24, 20),
+            Theme.Text,
+            TextFormatFlags.HorizontalCenter |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.NoPadding);
     }
 }

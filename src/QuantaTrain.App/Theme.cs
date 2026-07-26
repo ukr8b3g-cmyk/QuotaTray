@@ -4,6 +4,7 @@ internal static class Theme
 {
     private static bool _light;
     private static Color _accent = Color.FromArgb(91, 196, 91);
+    private static bool _useGreenUsedQuota;
 
     public static Color Window => _light
         ? Color.FromArgb(246, 248, 250)
@@ -28,16 +29,19 @@ internal static class Theme
         : Color.FromArgb(116, 129, 137);
     public static Color Green => Color.FromArgb(91, 196, 91);
     public static Color Blue => Color.FromArgb(69, 153, 232);
+    public static Color Orange => Color.FromArgb(239, 143, 52);
     public static Color Yellow => Color.FromArgb(248, 185, 27);
     public static Color Red => Color.FromArgb(239, 83, 80);
     public static Color Accent => _accent;
+    public static Color UsedQuota => _useGreenUsedQuota ? Green : Blue;
 
     public static void Configure(string theme, string accent)
     {
         _light = theme.Equals("light", StringComparison.OrdinalIgnoreCase)
             || (theme.Equals("system", StringComparison.OrdinalIgnoreCase)
                 && UsesLightSystemTheme());
-        _accent = accent.ToLowerInvariant() switch
+        var normalizedAccent = accent.ToLowerInvariant();
+        _accent = normalizedAccent switch
         {
             "blue" => Blue,
             "cyan" => Color.FromArgb(73, 179, 214),
@@ -46,6 +50,8 @@ internal static class Theme
             "gray" => Subtle,
             _ => Green,
         };
+        _useGreenUsedQuota =
+            normalizedAccent is "blue" or "cyan";
     }
 
     private static bool UsesLightSystemTheme()
@@ -74,7 +80,7 @@ internal static class Theme
         {
             null => Subtle,
             <= 10 => Red,
-            <= 30 => Yellow,
+            <= 30 => Orange,
             _ => Accent,
         };
 
@@ -85,8 +91,44 @@ internal static class Theme
     {
         combo.BackColor = SurfaceRaised;
         combo.ForeColor = Text;
-        combo.FlatStyle = FlatStyle.Flat;
+        combo.FlatStyle = FlatStyle.Standard;
         combo.Font = Ui(9F);
         combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.DrawMode = DrawMode.OwnerDrawFixed;
+        combo.ItemHeight = 22;
+        combo.DrawItem -= DrawComboItem;
+        combo.DrawItem += DrawComboItem;
+    }
+
+    private static void DrawComboItem(object? sender, DrawItemEventArgs eventArgs)
+    {
+        if (sender is not ComboBox combo)
+        {
+            return;
+        }
+
+        var isEdit = (eventArgs.State & DrawItemState.ComboBoxEdit) != 0;
+        var isSelected =
+            (eventArgs.State & DrawItemState.Selected) != 0 && !isEdit;
+        using var background = new SolidBrush(
+            isSelected ? Surface : SurfaceRaised);
+        eventArgs.Graphics.FillRectangle(background, eventArgs.Bounds);
+
+        var item = eventArgs.Index >= 0 && eventArgs.Index < combo.Items.Count
+            ? combo.Items[eventArgs.Index]
+            : combo.SelectedItem;
+        var text = item?.ToString() ?? string.Empty;
+        var textBounds = Rectangle.Inflate(eventArgs.Bounds, -5, 0);
+        TextRenderer.DrawText(
+            eventArgs.Graphics,
+            text,
+            combo.Font,
+            textBounds,
+            Text,
+            TextFormatFlags.Left |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis |
+            TextFormatFlags.NoPrefix);
+        eventArgs.DrawFocusRectangle();
     }
 }

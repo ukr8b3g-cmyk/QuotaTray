@@ -11,6 +11,12 @@ internal static class FluentSymbol
     public const string Compact = "\uE73F";
     public const string Settings = "\uE713";
     public const string Close = "\uE8BB";
+    public const string CheckMark = "\uE73E";
+    public const string Warning = "\uE7BA";
+    public const string Calendar = "\uE787";
+    public const string Clock = "\uE823";
+    public const string Timer = "\uE916";
+    public const string Turn = "\uE8AB";
     public const string General = "\uE713";
     public const string Display = "\uE7F4";
     public const string Language = "\uE774";
@@ -269,6 +275,62 @@ internal sealed class IconButton : Button
     }
 }
 
+internal sealed class IconTextButton : Button
+{
+    private readonly Image _icon;
+
+    public IconTextButton(string symbol, string text)
+    {
+        Text = text;
+        _icon = RenderIcon(symbol);
+        Image = _icon;
+        ImageAlign = ContentAlignment.MiddleLeft;
+        TextAlign = ContentAlignment.MiddleCenter;
+        TextImageRelation = TextImageRelation.ImageBeforeText;
+        Padding = new Padding(5, 0, 5, 0);
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderColor = Theme.Border;
+        BackColor = Theme.SurfaceRaised;
+        ForeColor = Theme.Text;
+        Font = Theme.Ui(8.2F);
+        Cursor = Cursors.Hand;
+        UseVisualStyleBackColor = false;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Image = null;
+            _icon.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
+    private static Bitmap RenderIcon(string symbol)
+    {
+        var bitmap = new Bitmap(16, 16);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Transparent);
+        using var font = new Font(
+            "Segoe Fluent Icons",
+            8.5F,
+            FontStyle.Regular,
+            GraphicsUnit.Point);
+        TextRenderer.DrawText(
+            graphics,
+            symbol,
+            font,
+            new Rectangle(0, 0, 16, 16),
+            Theme.Text,
+            Color.Transparent,
+            TextFormatFlags.HorizontalCenter |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.NoPadding);
+        return bitmap;
+    }
+}
+
 internal sealed class QuotaProgressBar : Control
 {
     private int _value;
@@ -313,6 +375,69 @@ internal sealed class QuotaProgressBar : Control
             Height / 2);
         using var fillBrush = new SolidBrush(ValueColor);
         eventArgs.Graphics.FillPath(fillBrush, fill);
+    }
+}
+
+internal sealed class QuotaSplitProgressBar : Control
+{
+    private double? _remainingPercent;
+
+    public QuotaSplitProgressBar()
+    {
+        DoubleBuffered = true;
+        Size = new Size(100, 12);
+    }
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public double? RemainingPercent
+    {
+        get => _remainingPercent;
+        set
+        {
+            _remainingPercent = value is null
+                ? null
+                : Math.Clamp(value.Value, 0d, 100d);
+            Invalidate();
+        }
+    }
+
+    protected override void OnPaint(PaintEventArgs eventArgs)
+    {
+        base.OnPaint(eventArgs);
+        eventArgs.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var path = UiGeometry.RoundedRectangle(
+            new Rectangle(0, 0, Width - 1, Height - 1),
+            Height / 2);
+        if (RemainingPercent is null)
+        {
+            using var emptyBrush = new SolidBrush(Theme.SurfaceRaised);
+            eventArgs.Graphics.FillPath(emptyBrush, path);
+            using var emptyBorder = new Pen(Theme.Border);
+            eventArgs.Graphics.DrawPath(emptyBorder, path);
+            return;
+        }
+        var graphicsState = eventArgs.Graphics.Save();
+        eventArgs.Graphics.SetClip(path);
+        var usedWidth = (int)Math.Round(
+            (Width - 1) * (100d - RemainingPercent.Value) / 100d);
+        using var usedBrush = new SolidBrush(Theme.UsedQuota);
+        eventArgs.Graphics.FillRectangle(
+            usedBrush,
+            0,
+            0,
+            usedWidth,
+            Height);
+        using var remainingBrush = new SolidBrush(
+            QuotaRingControl.RemainingColor(RemainingPercent.Value));
+        eventArgs.Graphics.FillRectangle(
+            remainingBrush,
+            usedWidth,
+            0,
+            Width - usedWidth,
+            Height);
+        eventArgs.Graphics.Restore(graphicsState);
+        using var border = new Pen(Theme.Border);
+        eventArgs.Graphics.DrawPath(border, path);
     }
 }
 

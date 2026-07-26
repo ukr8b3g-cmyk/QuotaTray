@@ -87,7 +87,8 @@ ui_defaults:
     - "weekly progress bar"
     - "next reset local date/time"
     - "countdown"
-    - "last successful update and freshness"
+    - "reset-credit count and nearest expiration"
+    - "most recent reset history item"
   detail_contents:
     - "weekly quota"
     - "reset-credit count and expirations when available"
@@ -132,7 +133,7 @@ settings:
     - "reset credit expiring"
     - "persistent connection failure"
   history:
-    default_retention_days: 365
+    default_retention_days: 1095
     export_formats: ["CSV", "JSON"]
 
 privacy:

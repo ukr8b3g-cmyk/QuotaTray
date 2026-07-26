@@ -69,6 +69,8 @@ internal sealed class SettingsForm : FixedWidthResizableForm
     private readonly ToggleSwitch _confirmRecovery = new();
     private readonly NumericUpDown _recentHistoryCount = new();
     private readonly ToggleSwitch _usageEnabled = new();
+    private readonly ComboBox _usageRefreshInterval = new();
+    private readonly ToggleSwitch _usageRefreshWhenOpened = new();
     private readonly ToggleSwitch _includeArchives = new();
     private readonly ToggleSwitch _collectModel = new();
     private readonly ToggleSwitch _collectReasoning = new();
@@ -108,7 +110,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _localizer = localizer;
         _initialDisplayMode = initialDisplayMode;
         Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
-        ConfigureFixedLogicalWidth(800, 600, 520);
+        ConfigureFixedLogicalWidth(800, 650, 520);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray settings";
 
@@ -131,62 +133,54 @@ internal sealed class SettingsForm : FixedWidthResizableForm
 
         var sidebar = new Panel
         {
-            Bounds = new Rectangle(14, 55, 190, 478),
+            Bounds = new Rectangle(14, 55, 190, 528),
             BackColor = Theme.Window,
             Anchor = AnchorStyles.Left | AnchorStyles.Top |
                 AnchorStyles.Bottom,
         };
         var divider = new Panel
         {
-            Bounds = new Rectangle(210, 55, 1, 478),
+            Bounds = new Rectangle(210, 55, 1, 528),
             BackColor = Theme.Border,
             Anchor = AnchorStyles.Left | AnchorStyles.Top |
                 AnchorStyles.Bottom,
         };
-        _contentHost.Bounds = new Rectangle(228, 55, 552, 478);
+        _contentHost.Bounds = new Rectangle(228, 55, 552, 528);
         _contentHost.BackColor = Theme.Window;
         _contentHost.Anchor = AnchorStyles.Left | AnchorStyles.Top |
             AnchorStyles.Right | AnchorStyles.Bottom;
 
         AddNav(sidebar, FluentSymbol.General, _localizer.Text("Settings.General"), 0);
         AddNav(sidebar, FluentSymbol.Display, _localizer.Text("Settings.Display"), 1);
-        AddNav(sidebar, FluentSymbol.Language, _localizer.Text("Settings.Language"), 2);
-        AddNav(sidebar, FluentSymbol.Notification, _localizer.Text("Settings.Notifications"), 3);
-        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.Connection"), 4);
-        AddNav(sidebar, FluentSymbol.Refresh, _localizer.Text("Settings.QuotaReset"), 5);
-        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.HistoryData"), 6);
-        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.UsageAcquisition"), 7);
-        AddNav(sidebar, FluentSymbol.Display, _localizer.Text("Settings.UsageDisplay"), 8);
-        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.UsageEstimates"), 9);
-        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.Backup"), 10);
-        AddNav(sidebar, FluentSymbol.Settings, _localizer.Text("Settings.Advanced"), 11);
-        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.About"), 12);
+        AddNav(sidebar, FluentSymbol.Notification, _localizer.Text("Settings.Notifications"), 2);
+        AddNav(sidebar, FluentSymbol.Refresh, _localizer.Text("Settings.QuotaReset"), 3);
+        AddNav(sidebar, FluentSymbol.History, _localizer.Text("Settings.HistoryData"), 4);
+        AddNav(sidebar, FluentSymbol.Account, _localizer.Text("Settings.UsageAcquisition"), 5);
+        AddNav(sidebar, FluentSymbol.Display, _localizer.Text("Settings.UsageDisplay"), 6);
+        AddNav(sidebar, FluentSymbol.Settings, _localizer.Text("Settings.Advanced"), 7);
+        AddNav(sidebar, FluentSymbol.Info, _localizer.Text("Settings.About"), 8);
 
         _pages.Add(BuildGeneralPage());
         _pages.Add(BuildDisplayPage());
-        _pages.Add(BuildLanguagePage());
         _pages.Add(BuildNotificationsPage());
-        _pages.Add(BuildConnectionPage());
         _pages.Add(BuildQuotaResetPage());
         _pages.Add(BuildHistoryPage());
         _pages.Add(BuildUsageAcquisitionPage());
         _pages.Add(BuildUsageDisplayPage());
-        _pages.Add(BuildUsageEstimatePage());
-        _pages.Add(BuildBackupPage());
         _pages.Add(BuildAdvancedPage());
         _pages.Add(BuildAboutPage());
         _contentHost.Controls.AddRange([.. _pages]);
 
         var footerLine = new Panel
         {
-            Bounds = new Rectangle(0, 541, 800, 1),
+            Bounds = new Rectangle(0, 591, 800, 1),
             BackColor = Theme.Border,
             Anchor = AnchorStyles.Left | AnchorStyles.Right |
                 AnchorStyles.Bottom,
         };
         var defaults = UiFactory.TextButton(
             _localizer.Text("Settings.RestoreDefaults"),
-            new Rectangle(18, 555, 174, 32),
+            new Rectangle(18, 605, 174, 32),
             danger: true);
         defaults.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
         defaults.Click += (_, _) =>
@@ -209,13 +203,13 @@ internal sealed class SettingsForm : FixedWidthResizableForm
 
         var cancel = UiFactory.TextButton(
             _localizer.Text("Common.Cancel"),
-            new Rectangle(570, 555, 96, 32));
+            new Rectangle(570, 605, 96, 32));
         cancel.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         cancel.Click += (_, _) => Close();
 
         var done = UiFactory.TextButton(
             _localizer.Text("Common.Save"),
-            new Rectangle(680, 555, 102, 32),
+            new Rectangle(680, 605, 102, 32),
             primary: true);
         done.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         done.Click += (_, _) =>
@@ -321,6 +315,25 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.ShowCachedOnFailure"),
             _showCachedOnFailure,
             238);
+        var languageHeading = PageTitle(_localizer.Text("Settings.Language"));
+        languageHeading.Location = new Point(0, 286);
+        languageHeading.Width = 340;
+        languageHeading.Font = Theme.Ui(8.8F, FontStyle.Bold);
+        page.Controls.Add(languageHeading);
+        ConfigureCombo(
+            _locale,
+            [
+                "auto", "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
+                "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU",
+            ]);
+        _locale.Bounds = new Rectangle(350, 284, 184, 28);
+        page.Controls.Add(_locale);
+        page.Controls.Add(
+            Hint(
+                _localizer.Text("Settings.LanguageHint"),
+                0,
+                326,
+                534));
         return page;
     }
 
@@ -453,33 +466,11 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.ResetSettingsHeight"),
             new Rectangle(412, 518, 122, 28));
         resetSettingsHeight.Click += (_, _) =>
-            _settings.Display.SettingsWindowHeightLogical = 600;
+            _settings.Display.SettingsWindowHeightLogical = 650;
         page.Controls.AddRange(
         [
             resetPosition, resetDetailHeight, resetSettingsHeight,
         ]);
-        return page;
-    }
-
-    private Panel BuildLanguagePage()
-    {
-        var page = CreatePage();
-        page.Controls.Add(PageTitle(_localizer.Text("Settings.Language")));
-        ConfigureCombo(
-            _locale,
-            [
-                "auto", "ja-JP", "en-US", "zh-Hans", "zh-Hant", "ko-KR",
-                "de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU",
-            ]);
-        _locale.Bounds = new Rectangle(282, 53, 252, 29);
-        page.Controls.Add(_locale);
-        page.Controls.Add(
-            UiFactory.Label(
-                _localizer.Text("Settings.LanguageHint"),
-                new Point(0, 94),
-                8.5F,
-                FontStyle.Regular,
-                Theme.Muted));
         return page;
     }
 
@@ -551,10 +542,12 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         return page;
     }
 
-    private Panel BuildConnectionPage()
+    private void AddConnectionControls(Control page, int top)
     {
-        var page = CreatePage();
-        page.Controls.Add(PageTitle(_localizer.Text("Settings.Connection")));
+        var heading = PageTitle(_localizer.Text("Settings.Connection"));
+        heading.Location = new Point(0, top);
+        heading.Font = Theme.Ui(8.8F, FontStyle.Bold);
+        page.Controls.Add(heading);
         ConfigureCombo(_codexPathMode, ["auto", "manual"]);
         _codexPathMode.SelectedIndexChanged += (_, _) =>
             _codexPath.Enabled =
@@ -566,30 +559,38 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             page,
             _localizer.Text("Settings.CodexPathMode"),
             _codexPathMode,
-            54);
-        page.Controls.Add(RowLabel(_localizer.Text("Settings.CodexExecutable"), 98));
-        _codexPath.Bounds = new Rectangle(0, 130, 534, 28);
+            top + 28);
+        page.Controls.Add(
+            RowLabel(
+                _localizer.Text("Settings.CodexExecutable"),
+                top + 62));
+        _codexPath.Bounds = new Rectangle(0, top + 92, 534, 28);
         _codexPath.BackColor = Theme.SurfaceRaised;
         _codexPath.ForeColor = Theme.Text;
         _codexPath.BorderStyle = BorderStyle.FixedSingle;
         page.Controls.Add(_codexPath);
         var diagnose = UiFactory.TextButton(
             _localizer.Text("Settings.ConnectionDiagnostic"),
-            new Rectangle(282, 176, 252, 30));
+            new Rectangle(282, top + 128, 252, 28));
         diagnose.Click += (_, _) =>
             ConnectionDiagnosticRequested?.Invoke(this, EventArgs.Empty);
-        _connectionStatus.Bounds = new Rectangle(0, 222, 534, 54);
+        _connectionStatus.Bounds = new Rectangle(0, top + 164, 534, 32);
         _connectionStatus.Font = Theme.Ui(8.3F);
         _connectionStatus.ForeColor = Theme.Muted;
         _connectionStatus.BackColor = Theme.Window;
         _connectionStatus.Text = _localizer.Text("Settings.ConnectionStatusHint");
+        var codexPathHint = Hint(
+            _localizer.Text("Settings.CodexPathHint"),
+            0,
+            top + 200,
+            534);
+        codexPathHint.Height = 32;
         page.Controls.AddRange(
         [
             diagnose,
             _connectionStatus,
-            Hint(_localizer.Text("Settings.CodexPathHint"), 0, 286, 534),
+            codexPathHint,
         ]);
-        return page;
     }
 
     private Panel BuildQuotaResetPage()
@@ -642,43 +643,60 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             page,
             _localizer.Text("Settings.EnableUsageCollection"),
             _usageEnabled,
-            48);
+            46);
+        ConfigureCombo(
+            _usageRefreshInterval,
+            [
+                "1", "5", "15", "30",
+                _localizer.Text("Settings.ManualOnly"),
+            ]);
+        AddControlRow(
+            page,
+            _localizer.Text("Settings.UsageRefreshInterval"),
+            _usageRefreshInterval,
+            78);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.UsageRefreshWhenOpened"),
+            _usageRefreshWhenOpened,
+            110);
         AddToggleRow(
             page,
             _localizer.Text("Settings.IncludeArchives"),
             _includeArchives,
-            84);
-        AddToggleRow(page, _localizer.Text("Settings.CollectModel"), _collectModel, 120);
+            142);
+        AddToggleRow(page, _localizer.Text("Settings.CollectModel"), _collectModel, 174);
         AddToggleRow(
             page,
             _localizer.Text("Settings.CollectReasoning"),
             _collectReasoning,
-            156);
-        AddToggleRow(page, _localizer.Text("Settings.CollectTier"), _collectTier, 192);
-        AddToggleRow(page, _localizer.Text("Settings.CollectTokens"), _collectTokens, 228);
+            206);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTier"), _collectTier, 238);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTokens"), _collectTokens, 270);
         AddToggleRow(
             page,
             _localizer.Text("Settings.CollectElapsed"),
             _collectElapsed,
-            264);
-        AddToggleRow(page, _localizer.Text("Settings.CollectTurns"), _collectTurns, 300);
+            302);
+        AddToggleRow(page, _localizer.Text("Settings.CollectTurns"), _collectTurns, 334);
         var rescan = UiFactory.TextButton(
             _localizer.Text("Usage.Rescan"),
-            new Rectangle(282, 344, 122, 30));
+            new Rectangle(282, 372, 122, 30));
         rescan.Click += (_, _) => UsageRescanRequested?.Invoke(this, EventArgs.Empty);
         var rebuild = UiFactory.TextButton(
             _localizer.Text("Settings.RebuildUsageCache"),
-            new Rectangle(412, 344, 122, 30));
+            new Rectangle(412, 372, 122, 30));
         rebuild.Click += (_, _) =>
             UsageCacheRebuildRequested?.Invoke(this, EventArgs.Empty);
         page.Controls.AddRange([rescan, rebuild]);
-        page.Controls.Add(
-            Hint(
-                _localizer.Text("Settings.UsageKnownRoots"),
-                0,
-                384,
-                534));
-        _usageScanStatus.Bounds = new Rectangle(0, 430, 534, 38);
+        var roots = Hint(
+            _localizer.Text("Settings.UsageKnownRoots"),
+            0,
+            410,
+            534);
+        roots.Height = 32;
+        page.Controls.Add(roots);
+        _usageScanStatus.Bounds = new Rectangle(0, 448, 534, 24);
         _usageScanStatus.Font = Theme.Ui(8.3F);
         _usageScanStatus.ForeColor = Theme.Muted;
         _usageScanStatus.BackColor = Theme.Window;
@@ -688,7 +706,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             Hint(
                 _localizer.Text("Settings.UsagePrivacyReadOnly"),
                 0,
-                476,
+                478,
                 534));
         return page;
     }
@@ -703,117 +721,125 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         ConfigureCombo(_sortOrder, ["descending", "ascending", "model"]);
         ConfigureCombo(_numberFormat, ["grouped", "compact"]);
         AddControlRow(page, _localizer.Text("Usage.Period"), _usagePeriod, 46);
-        AddControlRow(page, _localizer.Text("Usage.Metric"), _usageMetric, 82);
-        AddControlRow(page, _localizer.Text("Settings.ChartStyle"), _chartStyle, 118);
-        AddControlRow(page, _localizer.Text("Settings.SortOrder"), _sortOrder, 154);
-        AddControlRow(page, _localizer.Text("Settings.NumberFormat"), _numberFormat, 190);
-        page.Controls.Add(RowLabel(_localizer.Text("Settings.MaximumModels"), 226));
-        _maximumModels.Bounds = new Rectangle(450, 226, 84, 27);
+        AddControlRow(page, _localizer.Text("Usage.Metric"), _usageMetric, 80);
+        AddControlRow(page, _localizer.Text("Settings.ChartStyle"), _chartStyle, 114);
+        AddControlRow(page, _localizer.Text("Settings.SortOrder"), _sortOrder, 148);
+        AddControlRow(page, _localizer.Text("Settings.NumberFormat"), _numberFormat, 182);
+        page.Controls.Add(RowLabel(_localizer.Text("Settings.MaximumModels"), 216));
+        _maximumModels.Bounds = new Rectangle(450, 216, 84, 27);
         _maximumModels.Minimum = 1;
         _maximumModels.Maximum = 5;
         _maximumModels.BackColor = Theme.SurfaceRaised;
         _maximumModels.ForeColor = Theme.Text;
         page.Controls.Add(_maximumModels);
-        AddToggleRow(page, _localizer.Text("Usage.ElapsedTime"), _showElapsed, 266);
-        AddToggleRow(page, _localizer.Text("Usage.TurnCount"), _showTurns, 302);
+        AddToggleRow(page, _localizer.Text("Usage.ElapsedTime"), _showElapsed, 250);
+        AddToggleRow(page, _localizer.Text("Usage.TurnCount"), _showTurns, 284);
         AddToggleRow(
             page,
             _localizer.Text("Usage.ReasoningBreakdown"),
             _showReasoning,
-            338);
+            318);
         AddToggleRow(
             page,
             _localizer.Text("Settings.ShowTierBreakdown"),
             _showTier,
-            374);
+            352);
         AddToggleRow(
             page,
             _localizer.Text("Settings.GroupOtherModels"),
             _groupOtherModels,
-            410);
-        return page;
-    }
-
-    private Panel BuildUsageEstimatePage()
-    {
-        var page = CreatePage();
-        page.Controls.Add(PageTitle(_localizer.Text("Settings.UsageEstimates")));
+            386);
+        var estimateHeading = UiFactory.Label(
+            _localizer.Text("Settings.UsageEstimates"),
+            new Point(0, 416),
+            8.8F,
+            FontStyle.Bold);
+        estimateHeading.Size = new Size(534, 25);
+        estimateHeading.AutoSize = false;
+        page.Controls.Add(estimateHeading);
         _usageEstimate.Enabled = false;
         AddToggleRow(
             page,
             _localizer.Text("Settings.EnableUsageEstimate"),
             _usageEstimate,
-            52);
+            442);
         page.Controls.Add(
             Hint(
                 _localizer.Text("Settings.EstimateUnavailable"),
                 0,
-                104,
+                474,
                 534));
         return page;
     }
 
-    private Panel BuildBackupPage()
+    private void AddBackupControls(Control page, int top)
     {
-        var page = CreatePage();
-        page.Controls.Add(PageTitle(_localizer.Text("Settings.Backup")));
+        var heading = UiFactory.Label(
+            _localizer.Text("Settings.Backup"),
+            new Point(0, top),
+            8.8F,
+            FontStyle.Bold);
+        heading.Size = new Size(534, 25);
+        heading.AutoSize = false;
         var export = UiFactory.TextButton(
             _localizer.Text("Settings.ExportSettings"),
-            new Rectangle(0, 54, 250, 34));
+            new Rectangle(0, top + 27, 250, 30));
         export.Click += async (_, _) => await ExportSettingsAsync();
         var import = UiFactory.TextButton(
             _localizer.Text("Settings.ImportSettings"),
-            new Rectangle(282, 54, 252, 34));
+            new Rectangle(282, top + 27, 252, 30));
         import.Click += async (_, _) => await ImportSettingsAsync();
         var history = UiFactory.TextButton(
             _localizer.Text("Settings.ExportHistoryJson"),
-            new Rectangle(0, 100, 250, 34));
+            new Rectangle(0, top + 63, 250, 30));
         history.Click += (_, _) =>
             HistoryExportRequested?.Invoke(this, EventArgs.Empty);
         var usageJson = UiFactory.TextButton(
             _localizer.Text("Settings.ExportUsageJson"),
-            new Rectangle(282, 100, 122, 34));
+            new Rectangle(282, top + 63, 122, 30));
         usageJson.Click += (_, _) =>
             UsageExportRequested?.Invoke(
                 this,
                 new UsageExportRequestedEventArgs("json"));
         var usageCsv = UiFactory.TextButton(
             _localizer.Text("Settings.ExportUsageCsv"),
-            new Rectangle(412, 100, 122, 34));
+            new Rectangle(412, top + 63, 122, 30));
         usageCsv.Click += (_, _) =>
             UsageExportRequested?.Invoke(
                 this,
                 new UsageExportRequestedEventArgs("csv"));
         page.Controls.AddRange(
         [
-            export, import, history, usageJson, usageCsv,
+            heading, export, import, history, usageJson, usageCsv,
         ]);
-        page.Controls.Add(
-            Hint(
-                _localizer.Text("Settings.BackupHint"),
-                0,
-                158,
-                534));
-        return page;
+        var backupHint = Hint(
+            _localizer.Text("Settings.BackupHint"),
+            0,
+            top + 99,
+            534);
+        backupHint.Height = 32;
+        page.Controls.Add(backupHint);
     }
 
     private Panel BuildAdvancedPage()
     {
         var page = CreatePage();
         page.Controls.Add(PageTitle(_localizer.Text("Settings.Advanced")));
+        AddConnectionControls(page, 38);
+        AddBackupControls(page, 276);
         ConfigureCombo(_logRetention, [7, 14, 30, 90]);
         AddControlRow(
             page,
             _localizer.Text("Settings.LogRetention"),
             _logRetention,
-            54);
+            412);
         var logs = UiFactory.TextButton(
             _localizer.Text("Settings.OpenLogs"),
-            new Rectangle(0, 106, 166, 32));
+            new Rectangle(0, 446, 166, 30));
         logs.Click += (_, _) => OpenLogsRequested?.Invoke(this, EventArgs.Empty);
         var cache = UiFactory.TextButton(
             _localizer.Text("Settings.ClearLocalCache"),
-            new Rectangle(184, 106, 166, 32),
+            new Rectangle(184, 446, 166, 30),
             danger: true);
         cache.Click += (_, _) =>
         {
@@ -829,16 +855,17 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         };
         var reconnect = UiFactory.TextButton(
             _localizer.Text("Settings.ReconnectAppServer"),
-            new Rectangle(368, 106, 166, 32));
+            new Rectangle(368, 446, 166, 30));
         reconnect.Click += (_, _) =>
             ReconnectRequested?.Invoke(this, EventArgs.Empty);
         page.Controls.AddRange([logs, cache, reconnect]);
-        page.Controls.Add(
-            Hint(
-                _localizer.Text("Settings.AdvancedHint"),
-                0,
-                160,
-                534));
+        var advancedHint = Hint(
+            _localizer.Text("Settings.AdvancedHint"),
+            0,
+            482,
+            534);
+        advancedHint.Height = 36;
+        page.Controls.Add(advancedHint);
         return page;
     }
 
@@ -1030,6 +1057,17 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             1,
             100);
         _usageEnabled.Checked = settings.UsageAnalytics.Enabled;
+        _usageRefreshInterval.SelectedIndex =
+            settings.UsageAnalytics.RefreshIntervalMinutes switch
+            {
+                1 => 0,
+                15 => 2,
+                30 => 3,
+                0 => 4,
+                _ => 1,
+            };
+        _usageRefreshWhenOpened.Checked =
+            settings.UsageAnalytics.RefreshWhenOpened;
         _includeArchives.Checked =
             settings.UsageAnalytics.IncludeArchivedSessions;
         _collectModel.Checked = settings.UsageAnalytics.CollectModel;
@@ -1123,6 +1161,17 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _settings.ResetDetection.RecentHistoryCount =
             (int)_recentHistoryCount.Value;
         _settings.UsageAnalytics.Enabled = _usageEnabled.Checked;
+        _settings.UsageAnalytics.RefreshIntervalMinutes =
+            _usageRefreshInterval.SelectedIndex switch
+            {
+                0 => 1,
+                2 => 15,
+                3 => 30,
+                4 => 0,
+                _ => 5,
+            };
+        _settings.UsageAnalytics.RefreshWhenOpened =
+            _usageRefreshWhenOpened.Checked;
         _settings.UsageAnalytics.IncludeArchivedSessions =
             _includeArchives.Checked;
         _settings.UsageAnalytics.CollectModel = _collectModel.Checked;

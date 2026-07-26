@@ -2,7 +2,7 @@ namespace QuantaTrain.Core;
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public GeneralSettings General { get; set; } = new();
     public DisplaySettings Display { get; set; } = new();
     public LanguageSettings Language { get; set; } = new();
@@ -68,7 +68,7 @@ public sealed class DisplaySettings
     public bool RememberDetailHeight { get; set; } = true;
     public int DetailWindowHeightLogical { get; set; } = 600;
     public bool RememberSettingsHeight { get; set; } = true;
-    public int SettingsWindowHeightLogical { get; set; } = 600;
+    public int SettingsWindowHeightLogical { get; set; } = 650;
     public PanelPositionSettings PanelPosition { get; set; } = new();
 
     internal DisplaySettings Clone()
@@ -100,9 +100,9 @@ public sealed class LanguageSettings
 
 public sealed class NotificationSettings
 {
-    public bool Remaining30 { get; set; }
+    public bool Remaining30 { get; set; } = true;
     public bool Remaining10 { get; set; } = true;
-    public bool ScheduledReset { get; set; }
+    public bool ScheduledReset { get; set; } = true;
     public bool UnexpectedResetCandidate { get; set; } = true;
     public bool ResetCreditExpiring { get; set; } = true;
     public bool PersistentConnectionFailure { get; set; } = true;
@@ -141,6 +141,8 @@ public sealed class ResetDetectionSettings
 public sealed class UsageAnalyticsSettings
 {
     public bool Enabled { get; set; }
+    public int RefreshIntervalMinutes { get; set; } = 5;
+    public bool RefreshWhenOpened { get; set; } = true;
     public bool IncludeArchivedSessions { get; set; } = true;
     public string? CodexHomeOverride { get; set; }
     public bool CollectModel { get; set; } = true;

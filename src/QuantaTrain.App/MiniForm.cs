@@ -18,6 +18,7 @@ internal sealed class MiniForm : FramelessForm
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
     private readonly RoundedPanel _quotaCard = new();
+    private readonly Label _weekly;
     private readonly Label _remainingPrefix = new();
     private readonly Label _remainingPercent = new();
     private readonly QuotaProgressBar _progress = new();
@@ -32,19 +33,19 @@ internal sealed class MiniForm : FramelessForm
         _localizer = localizer;
         _canDrag = canDrag ?? (() => true);
         Text = $"{_localizer.Text("Menu.ShowMini")} — QuantaTray";
-        ClientSize = new Size(232, 126);
+        ClientSize = new Size(220, 95);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray mini quota panel";
 
-        _quotaCard.Bounds = new Rectangle(6, 6, 220, 114);
-        var weekly = UiFactory.Label(
+        _quotaCard.Bounds = new Rectangle(6, 6, 208, 83);
+        _weekly = UiFactory.Label(
             _localizer.Text("Quota.Weekly"),
             new Point(10, 4),
-            8.7F,
+            8.2F,
             FontStyle.Bold);
-        weekly.AutoSize = false;
-        weekly.Size = new Size(200, 17);
-        weekly.AutoEllipsis = true;
+        _weekly.AutoSize = false;
+        _weekly.Size = new Size(80, 18);
+        _weekly.AutoEllipsis = true;
 
         _remainingPrefix.AutoSize = true;
         _remainingPrefix.Font = Theme.Ui(7.8F);
@@ -57,19 +58,20 @@ internal sealed class MiniForm : FramelessForm
         _remainingPercent.BackColor = Color.Transparent;
         _remainingPercent.Text = "—";
 
-        _progress.Bounds = new Rectangle(10, 53, 200, 10);
-        _reset = UiFactory.Label(string.Empty, new Point(10, 70), 7.8F);
+        _progress.Bounds = new Rectangle(10, 39, 188, 9);
+        _reset = UiFactory.Label(string.Empty, new Point(10, 57), 7F);
         _reset.AutoSize = false;
-        _reset.Size = new Size(200, 17);
+        _reset.Size = new Size(68, 16);
         _reset.AutoEllipsis = true;
-        _countdown = UiFactory.Label(string.Empty, new Point(10, 89), 7.8F);
+        _countdown = UiFactory.Label(string.Empty, new Point(82, 57), 7F);
         _countdown.AutoSize = false;
-        _countdown.Size = new Size(200, 17);
-        _countdown.TextAlign = ContentAlignment.TopCenter;
+        _countdown.Size = new Size(116, 16);
+        _countdown.TextAlign = ContentAlignment.TopLeft;
+        _countdown.AutoEllipsis = true;
 
         _quotaCard.Controls.AddRange(
         [
-            weekly,
+            _weekly,
             _remainingPrefix,
             _remainingPercent,
             _progress,
@@ -118,6 +120,7 @@ internal sealed class MiniForm : FramelessForm
             control.DoubleClick += (_, _) =>
                 CompactRequested?.Invoke(this, EventArgs.Empty);
         }
+        AlignResetLine();
         AlignRemaining();
     }
 
@@ -202,8 +205,8 @@ internal sealed class MiniForm : FramelessForm
             _remainingPercent.Text = "—";
             _remainingPercent.ForeColor = Theme.Subtle;
             _progress.Value = 0;
-            _reset.Text = _localizer.Text("Quota.Unavailable");
-            _countdown.Text = string.Empty;
+            _reset.Text = ResetCaption();
+            _countdown.Text = _localizer.Text("Quota.Unavailable");
         }
         else
         {
@@ -214,15 +217,13 @@ internal sealed class MiniForm : FramelessForm
             _remainingPercent.ForeColor = Theme.QuotaColor(remaining);
             _progress.ValueColor = Theme.QuotaColor(remaining);
             _progress.Value = (int)Math.Round(Math.Clamp(remaining, 0d, 100d));
-            _reset.Text = _localizer.Text(
-                "Quota.NextReset",
-                state.ResetsAtUtc?.ToLocalTime().ToString("g") ?? "—");
+            _reset.Text = ResetCaption();
             _countdown.Text = state.ResetsAtUtc is null
-                ? string.Empty
-                : _localizer.Text(
-                    "Quota.Countdown",
-                    FormatCountdown(state.ResetsAtUtc.Value));
+                ? "—"
+                : $"{state.ResetsAtUtc.Value.ToLocalTime():yyyy/MM/dd HH:mm} " +
+                  $"({FormatCountdown(state.ResetsAtUtc.Value)})";
         }
+        AlignResetLine();
         AlignRemaining();
     }
 
@@ -269,10 +270,12 @@ internal sealed class MiniForm : FramelessForm
     {
         _remainingPercent.Location = new Point(
             _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
-            21);
+            2);
         _remainingPrefix.Location = new Point(
             _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
-            29);
+            10);
+        _weekly.Top = _remainingPrefix.Top;
+        _weekly.Width = Math.Max(32, _remainingPrefix.Left - _weekly.Left - 6);
     }
 
     private string RemainingPrefix(string value)
@@ -282,17 +285,35 @@ internal sealed class MiniForm : FramelessForm
         return index <= 0 ? string.Empty : formatted[..index].Trim();
     }
 
+    private string ResetCaption() =>
+        _localizer.Text("Quota.NextReset", string.Empty).Trim();
+
+    private void AlignResetLine()
+    {
+        var measured = TextRenderer.MeasureText(
+            _reset.Text,
+            _reset.Font,
+            Size.Empty,
+            TextFormatFlags.NoPadding).Width + 8;
+        var captionWidth = Math.Clamp(measured, 56, 76);
+        _reset.Width = captionWidth;
+        _countdown.Left = _reset.Right + 4;
+        _countdown.Width = Math.Max(
+            0,
+            _quotaCard.ClientSize.Width - _countdown.Left - 10);
+    }
+
     private static string FormatCountdown(DateTimeOffset resetAtUtc)
     {
         var remaining = resetAtUtc - DateTimeOffset.UtcNow;
         if (remaining <= TimeSpan.Zero)
         {
-            return "0m";
+            return "0M";
         }
 
         return remaining.TotalDays >= 1
-            ? $"{(int)remaining.TotalDays}d {remaining.Hours}h"
-            : $"{(int)remaining.TotalHours}h {remaining.Minutes}m";
+            ? $"{(int)remaining.TotalDays}D{remaining.Hours}H"
+            : $"{(int)remaining.TotalHours}H{remaining.Minutes}M";
     }
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]

@@ -26,6 +26,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly Control _dispatcher = new();
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _activationTimer;
+    private readonly System.Windows.Forms.Timer _usageRefreshTimer;
     private readonly DataPaths _paths;
     private readonly JsonSettingsStore _settingsStore;
     private readonly JsonlHistoryStore _historyStore;
@@ -45,10 +46,15 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private PollingCoordinator? _polling;
     private CodexInstallation? _codex;
     private WeeklyQuotaState? _previousState;
+    private WeeklyQuotaState? _displayState;
     private IReadOnlyList<string> _historyItems = [];
     private UsageAnalysisSnapshot? _usageSnapshot;
+    private bool _viewUpdating;
+    private string? _viewError;
+    private bool _signedIn;
     private bool _confirmationPending;
     private bool _usageScanPending;
+    private DateTimeOffset? _lastUsageRefreshUtc;
     private int _connectionFailureCount;
     private readonly HashSet<string> _notifiedCreditExpiries =
         new(StringComparer.Ordinal);
@@ -108,6 +114,39 @@ internal sealed class QuantaTrainContext : ApplicationContext
             if (_singleInstance.ConsumeActivationRequest())
             {
                 ShowCompact();
+            }
+        };
+        _usageRefreshTimer = new System.Windows.Forms.Timer
+        {
+            Interval = 60_000,
+            Enabled = true,
+        };
+        _usageRefreshTimer.Tick += async (_, _) =>
+        {
+            try
+            {
+                var interval =
+                    _settings.UsageAnalytics.RefreshIntervalMinutes;
+                if (!_settings.UsageAnalytics.Enabled ||
+                    interval <= 0 ||
+                    _usageScanPending ||
+                    _lastUsageRefreshUtc is not null &&
+                    DateTimeOffset.UtcNow - _lastUsageRefreshUtc.Value <
+                    TimeSpan.FromMinutes(interval))
+                {
+                    return;
+                }
+                await RefreshUsageAsync();
+            }
+            catch (OperationCanceledException) when (
+                _lifetime.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                await _logger.WarningAsync(
+                    exception.Message,
+                    CancellationToken.None);
             }
         };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged +=
@@ -216,6 +255,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 var persistedState = await _quotaStateStore.ReadAsync(
                     _lifetime.Token);
                 _previousState = persistedState?.State;
+                _displayState = _previousState;
             }
             await _retentionMaintenance.RunIfDueAsync(
                 _settings.History.RetentionDays,
@@ -569,6 +609,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _compactForm.MoveCompleted += async (_, _) =>
                 await HandlePanelMoveCompletedAsync(_compactForm);
             ApplyDisplaySettings();
+            _compactForm.SetSignedIn(_signedIn);
+            _compactForm.UpdateState(
+                _displayState,
+                _viewUpdating,
+                _viewError,
+                _historyItems);
         }
         return _compactForm;
     }
@@ -594,6 +640,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _miniForm.MoveCompleted += async (_, _) =>
                 await HandlePanelMoveCompletedAsync(_miniForm);
             ApplyDisplaySettings();
+            _miniForm.UpdateState(_displayState);
         }
         return _miniForm;
     }
@@ -604,7 +651,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             _detailForm = new DetailForm(
                 _localizer,
-                () => !_settings.Display.LockPosition);
+                () => !_settings.Display.LockPosition,
+                () => _settings.General.RefreshIntervalSeconds);
             _detailForm.Height = Math.Clamp(
                 (int)Math.Round(
                     _settings.Display.DetailWindowHeightLogical *
@@ -614,6 +662,14 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _detailForm.RefreshRequested += async (_, _) => await RefreshAsync();
             _detailForm.UsageRefreshRequested += async (_, _) =>
                 await RefreshUsageAsync();
+            _detailForm.UsageViewRequested += async (_, _) =>
+            {
+                if (_settings.UsageAnalytics.Enabled &&
+                    _settings.UsageAnalytics.RefreshWhenOpened)
+                {
+                    await RefreshUsageAsync();
+                }
+            };
             _detailForm.UsageFilterChanged += async (_, eventArgs) =>
             {
                 _settings.UsageAnalytics.DefaultPeriod = eventArgs.Period;
@@ -621,6 +677,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 await SaveSettingsAsync();
                 await RefreshUsageAsync();
             };
+            _detailForm.MiniRequested += (_, _) => ShowMini();
             _detailForm.CompactRequested += (_, _) => ShowCompact();
             _detailForm.SettingsRequested += (_, _) => QueueShowSettings();
             _detailForm.MoveCompleted += async (_, _) =>
@@ -636,6 +693,15 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 await HandlePanelMoveCompletedAsync(_detailForm);
             };
             ApplyDisplaySettings();
+            _detailForm.UpdateState(
+                _displayState,
+                _viewUpdating,
+                _viewError,
+                _historyItems);
+            _detailForm.UpdateUsage(
+                _usageSnapshot,
+                _settings.UsageAnalytics,
+                _usageScanPending);
         }
         return _detailForm;
     }
@@ -648,6 +714,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         var form = GetCompactForm();
         PositionPanel(form);
         form.Show();
+        RenderPanel(form);
         if (activate)
         {
             form.Activate();
@@ -662,6 +729,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         var form = GetDetailForm();
         PositionPanel(form);
         form.Show();
+        RenderPanel(form);
         if (activate)
         {
             form.Activate();
@@ -680,6 +748,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         var form = GetMiniForm();
         PositionPanel(form);
         form.Show();
+        RenderPanel(form);
         if (_settings.Display.MiniClickThrough)
         {
             if (activate || _settingsForm is null)
@@ -700,6 +769,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ShowSettings()
     {
+        if (TryCloseVisibleSettings(_settingsForm))
+        {
+            return;
+        }
         if (_settingsForm is not null && !_settingsForm.IsDisposed)
         {
             _settingsForm.Show();
@@ -879,6 +952,16 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         form.Show();
         form.Activate();
+    }
+
+    internal static bool TryCloseVisibleSettings(Form? form)
+    {
+        if (form is null || form.IsDisposed || !form.Visible)
+        {
+            return false;
+        }
+        form.Close();
+        return true;
     }
 
     private async Task ApplySettingsPreviewAsync(SettingsPreviewKind kind)
@@ -1096,7 +1179,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
-            FormatException or System.Text.Json.JsonException)
+            FormatException or System.Text.Json.JsonException or
+            InvalidOperationException)
         {
             await _logger.WarningAsync(
                 exception.Message,
@@ -1114,6 +1198,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         finally
         {
             _usageScanPending = false;
+            _lastUsageRefreshUtc = DateTimeOffset.UtcNow;
             _detailForm?.UpdateUsage(
                 _usageSnapshot,
                 _settings.UsageAnalytics,
@@ -1132,30 +1217,59 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void SetSignedIn(bool signedIn)
     {
+        _signedIn = signedIn;
         _compactForm?.SetSignedIn(signedIn);
     }
 
     private void UpdateViews(WeeklyQuotaState? state, bool updating, string? error)
     {
-        _miniForm?.UpdateState(state);
-        _compactForm?.UpdateState(state, updating, error);
-        _detailForm?.UpdateState(state, updating, error, _historyItems);
+        _viewUpdating = updating;
+        _viewError = error;
+        if (state is not null)
+        {
+            _displayState = state;
+        }
+        else if (
+            !_settings.General.ShowCachedOnFailure ||
+            !updating && error is null)
+        {
+            _displayState = null;
+        }
+        var displayedState = state ?? _displayState;
+        _miniForm?.UpdateState(displayedState);
+        _compactForm?.UpdateState(
+            displayedState,
+            updating,
+            error,
+            _historyItems);
+        _detailForm?.UpdateState(
+            displayedState,
+            updating,
+            error,
+            _historyItems);
         _detailForm?.UpdateUsage(
             _usageSnapshot,
             _settings.UsageAnalytics,
             _usageScanPending);
 
         var oldIcon = _notifyIcon.Icon;
-        _notifyIcon.Icon = IconFactory.Create(state?.RemainingPercent);
+        _notifyIcon.Icon = IconFactory.Create(displayedState?.RemainingPercent);
         oldIcon?.Dispose();
-        var remainingText = state is null
+        var remainingText = displayedState is null
             ? _localizer.Text("Quota.Unavailable")
             : _localizer.Text(
                 "Common.Remaining",
-                QuotaDisplay.Number(state.RemainingPercent));
+                QuotaDisplay.Number(displayedState.RemainingPercent));
         _notifyIcon.Text = remainingText.Length <= 63
             ? remainingText
             : remainingText[..63];
+    }
+
+    private static void RenderPanel(Form form)
+    {
+        form.PerformLayout();
+        form.Invalidate(true);
+        form.Update();
     }
 
     private void ApplyDisplaySettings()
@@ -1551,6 +1665,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             HandleDisplaySettingsChanged;
         _lifetime.Cancel();
         _activationTimer.Stop();
+        _usageRefreshTimer.Stop();
         _notifyIcon.Visible = false;
         DisposeConnectionAsync().GetAwaiter().GetResult();
         _settingsForm?.Dispose();
@@ -1559,6 +1674,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _detailForm?.Dispose();
         _notifyIcon.Dispose();
         _activationTimer.Dispose();
+        _usageRefreshTimer.Dispose();
         _dispatcher.Dispose();
         _lifetime.Dispose();
         base.ExitThreadCore();

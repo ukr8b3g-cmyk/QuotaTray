@@ -225,6 +225,10 @@ public sealed class CodexSessionScannerTests
     [
         """{"timestamp":"2026-07-26T01:00:00Z","type":"event_msg","payload":{"type":"task_started","started_at":"2026-07-26T01:00:00Z"}}""",
         """{"timestamp":"2026-07-26T01:00:01Z","type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"D:\\private"}}""",
+        """{"type":"turn_context","payload":null}""",
+        """{"type":"event_msg","payload":null,"note":"token_count"}""",
+        """{"type":"event_msg","payload":{"type":"token_count","info":null}}""",
+        """["turn_context"]""",
         """{"timestamp":"2026-07-26T01:00:02Z","type":"response_item","payload":{"type":"message","text":"private user message"}}""",
         """{"timestamp":"2026-07-26T01:00:03Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":150},"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":150}}}}""",
         """{"timestamp":"2026-07-26T01:00:04Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":120,"cached_input_tokens":30,"output_tokens":30,"reasoning_output_tokens":5,"total_tokens":150},"total_token_usage":{"input_tokens":220,"cached_input_tokens":50,"output_tokens":80,"reasoning_output_tokens":15,"total_tokens":300}}}}""",
