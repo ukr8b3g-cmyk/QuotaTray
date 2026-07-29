@@ -42,13 +42,13 @@
 - Added an opt-in mini-view click-through mode recoverable from the tray.
 - Fixed click-through mini panels becoming faint, disappearing behind other windows, or failing to return after Settings closes.
 - Serialized live settings previews and safely restored the active panel after repeated theme, accent, or language changes.
-- Added shared mini/compact/detail positioning, missing-monitor recovery, and position reset actions.
+- Added shared mini/compact/detail positioning, missing-monitor recovery, and position-only/full reset actions.
 - Added a clickable GitHub repository link to the About dialog.
 - Fixed live theme, accent, language, and display changes that could close Settings, raise WinForms handle errors, or terminate the app.
 - Kept Settings modeless so compact and detailed panels remain interactive, and restricted click-through to the mini panel.
 - Fixed localized quota headings overlapping the remaining percentage.
 - Applied opacity, always-on-top, position lock, position memory, and edge snap to quota panels while keeping Settings opaque.
-- Applied the selected accent to normal quota values and added optional one-decimal percentage display.
+- Applied the selected accent to normal quota values and added optional one-decimal quota display.
 
 ## 0.1.2 - 2026-07-25
 
