@@ -1,28 +1,28 @@
-# QuantaTray v0.2.2
+# QuantaTray v0.2.3
 
 ## 日本語
 
-QuantaTray v0.2.2では、詳細画面のリセット履歴にある「すべて表示」が、保存期間内の履歴をすべて表示するよう修正しました。
+QuantaTray v0.2.3では、Windows 11の4K・高DPI環境でコンパクト表示の文字やカード、上部ボタンが切れる問題を修正しました。
 
-- 「すべて表示」を押すと、保持中の月別履歴ファイルをすべて読み込む一覧画面を表示
-- 履歴を新しい順で表示
-- 破損した行だけを無視し、同じファイル内の正常な履歴は継続して表示
-- コンパクト表示と詳細画面の「最近の履歴」件数は従来どおり維持
-- 複数月、破損行、最近の履歴件数、ボタン操作の回帰テストを追加
+- コンパクト表示の論理幅とカード領域を拡大
+- 既存のPerMonitorV2設定に加えて、フォーム側のDPI自動スケーリングを明示
+- 次回リセット日時とリセット券有効期限に十分な折り返し領域を確保
+- 上部ツールバーの配置を広い論理幅に合わせて調整
+- 既存の配色、カード構成、操作方法は維持
 
-既に保存期間の処理で削除された履歴は復元されません。ローカルの履歴JSONLに残っている記録が表示対象です。
+Windowsの互換性設定にある「高DPIスケール設定の上書き」を使用しなくても表示できることを目的とした修正です。
 
 ## English
 
-QuantaTray v0.2.2 fixes the reset-history **Show all** action so it displays every retained local history record.
+QuantaTray v0.2.3 fixes clipped text, cards, and toolbar controls in the compact panel on Windows 11 systems using 4K or other high-DPI display scaling.
 
-- Opens a dedicated list containing all retained monthly history files
-- Sorts records newest first
-- Skips only damaged rows while continuing to read valid rows from the same file
-- Preserves the existing recent-history limits in compact and detailed views
-- Adds regression tests for multiple months, damaged rows, recent-count behavior, and the Show all action
+- Increases the compact panel's logical width and card content area
+- Explicitly enables form-level DPI autoscaling while retaining PerMonitorV2 process awareness
+- Gives reset dates and reset-credit expiry text enough vertical space to wrap
+- Repositions the top toolbar for the wider logical layout
+- Preserves the existing colors, card structure, and interaction model
 
-History already removed by retention cleanup cannot be restored. The dialog displays records still present in the local history JSONL files.
+The fix is intended to remove the need for the Windows compatibility override for high-DPI scaling.
 
 - Installer: per-user installation, no administrator privileges required.
 - Portable ZIP: extract to a writable folder; data stays under `data/`.
