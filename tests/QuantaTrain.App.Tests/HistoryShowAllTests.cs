@@ -67,7 +67,6 @@ public sealed class HistoryShowAllTests
                     Mode = "manual",
                     Locale = "en-US",
                 });
-                Theme.Configure("dark", "green");
                 using var form = new DetailForm(localizer);
                 var requested = false;
                 form.HistoryRequested += (_, _) => requested = true;
