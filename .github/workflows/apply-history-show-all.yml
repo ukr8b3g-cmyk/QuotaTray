@@ -3,9 +3,6 @@ name: apply-history-show-all
 on:
   pull_request:
     branches: ['main']
-    paths:
-      - '.github/history-show-all.patch'
-      - '.github/workflows/apply-history-show-all.yml'
 
 permissions:
   contents: write
@@ -19,86 +16,12 @@ jobs:
           ref: fix/history-show-all
           fetch-depth: 0
       - name: Apply focused replacements
+        run: python .github/scripts/apply-history-show-all.py
+      - name: Commit focused changes
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path: str, old: str, new: str) -> None:
-              file = Path(path)
-              text = file.read_text(encoding='utf-8-sig')
-              if text.count(old) != 1:
-                  raise SystemExit(f'{path}: expected one match, found {text.count(old)}')
-              file.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          store_method = '''    public async Task<IReadOnlyList<string>> ReadAllAsync(
-              CancellationToken cancellationToken)
-          {
-              var records = new List<(DateTimeOffset Time, string Display)>();
-              foreach (var file in Directory.EnumerateFiles(
-                           _historyDirectory,
-                           "*.jsonl"))
-              {
-                  await foreach (var line in File.ReadLinesAsync(file, cancellationToken))
-                  {
-                      try
-                      {
-                          using var document = JsonDocument.Parse(line);
-                          var root = document.RootElement;
-                          var time = root.GetProperty("observedToUtc").GetDateTimeOffset();
-                          var classification = root.GetProperty("classification").GetString();
-                          records.Add(
-                              (time, $"{time.ToLocalTime():g}  {classification}"));
-                      }
-                      catch (Exception exception) when (
-                          exception is JsonException or KeyNotFoundException or
-                          InvalidOperationException or FormatException)
-                      {
-                          // Skip only the damaged or unsupported row.
-                      }
-                  }
-              }
-
-              return records
-                  .OrderByDescending(record => record.Time)
-                  .Select(record => record.Display)
-                  .ToArray();
-          }
-
-'''
-          replace_once(
-              'src/QuantaTrain.Infrastructure/JsonlHistoryStore.cs',
-              '    public async Task<IReadOnlyList<ResetEvent>> ReadRecentEventsAsync(\n',
-              store_method + '    public async Task<IReadOnlyList<ResetEvent>> ReadRecentEventsAsync(\n')
-
-          replace_once(
-              'src/QuantaTrain.App/DetailDashboardForm.cs',
-              '    public event EventHandler? SettingsRequested;\n',
-              '    public event EventHandler? SettingsRequested;\n'
-              '    public event EventHandler? HistoryRequested;\n')
-          replace_once(
-              'src/QuantaTrain.App/DetailDashboardForm.cs',
-              '        allHistory.Bounds = new Rectangle(198, 229, 160, 28);\n'
-              '        history.Controls.Add(allHistory);\n',
-              '        allHistory.Bounds = new Rectangle(198, 229, 160, 28);\n'
-              '        allHistory.Click += (_, _) =>\n'
-              '            HistoryRequested?.Invoke(this, EventArgs.Empty);\n'
-              '        history.Controls.Add(allHistory);\n')
-
-          replace_once(
-              'src/QuantaTrain.App/QuantaTrainContext.cs',
-              '            _detailForm.SettingsRequested += (_, _) => QueueShowSettings();\n'
-              '            _detailForm.MoveCompleted += async (_, _) =>\n',
-              '            _detailForm.SettingsRequested += (_, _) => QueueShowSettings();\n'
-              '            _detailForm.HistoryRequested += async (_, _) =>\n'
-              '                await ResetHistoryDialog.ShowAsync(\n'
-              '                    _detailForm,\n'
-              '                    _historyStore,\n'
-              '                    _localizer,\n'
-              '                    _lifetime.Token);\n'
-              '            _detailForm.MoveCompleted += async (_, _) =>\n')
-          PY
           rm .github/history-show-all.patch
+          rm .github/scripts/apply-history-show-all.py
           rm .github/workflows/apply-history-show-all.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
