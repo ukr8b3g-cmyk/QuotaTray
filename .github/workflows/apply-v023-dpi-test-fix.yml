@@ -21,21 +21,26 @@ jobs:
         run: |
           $compactPath = 'src/QuantaTrain.App/CompactForm.cs'
           $compact = Get-Content $compactPath -Raw
-          $compact = $compact.Replace('_quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,`r`n            22);', '_quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,`r`n            24);')
-          $compact = $compact.Replace('_remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,`r`n            30);', '_remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,`r`n            32);')
+          $compact = $compact -replace '(?s)(_quotaCard\.ClientSize\.Width - _remainingPercent\.PreferredWidth - 13,\s*)22\);', '${1}24);'
+          $compact = $compact -replace '(?s)(_remainingPercent\.Left - _remainingPrefix\.PreferredWidth - 4,\s*)30\);', '${1}32);'
           Set-Content $compactPath $compact -NoNewline
 
           $testPath = 'tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs'
           $tests = Get-Content $testPath -Raw
-          $tests = $tests.Replace('Assert.Equal(new Size(240, 338), compact.ClientSize);', @'
+          $replacement = @'
 Assert.True(
                 compact.ClientSize.Width >= 286,
                 $"Compact width was {compact.ClientSize.Width}.");
             Assert.True(
                 compact.ClientSize.Height >= 384,
                 $"Compact height was {compact.ClientSize.Height}.");
-'@)
+'@
+          $tests = $tests.Replace('Assert.Equal(new Size(240, 338), compact.ClientSize);', $replacement.TrimEnd())
           Set-Content $testPath $tests -NoNewline
+
+          if ($compact -notmatch '_remainingPercent\.PreferredWidth - 13,\s*24\);') { throw 'Compact percent position was not updated.' }
+          if ($compact -notmatch '_remainingPrefix\.PreferredWidth - 4,\s*32\);') { throw 'Compact prefix position was not updated.' }
+          if ($tests -notmatch 'compact\.ClientSize\.Width >= 286') { throw 'Compact size test was not updated.' }
 
           Remove-Item '.github/workflows/apply-v023-dpi-test-fix.yml'
       - name: Commit fixes
