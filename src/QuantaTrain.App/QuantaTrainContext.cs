@@ -680,6 +680,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _detailForm.MiniRequested += (_, _) => ShowMini();
             _detailForm.CompactRequested += (_, _) => ShowCompact();
             _detailForm.SettingsRequested += (_, _) => QueueShowSettings();
+            _detailForm.HistoryRequested += async (_, _) =>
+                await ResetHistoryDialog.ShowAsync(
+                    _detailForm,
+                    _historyStore,
+                    _localizer,
+                    _lifetime.Token);
             _detailForm.MoveCompleted += async (_, _) =>
             {
                 if (_settings.Display.RememberDetailHeight)

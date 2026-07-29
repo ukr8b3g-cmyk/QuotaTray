@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.2.2 - 2026-07-29
+
+- Fixed the Overview "Show all" action so it opens every retained reset-history record instead of only the recent in-memory subset.
+- Read all retained monthly history JSONL files in newest-first order while skipping only damaged or unsupported rows.
+- Kept the compact and detailed recent-history limits unchanged.
+- Added regression coverage for multi-month history, damaged rows, recent-count behavior, and the Show all click event.
+
 ## 0.2.1 - 2026-07-26
 
 - Finalized the overview and usage-analysis layouts, compact presentation, colors, icons, and spacing.

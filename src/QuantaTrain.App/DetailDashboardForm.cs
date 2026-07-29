@@ -161,6 +161,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     public event EventHandler? MiniRequested;
     public event EventHandler? CompactRequested;
     public event EventHandler? SettingsRequested;
+    public event EventHandler? HistoryRequested;
     public event EventHandler<UsageFilterChangedEventArgs>? UsageFilterChanged;
 
     public void UpdateState(
@@ -374,6 +375,8 @@ internal sealed class DetailForm : FixedWidthResizableForm
         history.Controls.Add(_history);
         var allHistory = LinkButton(_localizer.Text("History.ShowAll"));
         allHistory.Bounds = new Rectangle(198, 229, 160, 28);
+        allHistory.Click += (_, _) =>
+            HistoryRequested?.Invoke(this, EventArgs.Empty);
         history.Controls.Add(allHistory);
 
         var footer = new Panel
