@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: build-${{ github.ref }}
@@ -70,3 +70,16 @@ jobs:
             dist/QuantaTray-v0.2.2-win-x64-setup.exe
             dist/QuantaTray-v0.2.2-win-x64-portable.zip
             dist/SHA256SUMS.txt
+
+  finalize-release-metadata:
+    if: github.event_name == 'pull_request'
+    needs: [test, package]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/history-show-all
+          fetch-depth: 0
+      - name: Finalize v0.2.2 metadata
+        shell: pwsh
+        run: ./.github/scripts/finalize-v0.2.2.ps1
