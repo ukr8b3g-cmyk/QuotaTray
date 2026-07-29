@@ -1,10 +1,7 @@
 name: apply-v0.2.3-dpi-fix-now
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/apply-v023-dpi-fix-now.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -44,7 +41,6 @@ jobs:
           if ($compact -notmatch '_remainingPrefix\.PreferredWidth - 4,\s*32\);') { throw 'Prefix position patch failed.' }
           if ($tests -notmatch 'compact\.ClientSize\.Width >= 286') { throw 'Test patch failed.' }
 
-          Remove-Item '.github/workflows/apply-v023-dpi-fix-now.yml'
       - name: Build and test
         shell: pwsh
         run: |
@@ -56,6 +52,6 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/QuantaTrain.App/CompactForm.cs tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs .github/workflows/apply-v023-dpi-fix-now.yml
+          git add src/QuantaTrain.App/CompactForm.cs tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs
           git commit -m 'Fix v0.2.3 high-DPI layout tests'
           git push origin HEAD:main
