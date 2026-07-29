@@ -21,3 +21,5 @@ jobs:
       - name: Apply release metadata and cleanup
         shell: pwsh
         run: ./.github/scripts/finalize-v0.2.2.ps1
+
+# Trigger after workflow registration.
