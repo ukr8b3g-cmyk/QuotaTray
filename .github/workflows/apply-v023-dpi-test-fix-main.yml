@@ -1,0 +1,53 @@
+name: apply-v0.2.3-dpi-test-fix-main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v023-dpi-test-fix-main.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Apply focused code and test fixes
+        shell: pwsh
+        run: |
+          $compactPath = 'src/QuantaTrain.App/CompactForm.cs'
+          $compact = Get-Content $compactPath -Raw
+          $compact = $compact -replace '(?s)(_quotaCard\.ClientSize\.Width - _remainingPercent\.PreferredWidth - 13,\s*)22\);', '${1}24);'
+          $compact = $compact -replace '(?s)(_remainingPercent\.Left - _remainingPrefix\.PreferredWidth - 4,\s*)30\);', '${1}32);'
+          Set-Content $compactPath $compact -NoNewline
+
+          $testPath = 'tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs'
+          $tests = Get-Content $testPath -Raw
+          $replacement = @'
+Assert.True(
+                compact.ClientSize.Width >= 286,
+                $"Compact width was {compact.ClientSize.Width}.");
+            Assert.True(
+                compact.ClientSize.Height >= 384,
+                $"Compact height was {compact.ClientSize.Height}.");
+'@
+          $tests = $tests.Replace('Assert.Equal(new Size(240, 338), compact.ClientSize);', $replacement.TrimEnd())
+          Set-Content $testPath $tests -NoNewline
+
+          if ($compact -notmatch '_remainingPercent\.PreferredWidth - 13,\s*24\);') { throw 'Compact percent position was not updated.' }
+          if ($compact -notmatch '_remainingPrefix\.PreferredWidth - 4,\s*32\);') { throw 'Compact prefix position was not updated.' }
+          if ($tests -notmatch 'compact\.ClientSize\.Width >= 286') { throw 'Compact size test was not updated.' }
+
+          Remove-Item '.github/workflows/apply-v023-dpi-test-fix-main.yml'
+      - name: Commit and push
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/QuantaTrain.App/CompactForm.cs tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs .github/workflows/apply-v023-dpi-test-fix-main.yml
+          git commit -m 'Fix high-DPI layout and tests'
+          git push origin HEAD:main
