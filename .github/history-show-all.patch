@@ -81,3 +81,4 @@ index eb50135..0000000 100644
              _detailForm.MoveCompleted += async (_, _) =>
              {
                  if (_settings.Display.RememberDetailHeight)
+
