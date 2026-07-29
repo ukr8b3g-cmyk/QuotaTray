@@ -334,10 +334,10 @@ internal sealed class CompactForm : FramelessForm
     {
         _remainingPercent.Location = new Point(
             _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
-            22);
+            24);
         _remainingPrefix.Location = new Point(
             _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
-            30);
+            32);
     }
 
     private string RemainingPrefix(string value)
