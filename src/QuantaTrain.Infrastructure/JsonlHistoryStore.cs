@@ -139,6 +139,40 @@ public sealed class JsonlHistoryStore
         return records;
     }
 
+    public async Task<IReadOnlyList<string>> ReadAllAsync(
+        CancellationToken cancellationToken)
+    {
+        var records = new List<(DateTimeOffset Time, string Display)>();
+        foreach (var file in Directory.EnumerateFiles(
+                     _historyDirectory,
+                     "*.jsonl"))
+        {
+            await foreach (var line in File.ReadLinesAsync(file, cancellationToken))
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(line);
+                    var root = document.RootElement;
+                    var time = root.GetProperty("observedToUtc").GetDateTimeOffset();
+                    var classification = root.GetProperty("classification").GetString();
+                    records.Add(
+                        (time, $"{time.ToLocalTime():g}  {classification}"));
+                }
+                catch (Exception exception) when (
+                    exception is JsonException or KeyNotFoundException or
+                    InvalidOperationException or FormatException)
+                {
+                    // Skip only the damaged or unsupported row.
+                }
+            }
+        }
+
+        return records
+            .OrderByDescending(record => record.Time)
+            .Select(record => record.Display)
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<ResetEvent>> ReadRecentEventsAsync(
         int maximum,
         CancellationToken cancellationToken)
