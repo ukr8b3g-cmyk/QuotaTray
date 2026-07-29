@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.2.3 - 2026-07-30
+
+- Increased the compact panel's logical width and card space to prevent clipped headings, reset dates, quota information, and toolbar controls on high-DPI displays.
+- Enabled explicit DPI autoscaling for the compact form while retaining the existing PerMonitorV2 process configuration.
+- Allowed reset and reset-credit text to use additional vertical space instead of being truncated.
+- Updated the release version to 0.2.3.
+
 ## 0.2.2 - 2026-07-29
 
 - Fixed the Overview "Show all" action so it opens every retained reset-history record instead of only the recent in-memory subset.
@@ -41,7 +48,7 @@
 - Kept Settings modeless so compact and detailed panels remain interactive, and restricted click-through to the mini panel.
 - Fixed localized quota headings overlapping the remaining percentage.
 - Applied opacity, always-on-top, position lock, position memory, and edge snap to quota panels while keeping Settings opaque.
-- Applied the selected accent to normal quota values and added optional one-decimal percentage display.
+- Applied the selected accent to normal quota values and added optional one-decimal quota display.
 
 ## 0.1.2 - 2026-07-25
 
