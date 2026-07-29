@@ -6,12 +6,18 @@ on:
     paths:
       - '.github/history-show-all.patch'
       - '.github/workflows/apply-history-show-all.yml'
+  pull_request:
+    branches: ['main']
+    paths:
+      - '.github/history-show-all.patch'
+      - '.github/workflows/apply-history-show-all.yml'
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
