@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Windows.Forms;
 using QuantaTrain.App;
 using QuantaTrain.Core;
 using QuantaTrain.Infrastructure;
