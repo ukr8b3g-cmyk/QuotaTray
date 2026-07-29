@@ -1,0 +1,61 @@
+name: apply-v0.2.3-dpi-fix-now
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v023-dpi-fix-now.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Patch compact layout and regression test
+        shell: pwsh
+        run: |
+          $compactPath = 'src/QuantaTrain.App/CompactForm.cs'
+          $compact = Get-Content $compactPath -Raw
+          $compact = $compact -replace '(?m)(\s+_quotaCard\.ClientSize\.Width - _remainingPercent\.PreferredWidth - 13,\r?\n\s+)22\);', '${1}24);'
+          $compact = $compact -replace '(?m)(\s+_remainingPercent\.Left - _remainingPrefix\.PreferredWidth - 4,\r?\n\s+)30\);', '${1}32);'
+          Set-Content $compactPath $compact -NoNewline
+
+          $testPath = 'tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs'
+          $tests = Get-Content $testPath -Raw
+          $old = '            Assert.Equal(new Size(240, 338), compact.ClientSize);'
+          $new = @'
+            Assert.True(
+                compact.ClientSize.Width >= 286,
+                $"Compact width was {compact.ClientSize.Width}.");
+            Assert.True(
+                compact.ClientSize.Height >= 384,
+                $"Compact height was {compact.ClientSize.Height}.");
+'@
+          if (-not $tests.Contains($old)) { throw 'Old compact size assertion was not found.' }
+          $tests = $tests.Replace($old, $new.TrimEnd())
+          Set-Content $testPath $tests -NoNewline
+
+          if ($compact -notmatch '_remainingPercent\.PreferredWidth - 13,\s*24\);') { throw 'Percent position patch failed.' }
+          if ($compact -notmatch '_remainingPrefix\.PreferredWidth - 4,\s*32\);') { throw 'Prefix position patch failed.' }
+          if ($tests -notmatch 'compact\.ClientSize\.Width >= 286') { throw 'Test patch failed.' }
+
+          Remove-Item '.github/workflows/apply-v023-dpi-fix-now.yml'
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet restore QuantaTrain.slnx
+          dotnet build QuantaTrain.slnx -c Release --no-restore
+          dotnet test QuantaTrain.slnx -c Release --no-build
+      - name: Commit and push fixes
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/QuantaTrain.App/CompactForm.cs tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs .github/workflows/apply-v023-dpi-fix-now.yml
+          git commit -m 'Fix v0.2.3 high-DPI layout tests'
+          git push origin HEAD:main
