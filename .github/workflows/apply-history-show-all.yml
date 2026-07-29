@@ -1,0 +1,32 @@
+name: apply-history-show-all
+
+on:
+  push:
+    branches: ['fix/history-show-all']
+    paths:
+      - '.github/history-show-all.patch'
+      - '.github/workflows/apply-history-show-all.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/history-show-all
+          fetch-depth: 0
+      - name: Apply focused patch
+        shell: bash
+        run: |
+          git apply --check .github/history-show-all.patch
+          git apply .github/history-show-all.patch
+          rm .github/history-show-all.patch
+          rm .github/workflows/apply-history-show-all.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Fix full reset history display"
+          git push origin HEAD:fix/history-show-all
