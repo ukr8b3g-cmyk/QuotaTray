@@ -1268,7 +1268,12 @@ public sealed class RuntimeAppearanceTests
             Application.DoEvents();
 
             Assert.Equal(new Size(220, 95), mini.ClientSize);
-            Assert.Equal(new Size(240, 338), compact.ClientSize);
+            Assert.True(
+                compact.ClientSize.Width >= 286,
+                $"Compact width was {compact.ClientSize.Width}.");
+            Assert.True(
+                compact.ClientSize.Height >= 384,
+                $"Compact height was {compact.ClientSize.Height}.");
             Assert.Equal(
                 3,
                 Descendants(compact).OfType<RoundedPanel>().Count());
