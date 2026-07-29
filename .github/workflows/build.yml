@@ -43,3 +43,30 @@ jobs:
               throw "Forbidden runtime pattern found: $pattern"
             }
           }
+
+  package:
+    if: github.event_name == 'pull_request'
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+      - run: dotnet restore QuantaTrain.slnx
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build test release assets
+        shell: pwsh
+        run: ./packaging/scripts/build-release.ps1 -Version 0.2.2
+      - uses: actions/upload-artifact@v6
+        with:
+          name: QuantaTray-v0.2.2-pr-${{ github.event.pull_request.number }}
+          retention-days: 7
+          path: |
+            dist/QuantaTray-v0.2.2-win-x64-setup.exe
+            dist/QuantaTray-v0.2.2-win-x64-portable.zip
+            dist/SHA256SUMS.txt
