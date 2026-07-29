@@ -1,0 +1,71 @@
+name: dispatch-v023-branch-fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dispatch-v023-branch-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-branch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/v023-dpi-regressions
+
+      - name: Apply exact source and test edits
+        shell: pwsh
+        run: |
+          $compactPath = 'src/QuantaTrain.App/CompactForm.cs'
+          $compact = Get-Content $compactPath -Raw
+          $oldPercent = @'
+            _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
+            22);
+'@
+          $newPercent = @'
+            _quotaCard.ClientSize.Width - _remainingPercent.PreferredWidth - 13,
+            24);
+'@
+          $oldPrefix = @'
+            _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
+            30);
+'@
+          $newPrefix = @'
+            _remainingPercent.Left - _remainingPrefix.PreferredWidth - 4,
+            32);
+'@
+          $compact = $compact.Replace($oldPercent.Trim(), $newPercent.Trim())
+          $compact = $compact.Replace($oldPrefix.Trim(), $newPrefix.Trim())
+          Set-Content $compactPath $compact -NoNewline
+
+          $testPath = 'tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs'
+          $tests = Get-Content $testPath -Raw
+          $oldTest = '            Assert.Equal(new Size(240, 338), compact.ClientSize);'
+          $newTest = @'
+            Assert.True(
+                compact.ClientSize.Width >= 286,
+                $"Compact width was {compact.ClientSize.Width}.");
+            Assert.True(
+                compact.ClientSize.Height >= 384,
+                $"Compact height was {compact.ClientSize.Height}.");
+'@
+          if (-not $tests.Contains($oldTest)) { throw 'Old compact size assertion was not found.' }
+          $tests = $tests.Replace($oldTest, $newTest.TrimEnd())
+          Set-Content $testPath $tests -NoNewline
+
+          if ((Get-Content $compactPath -Raw) -notmatch '_remainingPercent\.PreferredWidth - 13,\s*24\);') { throw 'Percent edit failed.' }
+          if ((Get-Content $compactPath -Raw) -notmatch '_remainingPrefix\.PreferredWidth - 4,\s*32\);') { throw 'Prefix edit failed.' }
+          if ((Get-Content $testPath -Raw) -notmatch 'compact\.ClientSize\.Width >= 286') { throw 'Test edit failed.' }
+
+      - name: Commit to fix branch
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/QuantaTrain.App/CompactForm.cs tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs
+          git commit -m 'Fix high-DPI compact layout regressions'
+          git push origin HEAD:fix/v023-dpi-regressions
