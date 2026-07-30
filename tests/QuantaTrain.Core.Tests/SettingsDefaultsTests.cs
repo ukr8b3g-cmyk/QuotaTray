@@ -53,7 +53,7 @@ public sealed class SettingsDefaultsTests
 
         var migrated = SettingsMigration.Upgrade(settings);
 
-        Assert.Equal(4, migrated.SchemaVersion);
+        Assert.Equal(5, migrated.SchemaVersion);
         Assert.Equal(680, migrated.Display.SettingsWindowHeightLogical);
         Assert.Equal(365, migrated.History.RetentionDays);
         Assert.False(migrated.UsageAnalytics.Enabled);
@@ -73,7 +73,7 @@ public sealed class SettingsDefaultsTests
 
         var migrated = SettingsMigration.Upgrade(settings);
 
-        Assert.Equal(4, migrated.SchemaVersion);
+        Assert.Equal(5, migrated.SchemaVersion);
         Assert.Equal(680, migrated.Display.SettingsWindowHeightLogical);
     }
 
