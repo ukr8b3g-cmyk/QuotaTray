@@ -1,0 +1,157 @@
+name: publish-v0.2.5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v0.2.5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Finalize v0.2.5 sources and remove one-shot workflow
+        shell: pwsh
+        run: |
+          $props = Get-Content 'Directory.Build.props' -Raw
+          $props = $props.Replace('<Version>0.2.4</Version>', '<Version>0.2.5</Version>')
+          if ($props -notmatch '<Version>0\.2\.5</Version>') { throw 'Version update failed.' }
+          Set-Content 'Directory.Build.props' $props -NoNewline
+
+          $installer = Get-Content 'packaging/inno/QuantaTrain.iss' -Raw
+          $installer = $installer.Replace('#define MyAppVersion "0.2.4"', '#define MyAppVersion "0.2.5"')
+          if ($installer -notmatch '#define MyAppVersion "0\.2\.5"') { throw 'Installer version update failed.' }
+          Set-Content 'packaging/inno/QuantaTrain.iss' $installer -NoNewline
+
+          $readme = Get-Content 'README.md' -Raw
+          $readme = $readme.Replace('QuantaTray-v0.2.4-', 'QuantaTray-v0.2.5-')
+          if ($readme -match 'QuantaTray-v0\.2\.4-') { throw 'README still contains v0.2.4 asset names.' }
+          Set-Content 'README.md' $readme -NoNewline
+
+          $changelog = Get-Content 'CHANGELOG.md' -Raw
+          if ($changelog -notmatch '## 0\.2\.5 - 2026-07-30') {
+            $entry = @(
+              '## 0.2.5 - 2026-07-30',
+              '',
+              '- Added one shared logical-DPI window-sizing manager for Mini, Compact, Detail, and Settings.',
+              '- Explicitly scales top-level client, minimum, and maximum sizes from the 96-DPI design baseline on initial display and after `WM_DPICHANGED`.',
+              '- Preserves user-resized logical heights for Detail and Settings while changing monitor DPI.',
+              '- Added regression tests covering all four primary windows and 200% scaling conversions.',
+              '- Updated source, installer, README, and release metadata to 0.2.5.',
+              ''
+            ) -join "`r`n"
+            $changelog = $changelog.Replace("## Unreleased`r`n", "## Unreleased`r`n`r`n$entry")
+          }
+          Set-Content 'CHANGELOG.md' $changelog -NoNewline
+
+          $notes = @(
+            '# QuantaTray v0.2.5',
+            '',
+            '## 日本語',
+            '',
+            'QuantaTray v0.2.5では、4K・表示倍率200%環境でトップレベル画面の大きさが内部コントロールと一致しない問題に対して、4画面共通のDPIサイズ処理を追加しました。',
+            '',
+            '- Mini／Compact／Detail／Settingsを同一のDPIウィンドウ管理へ統合',
+            '- 96 DPI基準の論理サイズを、初期表示時とDPI変更時に実DPIへ明示変換',
+            '- Detail／Settingsのユーザー変更済み高さを維持',
+            '- 200%表示時のサイズ変換と4画面の定義を検証する回帰テストを追加',
+            '- 既存のPerMonitorV2、UI構成、配色、操作方法は維持',
+            '',
+            '開発側には4K・200%の実機環境がないため、Issue #2の報告環境で最終確認を依頼しています。',
+            '',
+            '## English',
+            '',
+            'QuantaTray v0.2.5 adds shared top-level DPI window sizing for the Mini, Compact, Detail, and Settings windows to address mismatched window and child-control scaling at 4K resolution with 200% display scaling.',
+            '',
+            '- Uses one shared DPI window manager for all four primary windows',
+            '- Converts 96-DPI logical window sizes on initial display and after DPI changes',
+            '- Preserves user-resized logical heights for Detail and Settings',
+            '- Adds regression tests for all four window definitions and 200% size conversion',
+            '- Preserves the existing PerMonitorV2 configuration, UI structure, colors, and controls',
+            '',
+            'The maintainers do not have a 4K / 200% test environment, so final validation is requested from the Issue #2 reporter.',
+            '',
+            '- Installer: per-user installation, no administrator privileges required.',
+            '- Portable ZIP: extract to a writable folder; data stays under `data/`.',
+            '- This build is unsigned. Verify it with `SHA256SUMS.txt`.'
+          ) -join "`r`n"
+          Set-Content 'RELEASE_NOTES.md' $notes -NoNewline
+
+          Remove-Item '.github/workflows/publish-v0.2.5.yml'
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Directory.Build.props packaging/inno/QuantaTrain.iss README.md CHANGELOG.md RELEASE_NOTES.md .github/workflows/publish-v0.2.5.yml
+          git commit -m 'Finalize QuantaTray v0.2.5 release'
+          git push origin HEAD:main
+
+          $releaseTarget = git rev-parse HEAD
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TARGET=$releaseTarget"
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore and test
+        shell: pwsh
+        run: |
+          dotnet restore QuantaTrain.slnx
+          dotnet build QuantaTrain.slnx -c Release --no-restore
+          dotnet test QuantaTrain.slnx -c Release --no-build
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build v0.2.5 release assets
+        shell: pwsh
+        run: ./packaging/scripts/build-release.ps1 -Version '0.2.5'
+
+      - name: Verify release assets
+        shell: pwsh
+        run: |
+          $assets = @(
+            'dist/QuantaTray-v0.2.5-win-x64-setup.exe',
+            'dist/QuantaTray-v0.2.5-win-x64-portable.zip',
+            'dist/SHA256SUMS.txt'
+          )
+          foreach ($asset in $assets) {
+            if (-not (Test-Path $asset)) { throw "Missing release asset: $asset" }
+          }
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-v0.2.5-win-x64
+          path: |
+            dist/QuantaTray-v0.2.5-win-x64-setup.exe
+            dist/QuantaTray-v0.2.5-win-x64-portable.zip
+            dist/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @(
+            'dist/QuantaTray-v0.2.5-win-x64-setup.exe',
+            'dist/QuantaTray-v0.2.5-win-x64-portable.zip',
+            'dist/SHA256SUMS.txt'
+          )
+          gh release view 'v0.2.5' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload 'v0.2.5' $assets --clobber
+            gh release edit 'v0.2.5' --title 'QuantaTray v0.2.5' --notes-file RELEASE_NOTES.md --draft=false
+          }
+          else {
+            gh release create 'v0.2.5' --target "$env:RELEASE_TARGET" --title 'QuantaTray v0.2.5' --notes-file RELEASE_NOTES.md $assets
+          }
