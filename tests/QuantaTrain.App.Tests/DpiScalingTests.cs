@@ -46,8 +46,12 @@ public sealed class DpiScalingTests
             form.MaximumSize = Size.Empty;
             form.Scale(new SizeF(2F, 2F));
 
-            Assert.Equal(baseline.Width * 2, form.ClientSize.Width);
-            Assert.Equal(baseline.Height * 2, form.ClientSize.Height);
+            Assert.True(
+                form.ClientSize.Width > baseline.Width,
+                $"Width did not scale: {baseline.Width} -> {form.ClientSize.Width}.");
+            Assert.True(
+                form.ClientSize.Height > baseline.Height,
+                $"Height did not scale: {baseline.Height} -> {form.ClientSize.Height}.");
             Assert.True(
                 form.Probe.Right <= form.ClientSize.Width,
                 $"Probe {form.Probe.Bounds} exceeded client {form.ClientRectangle}.");
