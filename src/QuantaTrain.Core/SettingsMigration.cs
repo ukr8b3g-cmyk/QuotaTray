@@ -2,7 +2,7 @@ namespace QuantaTrain.Core;
 
 public static class SettingsMigration
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public static AppSettings Upgrade(AppSettings settings)
     {
@@ -19,13 +19,15 @@ public static class SettingsMigration
         settings.Diagnostics ??= new DiagnosticSettings();
         settings.Display.PanelPosition ??= new PanelPositionSettings();
 
-        settings.Display.DetailWindowHeightLogical =
-            Math.Clamp(settings.Display.DetailWindowHeightLogical, 520, 2160);
-        if (settings.SchemaVersion < 4 &&
-            settings.Display.SettingsWindowHeightLogical < 680)
+        if (settings.SchemaVersion < 5)
         {
+            // v0.2.5 could persist already DPI-scaled heights as logical values.
+            // Reset them once so OS-managed GDI scaling starts from safe sizes.
+            settings.Display.DetailWindowHeightLogical = 600;
             settings.Display.SettingsWindowHeightLogical = 680;
         }
+        settings.Display.DetailWindowHeightLogical =
+            Math.Clamp(settings.Display.DetailWindowHeightLogical, 520, 2160);
         settings.Display.SettingsWindowHeightLogical =
             Math.Clamp(settings.Display.SettingsWindowHeightLogical, 520, 2160);
         settings.ResetDetection.ConfirmationSeconds = 20;
