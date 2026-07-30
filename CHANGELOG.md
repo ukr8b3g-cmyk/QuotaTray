@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.2.4 - 2026-07-30
+
+- Reworked the shared frameless-form DPI foundation so all custom windows use a consistent 96-DPI design baseline with PerMonitorV2 scaling.
+- Removed the custom physical-width lock and manual `WM_DPICHANGED` width handling that could keep top-level widths from following child-control scaling at 200%.
+- Kept fixed-width behavior through DPI-scaled `MinimumSize` and `MaximumSize` constraints managed by current WinForms.
+- Corrected the application manifest to declare the supported Windows 10/11 compatibility identifier.
+- Added regression coverage for the shared DPI baseline, removal of physical width locking, fixed-width constraints, and manifest declarations.
+- Updated the source and packaging version to 0.2.4.
+
 ## 0.2.3 - 2026-07-30
 
 - Increased the compact panel's logical width and card space to prevent clipped headings, reset dates, quota information, and toolbar controls on high-DPI displays.

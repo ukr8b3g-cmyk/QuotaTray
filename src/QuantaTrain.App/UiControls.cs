@@ -72,6 +72,8 @@ internal class FramelessForm : Form
         BackColor = Theme.Window;
         ForeColor = Theme.Text;
         Font = Theme.Ui();
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
         DoubleBuffered = true;
         ShowInTaskbar = Environment.GetCommandLineArgs()
             .Contains("--qa-window", StringComparer.OrdinalIgnoreCase);
@@ -139,49 +141,21 @@ internal class FramelessForm : Form
 internal abstract class FixedWidthResizableForm : FramelessForm
 {
     private const int WmNcHitTest = 0x0084;
-    private const int WmDpiChanged = 0x02E0;
     private const int HtClient = 1;
     private const int HtBottom = 15;
-    private int _fixedWidth;
 
     protected void ConfigureFixedLogicalWidth(
         int logicalWidth,
         int logicalHeight,
         int minimumLogicalHeight)
     {
-        AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(logicalWidth, logicalHeight);
         MinimumSize = new Size(logicalWidth, minimumLogicalHeight);
         MaximumSize = new Size(logicalWidth, 2160);
-        _fixedWidth = Width;
-    }
-
-    protected override void SetBoundsCore(
-        int x,
-        int y,
-        int width,
-        int height,
-        BoundsSpecified specified)
-    {
-        if (_fixedWidth > 0 && (specified & BoundsSpecified.Width) != 0)
-        {
-            width = _fixedWidth;
-        }
-        base.SetBoundsCore(x, y, width, height, specified);
     }
 
     protected override void WndProc(ref Message message)
     {
-        if (message.Msg == WmDpiChanged)
-        {
-            _fixedWidth = 0;
-            base.WndProc(ref message);
-            _fixedWidth = Width;
-            MinimumSize = new Size(_fixedWidth, MinimumSize.Height);
-            MaximumSize = new Size(_fixedWidth, MaximumSize.Height);
-            return;
-        }
-
         base.WndProc(ref message);
         if (message.Msg != WmNcHitTest ||
             message.Result.ToInt32() != HtClient)
