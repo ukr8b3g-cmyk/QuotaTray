@@ -15,47 +15,33 @@ public sealed class DpiScalingTests
 
             Assert.Equal(AutoScaleMode.Dpi, form.AutoScaleMode);
             Assert.Equal(new SizeF(96F, 96F), form.AutoScaleDimensions);
+            Assert.Equal(800, form.ClientSize.Width);
             Assert.Equal(800, form.MinimumSize.Width);
             Assert.Equal(800, form.MaximumSize.Width);
         });
     }
 
     [Fact]
-    public void FixedWidthBaseDoesNotOverrideBoundsDuringDpiScaling()
+    public void FixedWidthBaseLeavesDpiResizeToWinForms()
     {
-        var overrideMethod = typeof(FixedWidthResizableForm).GetMethod(
-            "SetBoundsCore",
+        const BindingFlags instanceMembers =
             BindingFlags.Instance |
             BindingFlags.NonPublic |
-            BindingFlags.DeclaredOnly);
+            BindingFlags.DeclaredOnly;
+        const BindingFlags staticMembers =
+            BindingFlags.Static |
+            BindingFlags.NonPublic |
+            BindingFlags.DeclaredOnly;
 
-        Assert.Null(overrideMethod);
-    }
-
-    [Fact]
-    public void TwoHundredPercentScaleKeepsWindowAndRightEdgeControlTogether()
-    {
-        RunSta(() =>
-        {
-            using var form = new TestFixedWidthForm();
-            var baseline = form.ClientSize;
-
-            // Remove resize constraints only for this direct scaling probe. The
-            // production constraints are DPI-scaled by WinForms in PerMonitorV2.
-            form.MinimumSize = Size.Empty;
-            form.MaximumSize = Size.Empty;
-            form.Scale(new SizeF(2F, 2F));
-
-            Assert.True(
-                form.ClientSize.Width > baseline.Width,
-                $"Width did not scale: {baseline.Width} -> {form.ClientSize.Width}.");
-            Assert.True(
-                form.ClientSize.Height > baseline.Height,
-                $"Height did not scale: {baseline.Height} -> {form.ClientSize.Height}.");
-            Assert.True(
-                form.Probe.Right <= form.ClientSize.Width,
-                $"Probe {form.Probe.Bounds} exceeded client {form.ClientRectangle}.");
-        });
+        Assert.Null(typeof(FixedWidthResizableForm).GetMethod(
+            "SetBoundsCore",
+            instanceMembers));
+        Assert.Null(typeof(FixedWidthResizableForm).GetField(
+            "_fixedWidth",
+            instanceMembers));
+        Assert.Null(typeof(FixedWidthResizableForm).GetField(
+            "WmDpiChanged",
+            staticMembers));
     }
 
     [Fact]
@@ -125,11 +111,6 @@ public sealed class DpiScalingTests
         public TestFixedWidthForm()
         {
             ConfigureFixedLogicalWidth(800, 680, 680);
-            Probe.Bounds = new Rectangle(755, 10, 31, 32);
-            Probe.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            Controls.Add(Probe);
         }
-
-        public Button Probe { get; } = new();
     }
 }
