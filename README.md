@@ -1,6 +1,6 @@
 # QuantaTray
 
-[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 ## 日本語
 
@@ -12,8 +12,8 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 
 ### ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
@@ -104,7 +104,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Installer版
 
-1. `QuantaTray-v0.2.4-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.5-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行します。
 3. インストール後、QuantaTrayがタスクトレイに常駐します。
 
@@ -116,7 +116,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Portable ZIP版
 
-1. `QuantaTray-v0.2.4-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.5-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -200,8 +200,8 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ### Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.4-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.5-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the files against `SHA256SUMS.txt`.
@@ -234,7 +234,7 @@ QuantaTray launches `codex app-server --stdio` in the background. The Codex desk
 
 ### Install
 
-For the installer, run `QuantaTray-v0.2.4-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
+For the installer, run `QuantaTray-v0.2.5-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
 
 ### Privacy and security
 

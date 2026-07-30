@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.2.5 - 2026-07-30
+
+- Added one shared logical-DPI window-sizing manager for Mini, Compact, Detail, and Settings.
+- Explicitly scales top-level client, minimum, and maximum sizes from the 96-DPI design baseline on initial display and after `WM_DPICHANGED`.
+- Preserves user-resized logical heights for Detail and Settings while changing monitor DPI.
+- Added regression tests covering all four primary windows and 200% scaling conversions.
+- Updated source, installer, README, and release metadata to 0.2.5.
+
 ## 0.2.4 - 2026-07-30
 
 - Reworked the shared frameless-form DPI foundation so all custom windows use a consistent 96-DPI design baseline with PerMonitorV2 scaling.
