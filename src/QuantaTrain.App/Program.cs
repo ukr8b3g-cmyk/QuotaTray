@@ -28,7 +28,16 @@ internal static class Program
             return;
         }
 
-        using var context = new QuantaTrainContext(singleInstance);
-        Application.Run(context);
+        using var dpiWindowManager = new LogicalDpiWindowManager();
+        Application.AddMessageFilter(dpiWindowManager);
+        try
+        {
+            using var context = new QuantaTrainContext(singleInstance);
+            Application.Run(context);
+        }
+        finally
+        {
+            Application.RemoveMessageFilter(dpiWindowManager);
+        }
     }
 }
