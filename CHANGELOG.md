@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.2.6 - 2026-07-30
+
+- Replaced custom PerMonitorV2 top-level window resizing with OS-managed DPI-unaware GDI scaling so each complete window and its controls scale together.
+- Removed the v0.2.5 logical DPI window manager and its duplicate `WM_DPICHANGED` size calculations.
+- Added a one-time settings migration that resets potentially doubled Detail and Settings heights saved by v0.2.5.
+- Added regression checks for the GDI-scaling manifest, startup path, and DPI-height migration.
+- Updated source and installer metadata to 0.2.6.
+
 ## 0.2.5 - 2026-07-30
 
 - Added one shared logical-DPI window-sizing manager for Mini, Compact, Detail, and Settings.

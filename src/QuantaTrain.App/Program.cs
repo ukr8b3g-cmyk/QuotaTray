@@ -5,7 +5,6 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
@@ -28,16 +27,7 @@ internal static class Program
             return;
         }
 
-        using var dpiWindowManager = new LogicalDpiWindowManager();
-        Application.AddMessageFilter(dpiWindowManager);
-        try
-        {
-            using var context = new QuantaTrainContext(singleInstance);
-            Application.Run(context);
-        }
-        finally
-        {
-            Application.RemoveMessageFilter(dpiWindowManager);
-        }
+        using var context = new QuantaTrainContext(singleInstance);
+        Application.Run(context);
     }
 }

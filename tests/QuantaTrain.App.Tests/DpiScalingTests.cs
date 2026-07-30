@@ -7,7 +7,7 @@ namespace QuantaTrain.App.Tests;
 public sealed class DpiScalingTests
 {
     [Fact]
-    public void CommonFormBaseUsesNinetySixDpiDesignBaseline()
+    public void CommonFormBaseKeepsNinetySixDpiDesignBaseline()
     {
         RunSta(() =>
         {
@@ -22,7 +22,7 @@ public sealed class DpiScalingTests
     }
 
     [Fact]
-    public void FixedWidthBaseLeavesDpiResizeToWinForms()
+    public void FixedWidthBaseDoesNotApplyPhysicalPixelWidthOverrides()
     {
         const BindingFlags instanceMembers =
             BindingFlags.Instance |
@@ -45,30 +45,58 @@ public sealed class DpiScalingTests
     }
 
     [Fact]
-    public void ManifestDeclaresPerMonitorV2AndWindowsTenOrLater()
+    public void ManifestUsesDpiUnawareGdiScalingAndWindowsTenOrLater()
     {
-        var manifest = File.ReadAllText(FindManifest());
+        var manifest = File.ReadAllText(FindRepositoryFile(
+            "src",
+            "QuantaTrain.App",
+            "app.manifest"));
 
         Assert.Contains(
-            ">PerMonitorV2</dpiAwareness>",
+            ">unaware</dpiAwareness>",
             manifest,
-            StringComparison.Ordinal);
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ">true</gdiScaling>",
+            manifest,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "PerMonitorV2",
+            manifest,
+            StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
             "{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}",
             manifest,
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string FindManifest()
+    [Fact]
+    public void StartupDoesNotOverrideManifestOrResizeTopLevelWindowsAgain()
+    {
+        var program = File.ReadAllText(FindRepositoryFile(
+            "src",
+            "QuantaTrain.App",
+            "Program.cs"));
+
+        Assert.DoesNotContain(
+            "SetHighDpiMode",
+            program,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "LogicalDpiWindowManager",
+            program,
+            StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryFile(params string[] pathParts)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            var candidate = Path.Combine(
-                directory.FullName,
-                "src",
-                "QuantaTrain.App",
-                "app.manifest");
+            var parts = new string[pathParts.Length + 1];
+            parts[0] = directory.FullName;
+            Array.Copy(pathParts, 0, parts, 1, pathParts.Length);
+            var candidate = Path.Combine(parts);
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -77,7 +105,8 @@ public sealed class DpiScalingTests
             directory = directory.Parent;
         }
 
-        throw new FileNotFoundException("QuantaTray app.manifest was not found.");
+        throw new FileNotFoundException(
+            $"Repository file was not found: {Path.Combine(pathParts)}");
     }
 
     private static void RunSta(Action action)
