@@ -1,28 +1,28 @@
-# QuantaTray v0.2.5
+# QuantaTray v0.2.6
 
 ## 日本語
 
-QuantaTray v0.2.5では、4K・表示倍率200%環境でトップレベル画面の大きさが内部コントロールと一致しない問題に対して、4画面共通のDPIサイズ処理を追加しました。
+QuantaTray v0.2.6では、Windows 11の4K・表示倍率200%環境で発生していた、文字・コントロールとトップレベル画面の倍率不一致を修正します。
 
-- Mini／Compact／Detail／Settingsを同一のDPIウィンドウ管理へ統合
-- 96 DPI基準の論理サイズを、初期表示時とDPI変更時に実DPIへ明示変換
-- Detail／Settingsのユーザー変更済み高さを維持
-- 200%表示時のサイズ変換と4画面の定義を検証する回帰テストを追加
-- 既存のPerMonitorV2、UI構成、配色、操作方法は維持
+- PerMonitorV2上での独自サイズ補正を廃止
+- WindowsのDPI非対応GDIスケーリングをアプリ側で有効化し、「システム（拡張）」の互換性設定と同系統の一括拡大へ変更
+- Mini／Compact／Detail／Settingsを、内部レイアウトごと同じ倍率で拡大
+- v0.2.5で二重拡大された可能性があるDetail／Settingsの保存済み高さを一度だけ安全な既定値へ移行
+- マニフェスト、起動処理、設定移行の回帰テストを追加
 
-開発側には4K・200%の実機環境がないため、Issue #2の報告環境で最終確認を依頼しています。
+この方式では、画面と内部コントロールをWindowsが一体として拡大するため、個別の物理ピクセル計算や`WM_DPICHANGED`補正は行いません。
 
 ## English
 
-QuantaTray v0.2.5 adds shared top-level DPI window sizing for the Mini, Compact, Detail, and Settings windows to address mismatched window and child-control scaling at 4K resolution with 200% display scaling.
+QuantaTray v0.2.6 fixes the scale mismatch between top-level windows and their text and controls on Windows 11 systems using 4K resolution and 200% display scaling.
 
-- Uses one shared DPI window manager for all four primary windows
-- Converts 96-DPI logical window sizes on initial display and after DPI changes
-- Preserves user-resized logical heights for Detail and Settings
-- Adds regression tests for all four window definitions and 200% size conversion
-- Preserves the existing PerMonitorV2 configuration, UI structure, colors, and controls
+- Removes the custom PerMonitorV2 top-level window resizing introduced in v0.2.5
+- Enables Windows DPI-unaware GDI scaling, using the same class of whole-window scaling as the working “System (Enhanced)” compatibility workaround
+- Scales Mini, Compact, Detail, and Settings together with their complete internal layouts
+- Migrates potentially doubled Detail and Settings saved heights from v0.2.5 back to safe defaults once
+- Adds regression checks for the manifest, startup path, and settings migration
 
-The maintainers do not have a 4K / 200% test environment, so final validation is requested from the Issue #2 reporter.
+Windows now scales each complete window as one unit, so QuantaTray no longer performs separate physical-pixel or `WM_DPICHANGED` size calculations.
 
 - Installer: per-user installation, no administrator privileges required.
 - Portable ZIP: extract to a writable folder; data stays under `data/`.
