@@ -1,16 +1,16 @@
 name: apply-v0.2.4-dpi-foundation
 
 on:
-  push:
-    branches: [fix/v0.2.4-dpi-scaling]
-    paths:
-      - '.github/workflows/apply-v024-dpi-foundation.yml'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.head_ref == 'fix/v0.2.4-dpi-scaling'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
