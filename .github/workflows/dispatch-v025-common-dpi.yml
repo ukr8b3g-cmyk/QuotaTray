@@ -1,0 +1,139 @@
+name: dispatch-v025-common-dpi
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dispatch-v025-common-dpi.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-push:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check out feature branch
+        shell: pwsh
+        run: |
+          git fetch origin fix/v0.2.5-common-dpi-window-sizing
+          git checkout fix/v0.2.5-common-dpi-window-sizing
+
+      - name: Apply shared logical DPI sizing
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          def read(path: str) -> str:
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path: str, text: str) -> None:
+              with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(text)
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              text = read(path)
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{path}: expected one match, found {count}")
+              write(path, text.replace(old, new, 1))
+
+          ui = "src/QuantaTrain.App/UiControls.cs"
+          replace_once(
+              ui,
+              """    private const int HtCaption = 2;\n\n    public FramelessForm()\n""",
+              """    private const int HtCaption = 2;\n    private const int LogicalDpi = 96;\n    private Size? _logicalClientSize;\n    private Size? _logicalMinimumSize;\n    private Size? _logicalMaximumSize;\n    private bool _applyingLogicalWindowSize;\n\n    public FramelessForm()\n""")
+
+          replace_once(
+              ui,
+              """        ShowInTaskbar = Environment.GetCommandLineArgs()\n            .Contains(\"--qa-window\", StringComparer.OrdinalIgnoreCase);\n    }\n\n    protected override CreateParams CreateParams\n""",
+              """        ShowInTaskbar = Environment.GetCommandLineArgs()\n            .Contains(\"--qa-window\", StringComparer.OrdinalIgnoreCase);\n    }\n\n    protected void ConfigureLogicalWindowSize(\n        Size logicalClientSize,\n        Size? logicalMinimumSize = null,\n        Size? logicalMaximumSize = null)\n    {\n        _logicalClientSize = logicalClientSize;\n        _logicalMinimumSize = logicalMinimumSize;\n        _logicalMaximumSize = logicalMaximumSize;\n        ApplyLogicalWindowSize(IsHandleCreated ? DeviceDpi : LogicalDpi);\n    }\n\n    internal static Size ScaleLogicalSize(Size logicalSize, int dpi)\n    {\n        if (dpi <= 0)\n        {\n            throw new ArgumentOutOfRangeException(nameof(dpi));\n        }\n\n        return new Size(\n            ScaleLogicalValue(logicalSize.Width, dpi),\n            ScaleLogicalValue(logicalSize.Height, dpi));\n    }\n\n    protected override void OnHandleCreated(EventArgs eventArgs)\n    {\n        base.OnHandleCreated(eventArgs);\n        ApplyLogicalWindowSize(DeviceDpi);\n    }\n\n    protected override void OnDpiChanged(DpiChangedEventArgs eventArgs)\n    {\n        base.OnDpiChanged(eventArgs);\n        ApplyLogicalWindowSize(eventArgs.DeviceDpiNew);\n    }\n\n    private static int ScaleLogicalValue(int value, int dpi) =>\n        (int)Math.Round(\n            value * dpi / (double)LogicalDpi,\n            MidpointRounding.AwayFromZero);\n\n    private void ApplyLogicalWindowSize(int dpi)\n    {\n        if (_applyingLogicalWindowSize || _logicalClientSize is null)\n        {\n            return;\n        }\n\n        _applyingLogicalWindowSize = true;\n        try\n        {\n            MinimumSize = Size.Empty;\n            MaximumSize = Size.Empty;\n            if (_logicalMaximumSize is { } logicalMaximumSize)\n            {\n                MaximumSize = ScaleLogicalSize(logicalMaximumSize, dpi);\n            }\n            if (_logicalMinimumSize is { } logicalMinimumSize)\n            {\n                MinimumSize = ScaleLogicalSize(logicalMinimumSize, dpi);\n            }\n            ClientSize = ScaleLogicalSize(_logicalClientSize.Value, dpi);\n        }\n        finally\n        {\n            _applyingLogicalWindowSize = false;\n        }\n    }\n\n    protected override CreateParams CreateParams\n""")
+
+          replace_once(
+              ui,
+              """    {\n        ClientSize = new Size(logicalWidth, logicalHeight);\n        MinimumSize = new Size(logicalWidth, minimumLogicalHeight);\n        MaximumSize = new Size(logicalWidth, 2160);\n    }\n""",
+              """    {\n        ConfigureLogicalWindowSize(\n            new Size(logicalWidth, logicalHeight),\n            new Size(logicalWidth, minimumLogicalHeight),\n            new Size(logicalWidth, 2160));\n    }\n""")
+
+          replace_once(
+              "src/QuantaTrain.App/MiniForm.cs",
+              """        ClientSize = new Size(220, 95);\n""",
+              """        ConfigureLogicalWindowSize(new Size(220, 95));\n""")
+
+          replace_once(
+              "src/QuantaTrain.App/CompactForm.cs",
+              """        AutoScaleDimensions = new SizeF(96F, 96F);\n        AutoScaleMode = AutoScaleMode.Dpi;\n        AutoScroll = true;\n        ClientSize = new Size(CompactWidth, CompactHeight);\n        MinimumSize = new Size(CompactWidth, CompactHeight);\n""",
+              """        AutoScroll = true;\n        ConfigureLogicalWindowSize(\n            new Size(CompactWidth, CompactHeight),\n            new Size(CompactWidth, CompactHeight));\n""")
+
+          tests = "tests/QuantaTrain.App.Tests/DpiScalingTests.cs"
+          replace_once(
+              tests,
+              """    private static string FindManifest()\n""",
+              """    [Theory]\n    [InlineData(220, 95, 440, 190)]\n    [InlineData(286, 384, 572, 768)]\n    [InlineData(800, 600, 1600, 1200)]\n    [InlineData(800, 680, 1600, 1360)]\n    public void SharedLogicalWindowSizesScaleAtTwoHundredPercent(\n        int logicalWidth,\n        int logicalHeight,\n        int expectedWidth,\n        int expectedHeight)\n    {\n        Assert.Equal(\n            new Size(expectedWidth, expectedHeight),\n            FramelessForm.ScaleLogicalSize(\n                new Size(logicalWidth, logicalHeight),\n                192));\n    }\n\n    [Fact]\n    public void PrimaryFormsUseSharedLogicalWindowSizing()\n    {\n        Assert.Contains(\n            \"ConfigureLogicalWindowSize(\",\n            File.ReadAllText(FindAppSource(\"MiniForm.cs\")),\n            StringComparison.Ordinal);\n        Assert.Contains(\n            \"ConfigureLogicalWindowSize(\",\n            File.ReadAllText(FindAppSource(\"CompactForm.cs\")),\n            StringComparison.Ordinal);\n        Assert.Contains(\n            \"ConfigureFixedLogicalWidth(\",\n            File.ReadAllText(FindAppSource(\"DetailDashboardForm.cs\")),\n            StringComparison.Ordinal);\n        Assert.Contains(\n            \"ConfigureFixedLogicalWidth(\",\n            File.ReadAllText(FindAppSource(\"SettingsForm.cs\")),\n            StringComparison.Ordinal);\n    }\n\n    private static string FindAppSource(string fileName)\n    {\n        var directory = new DirectoryInfo(AppContext.BaseDirectory);\n        while (directory is not null)\n        {\n            var candidate = Path.Combine(\n                directory.FullName,\n                \"src\",\n                \"QuantaTrain.App\",\n                fileName);\n            if (File.Exists(candidate))\n            {\n                return candidate;\n            }\n\n            directory = directory.Parent;\n        }\n\n        throw new FileNotFoundException($\"QuantaTray source file was not found: {fileName}\");\n    }\n\n    private static string FindManifest()\n""")
+
+          branch_workflow = Path(".github/workflows/apply-common-dpi-window-sizing.yml")
+          if branch_workflow.exists():
+              branch_workflow.unlink()
+          '@ | python -
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore QuantaTrain.slnx
+
+      - name: Build
+        run: dotnet build QuantaTrain.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test QuantaTrain.slnx -c Release --no-build
+
+      - name: Verify focused diff
+        shell: pwsh
+        run: |
+          git diff --check
+          $changed = git diff --name-only
+          $allowed = @(
+            'src/QuantaTrain.App/UiControls.cs',
+            'src/QuantaTrain.App/MiniForm.cs',
+            'src/QuantaTrain.App/CompactForm.cs',
+            'tests/QuantaTrain.App.Tests/DpiScalingTests.cs',
+            '.github/workflows/apply-common-dpi-window-sizing.yml'
+          )
+          foreach ($path in $changed) {
+            if ($allowed -notcontains $path) {
+              throw "Unexpected changed file: $path"
+            }
+          }
+
+      - name: Commit feature branch
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/QuantaTrain.App/UiControls.cs `
+                  src/QuantaTrain.App/MiniForm.cs `
+                  src/QuantaTrain.App/CompactForm.cs `
+                  tests/QuantaTrain.App.Tests/DpiScalingTests.cs `
+                  .github/workflows/apply-common-dpi-window-sizing.yml
+          git commit -m 'Scale all primary windows from shared logical DPI sizes'
+          git push origin HEAD:fix/v0.2.5-common-dpi-window-sizing
+
+      - name: Remove dispatcher from main
+        shell: pwsh
+        run: |
+          git checkout main
+          git pull --ff-only origin main
+          git rm .github/workflows/dispatch-v025-common-dpi.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Remove temporary v0.2.5 DPI dispatcher'
+          git push origin HEAD:main
