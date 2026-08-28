@@ -1,14 +1,14 @@
 # Project state
 
 - Authoritative checkout: `D:\Codex\QuotaTray`
-- Active implementation branch: `feat/v0.2.7-usage-dashboard`
+- Active branch: `main`
 - Target version: `0.2.7`
 - Settings schema: `7`
 - Local test executable: `dist\portable\win-x64\QuantaTray.exe`
 - Local test ZIP: `dist\QuantaTray-v0.2.7-win-x64-portable.zip`
 - Current setup SHA-256: `031ec3bc9798ea41236cbea8090828d1d591a30e13c837b21a7085eba0201953`
 - Current portable SHA-256: `7d9a6f45ba4d47b5b70c1d1c9855ba02cd5bfc3b8018d3adfd8862a4dd3c7c6b`
-- Formal release path: one-shot `.github\workflows\publish-v0.2.7.yml` publishes `v0.2.7` from `main` and removes itself.
+- Formal v0.2.7 release: published from commit `2eafe79`; the one-shot release workflow removed itself successfully.
 
 ## v0.2.7 decisions
 

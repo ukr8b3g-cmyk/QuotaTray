@@ -15,3 +15,4 @@
 - Fixed panel switching so Mini, Compact, and Detail remember independent positions; added schema 7 migration from the legacy shared position and verified 95 passing tests.
 - Rebuilt the v0.2.7 setup and portable ZIP with the per-mode position fix; checksums are recorded in `PROJECT_STATE.md` and `dist\SHA256SUMS.txt`.
 - Prepared the final README and one-shot public GitHub Release workflow for the formal v0.2.7 launch.
+- Published v0.2.7 at commit/tag `2eafe79`, then replaced the README usage-analysis screenshot and expanded its feature explanation from the verified final UI.
