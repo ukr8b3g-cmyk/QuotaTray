@@ -12,28 +12,48 @@ internal static class IconFactory
         {
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             graphics.Clear(Color.Transparent);
-            using var backgroundPen = new Pen(Color.FromArgb(70, 80, 82), 7);
-            using var valuePen = new Pen(Theme.QuotaColor(remaining), 7)
+            using var backgroundPen = new Pen(Color.FromArgb(70, 80, 82), 5);
+            using var valuePen = new Pen(Theme.QuotaColor(remaining), 5)
             {
                 StartCap = System.Drawing.Drawing2D.LineCap.Round,
                 EndCap = System.Drawing.Drawing2D.LineCap.Round,
             };
-            graphics.DrawEllipse(backgroundPen, 7, 7, 50, 50);
+            graphics.DrawEllipse(backgroundPen, 3, 3, 58, 58);
             if (remaining is not null)
             {
-                graphics.DrawArc(valuePen, 7, 7, 50, 50, -90, (float)(remaining.Value * 3.6));
+                graphics.DrawArc(
+                    valuePen,
+                    3,
+                    3,
+                    58,
+                    58,
+                    -90,
+                    (float)(Math.Clamp(remaining.Value, 0, 100) * 3.6));
             }
 
-            using var font = new Font("Segoe UI", 19, FontStyle.Bold, GraphicsUnit.Pixel);
-            using var brush = new SolidBrush(Color.White);
             var text = remaining is null ? "Q" : Math.Round(remaining.Value).ToString("0");
-            var measured = graphics.MeasureString(text, font);
-            graphics.DrawString(
+            var fontSize = text.Length switch
+            {
+                1 => 30F,
+                2 => 27F,
+                _ => 23F,
+            };
+            using var font = new Font(
+                "Segoe UI",
+                fontSize,
+                FontStyle.Bold,
+                GraphicsUnit.Pixel);
+            TextRenderer.DrawText(
+                graphics,
                 text,
                 font,
-                brush,
-                (size - measured.Width) / 2,
-                (size - measured.Height) / 2);
+                new Rectangle(1, 1, size - 2, size - 2),
+                Color.White,
+                Color.Transparent,
+                TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.VerticalCenter |
+                TextFormatFlags.NoPadding |
+                TextFormatFlags.NoPrefix);
         }
 
         var handle = bitmap.GetHicon();

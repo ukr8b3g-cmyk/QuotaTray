@@ -1,3 +1,17 @@
+# QuantaTray v0.2.7
+
+## 日本語
+
+v0.2.7では、タスクトレーの数値を読みやすくし、最近のリセット履歴を4件表示へ変更しました。「すべて表示」は親画面を操作不能にしない非モーダル画面になりました。
+
+使用分析には、Codex App Serverの正式な読み取り専用APIによる購入クレジット残高・日別トークン・累計・ピーク・連続利用日数を追加しました。ローカルのプラグイン／ツールとSkill回数は初期値オフで、会話本文・コマンド・パスを保存しません。詳細画面は横幅を維持し、DPI対応の縦スクロールで表示します。Mini／コンパクト表示のレイアウトは変更せず、3表示の位置は個別に記憶します。
+
+## English
+
+v0.2.7 improves tray-number legibility, shows four recent reset rows, and makes the full-history window modeless. It adds read-only purchased-credit and account token usage from Codex App Server, plus opt-in privacy-limited local tool and skill counters. The detailed dashboard keeps its width and uses DPI-aware vertical scrolling; Mini and Compact layouts are unchanged, and all three views remember their positions independently.
+
+---
+
 # QuantaTray v0.2.6
 
 ## 日本語

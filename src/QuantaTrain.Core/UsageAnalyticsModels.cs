@@ -86,7 +86,8 @@ public sealed record UsageAnalysisSnapshot(
     DateTimeOffset RefreshedAtUtc,
     int ScannedFileCount,
     int SkippedFileCount,
-    int ErrorFileCount)
+    int ErrorFileCount,
+    IReadOnlyList<LocalActivityAggregate>? Activities = null)
 {
     public static UsageAnalysisSnapshot Empty(
         DateTimeOffset fromUtc,
@@ -98,3 +99,26 @@ public sealed record UsagePeriod(
     DateTimeOffset FromUtc,
     DateTimeOffset ToUtc,
     bool IsStartEstimated);
+
+public sealed record AccountDailyUsage(DateOnly Date, long Tokens);
+
+public sealed record AccountUsageSnapshot(
+    DateTimeOffset ObservedAtUtc,
+    long? LifetimeTokens,
+    long? PeakDailyTokens,
+    long? LongestRunningTurnSeconds,
+    int? CurrentStreakDays,
+    int? LongestStreakDays,
+    IReadOnlyList<AccountDailyUsage> DailyUsage);
+
+public enum LocalActivityKind
+{
+    Tool,
+    Skill,
+}
+
+public sealed record LocalActivityAggregate(
+    DateOnly LocalDate,
+    LocalActivityKind Kind,
+    string Name,
+    long Count);

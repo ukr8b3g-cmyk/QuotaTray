@@ -49,6 +49,7 @@ public static class WeeklyBucketSelector
             snapshot.ResetCredits,
             snapshot.PlanType,
             snapshot.ObservedAtUtc,
-            snapshot.CodexVersion);
+            snapshot.CodexVersion,
+            snapshot.PurchasedCredits);
     }
 }

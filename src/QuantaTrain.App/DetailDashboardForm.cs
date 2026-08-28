@@ -28,6 +28,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private readonly Label _version = ValueLabel();
     private readonly FlowLayoutPanel _credits = RowsPanel();
     private readonly FlowLayoutPanel _history = RowsPanel();
+    private readonly Label _purchasedBalance = ValueLabel();
     private readonly Label _status = ValueLabel();
     private readonly Label _usageStatus = ValueLabel();
     private readonly FlowLayoutPanel _modelRows = RowsPanel();
@@ -35,6 +36,10 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private readonly Panel _timeDetails = DetailsPanel();
     private readonly UsageDonutControl _reasoningDonut = new();
     private readonly Panel _reasoningLegend = DetailsPanel();
+    private readonly AccountUsageChart _accountChart = new();
+    private readonly Panel _accountSummary = DetailsPanel();
+    private readonly FlowLayoutPanel _toolRows = RowsPanel();
+    private readonly FlowLayoutPanel _skillRows = RowsPanel();
     private readonly ComboBox _period = new();
     private readonly ComboBox _metric = new();
     private bool _syncingUsageFilters;
@@ -48,7 +53,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _canDrag = canDrag ?? (() => true);
         _refreshIntervalSeconds = refreshIntervalSeconds ?? (() => 60);
         Text = $"{_localizer.Text("Menu.ShowDetail")} — QuantaTray";
-        ConfigureFixedLogicalWidth(800, 600, 520);
+        ConfigureFixedLogicalWidth(800, 700, 520);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray detailed quota and usage dashboard";
 
@@ -147,10 +152,30 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _overviewPage = BuildOverviewPage();
         _usagePage = BuildUsagePage();
         pages.Controls.AddRange([_usagePage, _overviewPage]);
-        Controls.AddRange([pages, tabs, header]);
+        var resizeGrip = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 9,
+            BackColor = Theme.Window,
+            AccessibleName = _localizer.Text("Detail.VerticalResizeGrip"),
+        };
+        resizeGrip.Paint += (_, eventArgs) =>
+        {
+            using var pen = new Pen(Theme.Border, 2F);
+            var center = resizeGrip.ClientSize.Width / 2;
+            eventArgs.Graphics.DrawLine(
+                pen,
+                center - 22,
+                4,
+                center + 22,
+                4);
+        };
+        MakeVerticalResizeGrip(resizeGrip);
+        Controls.AddRange([pages, tabs, header, resizeGrip]);
+        resizeGrip.BringToFront();
         SelectTab(usage: false);
         UpdateState(null, false, null, []);
-        UpdateUsage(null, new UsageAnalyticsSettings(), false);
+        UpdateUsage(null, null, new UsageAnalyticsSettings(), false);
     }
 
     protected override bool CanDrag => _canDrag();
@@ -242,11 +267,20 @@ internal sealed class DetailForm : FixedWidthResizableForm
             _history,
             history.Count == 0
                 ? [_localizer.Text("History.Empty")]
-                : history.Take(3));
+                : history.Take(4));
+        _purchasedBalance.Text = FormatPurchasedCredits(
+            state?.PurchasedCredits);
     }
 
     public void UpdateUsage(
         UsageAnalysisSnapshot? snapshot,
+        UsageAnalyticsSettings settings,
+        bool scanning) =>
+        UpdateUsage(snapshot, null, settings, scanning);
+
+    public void UpdateUsage(
+        UsageAnalysisSnapshot? snapshot,
+        AccountUsageSnapshot? accountUsage,
         UsageAnalyticsSettings settings,
         bool scanning)
     {
@@ -265,6 +299,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
             _ => 0,
         };
         _syncingUsageFilters = false;
+        PopulateAccountUsage(accountUsage, settings);
         if (!settings.Enabled)
         {
             _usageStatus.Text = _localizer.Text("Usage.Disabled");
@@ -276,6 +311,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
             PopulatePlaceholder(_reasoningLegend, "—");
             _reasoningDonut.SetValues(
                 new Dictionary<string, long>(StringComparer.Ordinal));
+            PopulateActivities([], settings);
             return;
         }
 
@@ -311,6 +347,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _reasoningDonut.CenterCaption = _localizer.Text("Common.Total");
         _reasoningDonut.SetValues(reasoning);
         PopulateReasoningLegend(reasoning, total);
+        PopulateActivities(snapshot.Activities ?? [], settings);
         _usageStatus.Text =
             $"{snapshot.RefreshedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm:ss}   " +
             $"{_localizer.Text("Usage.FileResult", snapshot.ScannedFileCount, snapshot.SkippedFileCount, snapshot.ErrorFileCount)}";
@@ -361,15 +398,23 @@ internal sealed class DetailForm : FixedWidthResizableForm
             116);
         AddInlineKeyValue(info, "Detail.AppVersion", _version, 18, 108, 116);
 
+        var purchased = Card(
+            new Rectangle(390, 10, 376, 92),
+            "Credits.PurchasedTitle");
+        _purchasedBalance.Bounds = new Rectangle(18, 42, 340, 34);
+        _purchasedBalance.AutoSize = false;
+        _purchasedBalance.Font = Theme.Ui(13F, FontStyle.Bold);
+        purchased.Controls.Add(_purchasedBalance);
+
         var credits = Card(
-            new Rectangle(390, 10, 376, 164),
+            new Rectangle(390, 112, 376, 134),
             "Credits.Title");
-        _credits.Bounds = new Rectangle(18, 45, 340, 104);
+        _credits.Bounds = new Rectangle(18, 42, 340, 82);
         _credits.FlowDirection = FlowDirection.LeftToRight;
         credits.Controls.Add(_credits);
 
         var history = Card(
-            new Rectangle(390, 184, 376, 270),
+            new Rectangle(390, 256, 376, 270),
             "History.Recent");
         _history.Bounds = new Rectangle(18, 45, 340, 174);
         history.Controls.Add(_history);
@@ -381,14 +426,17 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
         var footer = new Panel
         {
-            Bounds = new Rectangle(16, 462, 750, 28),
+            Bounds = new Rectangle(16, 534, 750, 28),
             Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
             BackColor = Theme.Window,
         };
         _status.Bounds = new Rectangle(0, 3, 726, 22);
         _status.ForeColor = Theme.Muted;
         footer.Controls.Add(_status);
-        page.Controls.AddRange([quota, info, credits, history, footer]);
+        page.Controls.AddRange(
+        [
+            quota, info, purchased, credits, history, footer,
+        ]);
         return page;
     }
 
@@ -435,8 +483,15 @@ internal sealed class DetailForm : FixedWidthResizableForm
             periodLabel, _period, metricLabel, _metric, refresh,
         ]);
 
+        var account = Card(
+            new Rectangle(16, 58, 750, 190),
+            "Usage.AccountTitle");
+        _accountChart.Bounds = new Rectangle(16, 42, 430, 132);
+        _accountSummary.Bounds = new Rectangle(462, 42, 272, 132);
+        account.Controls.AddRange([_accountChart, _accountSummary]);
+
         var models = Card(
-            new Rectangle(16, 58, 750, 246),
+            new Rectangle(16, 258, 750, 246),
             "Usage.ModelStatus");
         var modelHeader = new Panel
         {
@@ -471,28 +526,39 @@ internal sealed class DetailForm : FixedWidthResizableForm
         models.Controls.AddRange([modelHeader, _modelRows]);
 
         var token = Card(
-            new Rectangle(16, 314, 242, 160),
+            new Rectangle(16, 514, 242, 160),
             "Usage.TokenBreakdown");
         _tokenDetails.Bounds = new Rectangle(16, 42, 210, 108);
         token.Controls.Add(_tokenDetails);
 
         var time = Card(
-            new Rectangle(268, 314, 228, 160),
+            new Rectangle(268, 514, 228, 160),
             "Usage.TimeTurnSummary");
         _timeDetails.Bounds = new Rectangle(16, 42, 196, 108);
         time.Controls.Add(_timeDetails);
 
         var reasoning = Card(
-            new Rectangle(506, 314, 260, 160),
+            new Rectangle(506, 514, 260, 160),
             "Usage.ReasoningBreakdown");
         _reasoningDonut.Bounds = new Rectangle(16, 45, 112, 112);
         _reasoningLegend.Bounds = new Rectangle(138, 46, 106, 100);
         reasoning.Controls.AddRange([_reasoningDonut, _reasoningLegend]);
-        _usageStatus.Bounds = new Rectangle(16, 478, 750, 20);
+        var tools = Card(
+            new Rectangle(16, 684, 370, 150),
+            "Usage.ToolCalls");
+        _toolRows.Bounds = new Rectangle(16, 42, 338, 94);
+        tools.Controls.Add(_toolRows);
+        var skills = Card(
+            new Rectangle(396, 684, 370, 150),
+            "Usage.SkillsUsed");
+        _skillRows.Bounds = new Rectangle(16, 42, 338, 94);
+        skills.Controls.Add(_skillRows);
+        _usageStatus.Bounds = new Rectangle(16, 842, 750, 20);
         _usageStatus.ForeColor = Theme.Muted;
         page.Controls.AddRange(
         [
-            filters, models, token, time, reasoning, _usageStatus,
+            filters, account, models, token, time, reasoning, tools, skills,
+            _usageStatus,
         ]);
         return page;
     }
@@ -933,6 +999,125 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
         return (FluentSymbol.History, Theme.Muted);
     }
+
+    private string FormatPurchasedCredits(PurchasedCreditsSnapshot? credits)
+    {
+        if (credits is null)
+        {
+            return _localizer.Text("Credits.PurchasedUnavailable");
+        }
+        if (credits.Unlimited)
+        {
+            return _localizer.Text("Credits.PurchasedUnlimited");
+        }
+        if (!string.IsNullOrWhiteSpace(credits.Balance))
+        {
+            return credits.Balance;
+        }
+        return credits.HasCredits
+            ? _localizer.Text("Credits.PurchasedUnavailable")
+            : "0";
+    }
+
+    private void PopulateAccountUsage(
+        AccountUsageSnapshot? usage,
+        UsageAnalyticsSettings settings)
+    {
+        _accountSummary.Controls.Clear();
+        if (!settings.ShowAccountUsage || usage is null)
+        {
+            _accountChart.SetValues([]);
+            PopulatePlaceholder(
+                _accountSummary,
+                _localizer.Text("Usage.AccountUnavailable"));
+            return;
+        }
+        var days = settings.DefaultPeriod == "30-days" ? 30 : 7;
+        _accountChart.SetValues(usage.DailyUsage.TakeLast(days).ToArray());
+        var rows = new (string Label, string Value)[]
+        {
+            (_localizer.Text("Usage.LifetimeTokens"), FormatNullable(usage.LifetimeTokens)),
+            (_localizer.Text("Usage.PeakDailyTokens"), FormatNullable(usage.PeakDailyTokens)),
+            (_localizer.Text("Usage.CurrentStreak"), FormatDays(usage.CurrentStreakDays)),
+            (_localizer.Text("Usage.LongestStreak"), FormatDays(usage.LongestStreakDays)),
+        };
+        for (var index = 0; index < rows.Length; index++)
+        {
+            AddValueRow(
+                _accountSummary,
+                rows[index].Label,
+                rows[index].Value,
+                index * 27,
+                272,
+                labelWidth: 150);
+        }
+    }
+
+    private void PopulateActivities(
+        IReadOnlyList<LocalActivityAggregate> activities,
+        UsageAnalyticsSettings settings)
+    {
+        PopulateActivityRows(
+            _toolRows,
+            settings.ShowToolAndSkillBreakdown && settings.CollectToolUsage
+                ? activities.Where(row => row.Kind == LocalActivityKind.Tool)
+                : []);
+        PopulateActivityRows(
+            _skillRows,
+            settings.ShowToolAndSkillBreakdown && settings.CollectSkillUsage
+                ? activities.Where(row => row.Kind == LocalActivityKind.Skill)
+                : []);
+    }
+
+    private void PopulateActivityRows(
+        FlowLayoutPanel panel,
+        IEnumerable<LocalActivityAggregate> activities)
+    {
+        panel.SuspendLayout();
+        panel.Controls.Clear();
+        var rows = activities
+            .GroupBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                Name = group.Key,
+                Count = group.Sum(row => row.Count),
+            })
+            .OrderByDescending(row => row.Count)
+            .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+        foreach (var row in rows)
+        {
+            var line = new Panel
+            {
+                Size = new Size(338, 22),
+                Margin = Padding.Empty,
+                BackColor = Theme.Surface,
+            };
+            AddValueRow(line, row.Name, $"{row.Count:N0}", 1, 338, labelWidth: 275);
+            panel.Controls.Add(line);
+        }
+        if (rows.Length == 0)
+        {
+            panel.Controls.Add(new Label
+            {
+                Text = _localizer.Text("Usage.NoActivityData"),
+                Size = new Size(338, 32),
+                Font = Theme.Ui(8F),
+                ForeColor = Theme.Muted,
+                BackColor = Theme.Surface,
+                TextAlign = ContentAlignment.MiddleLeft,
+            });
+        }
+        panel.ResumeLayout();
+    }
+
+    private string FormatDays(int? days) => days is null
+        ? "—"
+        : _localizer.Text("Usage.Days", days.Value);
+
+    private static string FormatNullable(long? value) =>
+        value is null ? "—" : value.Value.ToString("N0");
 
     private void PopulateTokenDetails(UsageTokenTotals tokens)
     {
@@ -1443,6 +1628,74 @@ internal sealed class QuotaRingControl : Control
             : remainingPercent <= 30d
                 ? Theme.Orange
                 : Theme.Accent;
+}
+
+internal sealed class AccountUsageChart : Control
+{
+    private IReadOnlyList<AccountDailyUsage> _values = [];
+
+    public AccountUsageChart()
+    {
+        DoubleBuffered = true;
+        BackColor = Theme.Surface;
+        AccessibleName = "Account daily token usage";
+    }
+
+    public void SetValues(IReadOnlyList<AccountDailyUsage> values)
+    {
+        _values = values;
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs eventArgs)
+    {
+        base.OnPaint(eventArgs);
+        var graphics = eventArgs.Graphics;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var plot = new Rectangle(4, 7, Math.Max(1, Width - 8), Math.Max(1, Height - 28));
+        using var gridPen = new Pen(Theme.Border, 1) { DashStyle = DashStyle.Dot };
+        for (var row = 0; row < 3; row++)
+        {
+            var y = plot.Top + row * plot.Height / 2;
+            graphics.DrawLine(gridPen, plot.Left, y, plot.Right, y);
+        }
+        if (_values.Count == 0)
+        {
+            using var emptyFont = Theme.Ui(8F);
+            TextRenderer.DrawText(
+                graphics,
+                "—",
+                emptyFont,
+                plot,
+                Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            return;
+        }
+        var maximum = Math.Max(1L, _values.Max(item => item.Tokens));
+        var gap = _values.Count <= 7 ? 8 : 2;
+        var barWidth = Math.Max(2, (plot.Width - gap * (_values.Count - 1)) / _values.Count);
+        using var fill = new SolidBrush(Color.FromArgb(168, 199, 240));
+        using var dateFont = Theme.Ui(_values.Count <= 7 ? 7F : 5.8F);
+        for (var index = 0; index < _values.Count; index++)
+        {
+            var value = _values[index];
+            var height = (int)Math.Round(plot.Height * value.Tokens / (double)maximum);
+            var x = plot.Left + index * (barWidth + gap);
+            graphics.FillRectangle(
+                fill,
+                new Rectangle(x, plot.Bottom - height, barWidth, height));
+            if (_values.Count <= 7 || index % 5 == 0 || index == _values.Count - 1)
+            {
+                TextRenderer.DrawText(
+                    graphics,
+                    $"{value.Date.Month}/{value.Date.Day}",
+                    dateFont,
+                    new Rectangle(x - 5, plot.Bottom + 3, barWidth + 10, 18),
+                    Theme.Muted,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
+            }
+        }
+    }
 }
 
 internal sealed class UsageDonutControl : Control

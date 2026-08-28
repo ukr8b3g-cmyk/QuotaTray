@@ -37,7 +37,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly RedactedLogger _logger;
     private readonly LocalizationService _localizer;
     private readonly AppSettings _settings;
-    private PanelPositionSettings _panelPosition;
+    private PanelPositionSettings _miniPanelPosition;
+    private PanelPositionSettings _compactPanelPosition;
+    private PanelPositionSettings _detailPanelPosition;
     private MiniForm? _miniForm;
     private CompactForm? _compactForm;
     private DetailForm? _detailForm;
@@ -49,6 +51,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private WeeklyQuotaState? _displayState;
     private IReadOnlyList<string> _historyItems = [];
     private UsageAnalysisSnapshot? _usageSnapshot;
+    private AccountUsageSnapshot? _accountUsageSnapshot;
     private bool _viewUpdating;
     private string? _viewError;
     private bool _signedIn;
@@ -69,8 +72,14 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _paths = DataPathResolver.Resolve(AppContext.BaseDirectory);
         _settingsStore = new JsonSettingsStore(_paths.SettingsFile);
         _settings = _settingsStore.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
-        _panelPosition = _settings.Display.RememberPosition
-            ? PanelPlacement.Clone(_settings.Display.PanelPosition)
+        _miniPanelPosition = _settings.Display.RememberPosition
+            ? PanelPlacement.Clone(_settings.Display.MiniPanelPosition)
+            : new PanelPositionSettings();
+        _compactPanelPosition = _settings.Display.RememberPosition
+            ? PanelPlacement.Clone(_settings.Display.CompactPanelPosition)
+            : new PanelPositionSettings();
+        _detailPanelPosition = _settings.Display.RememberPosition
+            ? PanelPlacement.Clone(_settings.Display.DetailPanelPosition)
             : new PanelPositionSettings();
         _historyStore = new JsonlHistoryStore(_paths.HistoryDirectory);
         _quotaStateStore = new JsonQuotaStateStore(_paths.StateFile);
@@ -416,6 +425,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 eventArgs.Error is null &&
                 eventArgs.State is not null)
             {
+                await RefreshAccountUsageAsync();
                 _connectionFailureCount = 0;
                 if (_confirmationPending)
                 {
@@ -706,6 +716,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 _historyItems);
             _detailForm.UpdateUsage(
                 _usageSnapshot,
+                _accountUsageSnapshot,
                 _settings.UsageAnalytics,
                 _usageScanPending);
         }
@@ -883,7 +894,6 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         form.AllSettingsResetRequested += async (_, _) =>
         {
-            _panelPosition = new PanelPositionSettings();
             await ResetPanelPositionAsync();
         };
         form.SettingsPreviewChanged += async (_, eventArgs) =>
@@ -1134,6 +1144,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             DateTimeOffset.UtcNow,
             _polling?.Current ?? _previousState,
             resetEvents);
+        await RefreshAccountUsageAsync();
         if (!_settings.UsageAnalytics.Enabled)
         {
             _usageSnapshot = UsageAnalysisSnapshot.Empty(
@@ -1141,6 +1152,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 period.ToUtc);
             _detailForm?.UpdateUsage(
                 _usageSnapshot,
+                _accountUsageSnapshot,
                 _settings.UsageAnalytics,
                 scanning: false);
             _settingsForm?.SetUsageScanStatus(
@@ -1151,6 +1163,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _usageScanPending = true;
         _detailForm?.UpdateUsage(
             _usageSnapshot,
+            _accountUsageSnapshot,
             _settings.UsageAnalytics,
             scanning: true);
         _settingsForm?.SetUsageScanStatus(
@@ -1178,7 +1191,11 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 DateTimeOffset.UtcNow,
                 result.ScannedFileCount,
                 result.SkippedFileCount,
-                result.ErrorFileCount);
+                result.ErrorFileCount,
+                (result.Activities ?? [])
+                    .Where(row =>
+                        row.LocalDate >= fromDate && row.LocalDate <= toDate)
+                    .ToArray());
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
@@ -1204,6 +1221,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _lastUsageRefreshUtc = DateTimeOffset.UtcNow;
             _detailForm?.UpdateUsage(
                 _usageSnapshot,
+                _accountUsageSnapshot,
                 _settings.UsageAnalytics,
                 scanning: false);
             if (_usageSnapshot is not null)
@@ -1215,6 +1233,27 @@ internal sealed class QuantaTrainContext : ApplicationContext
                         _usageSnapshot.SkippedFileCount,
                         _usageSnapshot.ErrorFileCount));
             }
+        }
+    }
+
+    private async Task RefreshAccountUsageAsync()
+    {
+        if (!_settings.UsageAnalytics.ShowAccountUsage || _accountClient is null)
+        {
+            return;
+        }
+        try
+        {
+            _accountUsageSnapshot = await _accountClient.ReadUsageAsync(
+                _lifetime.Token);
+        }
+        catch (Exception exception) when (
+            exception is IOException or InvalidOperationException or
+            JsonException or FormatException)
+        {
+            await _logger.WarningAsync(
+                exception.Message,
+                CancellationToken.None);
         }
     }
 
@@ -1252,6 +1291,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _historyItems);
         _detailForm?.UpdateUsage(
             _usageSnapshot,
+            _accountUsageSnapshot,
             _settings.UsageAnalytics,
             _usageScanPending);
 
@@ -1303,25 +1343,23 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             PanelPlacement.SnapToEdge(form);
         }
-        PanelPlacement.Capture(form, _panelPosition);
-        if (_settings.Display.RememberPosition)
-        {
-            _settings.Display.PanelPosition =
-                PanelPlacement.Clone(_panelPosition);
-        }
+        var position = PanelPositionFor(form);
+        PanelPlacement.Capture(form, position);
+        PersistPanelPosition(form, position);
     }
 
     private void PositionPanel(Form form)
     {
-        var previousMonitor = _panelPosition.MonitorDeviceName;
-        if (PanelPlacement.TryRestore(form, _panelPosition))
+        var position = PanelPositionFor(form);
+        var previousMonitor = position.MonitorDeviceName;
+        if (PanelPlacement.TryRestore(form, position))
         {
-            PanelPlacement.Capture(form, _panelPosition);
-            PersistPanelPosition();
+            PanelPlacement.Capture(form, position);
+            PersistPanelPosition(form, position);
             if (_settings.Display.RememberPosition
                 && !string.Equals(
                     previousMonitor,
-                    _panelPosition.MonitorDeviceName,
+                    position.MonitorDeviceName,
                     StringComparison.OrdinalIgnoreCase))
             {
                 _ = SaveSettingsAsync();
@@ -1341,8 +1379,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             detail.PositionNearTray();
         }
-        PanelPlacement.Capture(form, _panelPosition);
-        PersistPanelPosition();
+        PanelPlacement.Capture(form, position);
+        PersistPanelPosition(form, position);
     }
 
     private async Task HandlePanelMoveCompletedAsync(Form? form)
@@ -1355,11 +1393,11 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             PanelPlacement.SnapToEdge(form);
         }
-        PanelPlacement.Capture(form, _panelPosition);
+        var position = PanelPositionFor(form);
+        PanelPlacement.Capture(form, position);
+        PersistPanelPosition(form, position);
         if (_settings.Display.RememberPosition)
         {
-            _settings.Display.PanelPosition =
-                PanelPlacement.Clone(_panelPosition);
             await SaveSettingsAsync();
         }
     }
@@ -1416,29 +1454,66 @@ internal sealed class QuantaTrainContext : ApplicationContext
             return;
         }
 
-        PanelPlacement.Capture(form, _panelPosition);
-        PersistPanelPosition();
+        var position = PanelPositionFor(form);
+        PanelPlacement.Capture(form, position);
+        PersistPanelPosition(form, position);
     }
 
-    private void PersistPanelPosition()
+    private PanelPositionSettings PanelPositionFor(Form form) => form switch
     {
-        if (_settings.Display.RememberPosition)
+        MiniForm => _miniPanelPosition,
+        CompactForm => _compactPanelPosition,
+        DetailForm => _detailPanelPosition,
+        _ => throw new ArgumentException("Unsupported panel form.", nameof(form)),
+    };
+
+    private void PersistPanelPosition(
+        Form form,
+        PanelPositionSettings position)
+    {
+        if (!_settings.Display.RememberPosition)
         {
-            _settings.Display.PanelPosition =
-                PanelPlacement.Clone(_panelPosition);
+            return;
         }
+
+        var copy = PanelPlacement.Clone(position);
+        switch (form)
+        {
+            case MiniForm:
+                _settings.Display.MiniPanelPosition = copy;
+                break;
+            case CompactForm:
+                _settings.Display.CompactPanelPosition = copy;
+                break;
+            case DetailForm:
+                _settings.Display.DetailPanelPosition = copy;
+                break;
+            default:
+                throw new ArgumentException(
+                    "Unsupported panel form.",
+                    nameof(form));
+        }
+
+        // Preserve downgrade compatibility without using this shared value in
+        // the current runtime.
+        _settings.Display.PanelPosition = PanelPlacement.Clone(position);
     }
 
     private async Task ResetPanelPositionAsync()
     {
-        _panelPosition = new PanelPositionSettings();
+        _miniPanelPosition = new PanelPositionSettings();
+        _compactPanelPosition = new PanelPositionSettings();
+        _detailPanelPosition = new PanelPositionSettings();
         _settings.Display.PanelPosition = new PanelPositionSettings();
+        _settings.Display.MiniPanelPosition = new PanelPositionSettings();
+        _settings.Display.CompactPanelPosition = new PanelPositionSettings();
+        _settings.Display.DetailPanelPosition = new PanelPositionSettings();
         _miniForm?.Hide();
         _detailForm?.Hide();
         var compact = GetCompactForm();
         PanelPlacement.CenterOnPrimary(compact);
-        PanelPlacement.Capture(compact, _panelPosition);
-        PersistPanelPosition();
+        PanelPlacement.Capture(compact, _compactPanelPosition);
+        PersistPanelPosition(compact, _compactPanelPosition);
         compact.Show();
         compact.Activate();
         await SaveSettingsAsync();
@@ -1458,8 +1533,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
         }
 
         PanelPlacement.CenterOnPrimary(form);
-        PanelPlacement.Capture(form, _panelPosition);
-        PersistPanelPosition();
+        var position = PanelPositionFor(form);
+        PanelPlacement.Capture(form, position);
+        PersistPanelPosition(form, position);
         await SaveSettingsAsync();
     }
 

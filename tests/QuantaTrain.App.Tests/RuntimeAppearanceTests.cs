@@ -729,11 +729,16 @@ public sealed class RuntimeAppearanceTests
 
             Assert.Equal(800, detail.ClientSize.Width);
             Assert.Equal(800, settings.ClientSize.Width);
-            Assert.Equal(680, settings.ClientSize.Height);
+            Assert.Equal(720, settings.ClientSize.Height);
             Assert.Equal(520, detail.MinimumSize.Height);
             Assert.Equal(680, settings.MinimumSize.Height);
             Assert.Equal(AutoScaleMode.Dpi, detail.AutoScaleMode);
             Assert.Equal(AutoScaleMode.Dpi, settings.AutoScaleMode);
+            var resizeGrip = detail.Controls
+                .OfType<Panel>()
+                .Single(control => control.Cursor == Cursors.SizeNS);
+            Assert.Equal(DockStyle.Bottom, resizeGrip.Dock);
+            Assert.Equal(9, resizeGrip.Height);
             var detailHeight = detail.Height;
             detail.Size = new Size(940, detailHeight + 40);
             settings.Size = new Size(940, settings.Height + 40);
@@ -795,9 +800,9 @@ public sealed class RuntimeAppearanceTests
             advanced.Show();
             Application.DoEvents();
 
-            Assert.Equal(680, usage.ClientSize.Height);
-            Assert.Equal(680, acquisition.ClientSize.Height);
-            Assert.Equal(680, advanced.ClientSize.Height);
+            Assert.Equal(720, usage.ClientSize.Height);
+            Assert.Equal(720, acquisition.ClientSize.Height);
+            Assert.Equal(720, advanced.ClientSize.Height);
             var usagePage = GetField<List<Panel>>(usage, "_pages")
                 .Single(page => page.Visible);
             var displayPage = GetField<List<Panel>>(display, "_pages")
@@ -1147,6 +1152,8 @@ public sealed class RuntimeAppearanceTests
                 label => label.Text == localizer.Text("Usage.Disabled"));
 
             settings.Enabled = true;
+            settings.CollectToolUsage = true;
+            settings.CollectSkillUsage = true;
             var key = new UsageAggregateKey(
                 new DateOnly(2026, 7, 26),
                 "gpt-5.6-sol",
@@ -1196,8 +1203,32 @@ public sealed class RuntimeAppearanceTests
                 DateTimeOffset.Parse("2026-07-26T01:30:45Z"),
                 1,
                 0,
-                0);
-            form.UpdateUsage(snapshot, settings, false);
+                0,
+                [
+                    new LocalActivityAggregate(
+                        new DateOnly(2026, 7, 26),
+                        LocalActivityKind.Tool,
+                        "Browser",
+                        12),
+                    new LocalActivityAggregate(
+                        new DateOnly(2026, 7, 26),
+                        LocalActivityKind.Skill,
+                        "Imagegen",
+                        4),
+                ]);
+            var account = new AccountUsageSnapshot(
+                DateTimeOffset.Parse("2026-07-26T01:30:45Z"),
+                563,
+                180,
+                92,
+                4,
+                7,
+                Enumerable.Range(0, 7)
+                    .Select(index => new AccountDailyUsage(
+                        new DateOnly(2026, 7, 20).AddDays(index),
+                        40 + index * 20))
+                    .ToArray());
+            form.UpdateUsage(snapshot, account, settings, false);
             form.Show();
             Application.DoEvents();
             var usageTab = Descendants(form)

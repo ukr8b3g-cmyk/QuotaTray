@@ -19,9 +19,9 @@ public sealed class SettingsMigrationDpiTests
 
         SettingsMigration.Upgrade(settings);
 
-        Assert.Equal(5, settings.SchemaVersion);
-        Assert.Equal(600, settings.Display.DetailWindowHeightLogical);
-        Assert.Equal(680, settings.Display.SettingsWindowHeightLogical);
+        Assert.Equal(7, settings.SchemaVersion);
+        Assert.Equal(700, settings.Display.DetailWindowHeightLogical);
+        Assert.Equal(720, settings.Display.SettingsWindowHeightLogical);
     }
 
     [Fact]
@@ -41,5 +41,30 @@ public sealed class SettingsMigrationDpiTests
 
         Assert.Equal(720, settings.Display.DetailWindowHeightLogical);
         Assert.Equal(760, settings.Display.SettingsWindowHeightLogical);
+    }
+
+    [Fact]
+    public void SchemaFiveUpgradeMovesOnlyOldV026Defaults()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = 5,
+            Display = new DisplaySettings
+            {
+                DetailWindowHeightLogical = 600,
+                SettingsWindowHeightLogical = 680,
+            },
+            ResetDetection = new ResetDetectionSettings
+            {
+                RecentHistoryCount = 3,
+            },
+        };
+
+        SettingsMigration.Upgrade(settings);
+
+        Assert.Equal(7, settings.SchemaVersion);
+        Assert.Equal(700, settings.Display.DetailWindowHeightLogical);
+        Assert.Equal(720, settings.Display.SettingsWindowHeightLogical);
+        Assert.Equal(4, settings.ResetDetection.RecentHistoryCount);
     }
 }

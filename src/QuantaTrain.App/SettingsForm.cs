@@ -79,6 +79,8 @@ internal sealed class SettingsForm : FixedWidthResizableForm
     private readonly ToggleSwitch _collectTokens = new();
     private readonly ToggleSwitch _collectElapsed = new();
     private readonly ToggleSwitch _collectTurns = new();
+    private readonly ToggleSwitch _collectTools = new();
+    private readonly ToggleSwitch _collectSkills = new();
     private readonly ComboBox _usagePeriod = new();
     private readonly ComboBox _usageMetric = new();
     private readonly ComboBox _chartStyle = new();
@@ -91,6 +93,8 @@ internal sealed class SettingsForm : FixedWidthResizableForm
     private readonly ToggleSwitch _showTier = new();
     private readonly ToggleSwitch _groupOtherModels = new();
     private readonly ToggleSwitch _usageEstimate = new();
+    private readonly ToggleSwitch _showAccountUsage = new();
+    private readonly ToggleSwitch _showActivityBreakdown = new();
     private readonly ComboBox _logRetention = new();
     private readonly ComboBox _codexPathMode = new();
     private readonly Label _connectionStatus = new();
@@ -111,7 +115,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _localizer = localizer;
         _initialDisplayMode = initialDisplayMode;
         Text = $"{_localizer.Text("Common.Settings")} — QuantaTray";
-        ConfigureFixedLogicalWidth(800, 680, 680);
+        ConfigureFixedLogicalWidth(800, 720, 680);
         StartPosition = FormStartPosition.Manual;
         AccessibleName = "QuantaTray settings";
         var contentHeight = ClientSize.Height - 122;
@@ -471,12 +475,12 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.ResetDetailHeight"),
             new Rectangle(282, 518, 122, 28));
         resetDetailHeight.Click += (_, _) =>
-            _settings.Display.DetailWindowHeightLogical = 600;
+            _settings.Display.DetailWindowHeightLogical = 700;
         var resetSettingsHeight = UiFactory.TextButton(
             _localizer.Text("Settings.ResetSettingsHeight"),
             new Rectangle(412, 518, 122, 28));
         resetSettingsHeight.Click += (_, _) =>
-            _settings.Display.SettingsWindowHeightLogical = 680;
+            _settings.Display.SettingsWindowHeightLogical = 720;
         page.Controls.AddRange(
         [
             resetPosition, resetDetailHeight, resetSettingsHeight,
@@ -689,13 +693,23 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _collectElapsed,
             302);
         AddToggleRow(page, _localizer.Text("Settings.CollectTurns"), _collectTurns, 334);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.CollectTools"),
+            _collectTools,
+            366);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.CollectSkills"),
+            _collectSkills,
+            398);
         var rescan = UiFactory.TextButton(
             _localizer.Text("Usage.Rescan"),
-            new Rectangle(282, 372, 122, 30));
+            new Rectangle(282, 436, 122, 30));
         rescan.Click += (_, _) => UsageRescanRequested?.Invoke(this, EventArgs.Empty);
         var rebuild = UiFactory.TextButton(
             _localizer.Text("Settings.RebuildUsageCache"),
-            new Rectangle(412, 372, 122, 30));
+            new Rectangle(412, 436, 122, 30));
         rebuild.Click += (_, _) =>
             UsageCacheRebuildRequested?.Invoke(this, EventArgs.Empty);
         _help.SetToolTip(rescan, _localizer.Text("Help.Rescan"));
@@ -706,11 +720,11 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         var roots = Hint(
             _localizer.Text("Settings.UsageKnownRoots"),
             0,
-            410,
+            474,
             534);
         roots.Height = 32;
         page.Controls.Add(roots);
-        _usageScanStatus.Bounds = new Rectangle(0, 448, 534, 24);
+        _usageScanStatus.Bounds = new Rectangle(0, 512, 534, 24);
         _usageScanStatus.Font = Theme.Ui(8.3F);
         _usageScanStatus.ForeColor = Theme.Muted;
         _usageScanStatus.BackColor = Theme.Window;
@@ -720,7 +734,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             Hint(
                 _localizer.Text("Settings.UsagePrivacyReadOnly"),
                 0,
-                478,
+                542,
                 534));
         return page;
     }
@@ -763,9 +777,19 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.GroupOtherModels"),
             _groupOtherModels,
             386);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ShowAccountUsage"),
+            _showAccountUsage,
+            420);
+        AddToggleRow(
+            page,
+            _localizer.Text("Settings.ShowActivityBreakdown"),
+            _showActivityBreakdown,
+            454);
         var estimateHeading = UiFactory.Label(
             _localizer.Text("Settings.UsageEstimates"),
-            new Point(0, 416),
+            new Point(0, 490),
             8.8F,
             FontStyle.Bold);
         estimateHeading.Size = new Size(534, 25);
@@ -776,12 +800,12 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             page,
             _localizer.Text("Settings.EnableUsageEstimate"),
             _usageEstimate,
-            442);
+            516);
         page.Controls.Add(
             Hint(
                 _localizer.Text("Settings.EstimateUnavailable"),
                 0,
-                474,
+                548,
                 534));
         return page;
     }
@@ -1096,6 +1120,8 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _collectElapsed.Checked =
             settings.UsageAnalytics.CollectElapsedTime;
         _collectTurns.Checked = settings.UsageAnalytics.CollectTurnCount;
+        _collectTools.Checked = settings.UsageAnalytics.CollectToolUsage;
+        _collectSkills.Checked = settings.UsageAnalytics.CollectSkillUsage;
         SelectOrFirst(_usagePeriod, settings.UsageAnalytics.DefaultPeriod);
         SelectOrFirst(_usageMetric, settings.UsageAnalytics.DefaultMetric);
         SelectOrFirst(_chartStyle, settings.UsageAnalytics.ChartStyle);
@@ -1115,6 +1141,9 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             settings.UsageAnalytics.GroupOtherModels;
         _usageEstimate.Checked =
             settings.UsageAnalytics.ShowEstimatedConsumption;
+        _showAccountUsage.Checked = settings.UsageAnalytics.ShowAccountUsage;
+        _showActivityBreakdown.Checked =
+            settings.UsageAnalytics.ShowToolAndSkillBreakdown;
         SelectOrFirst(_logRetention, settings.Diagnostics.LogRetentionDays);
         _loadingControls = false;
     }
@@ -1239,6 +1268,8 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _settings.UsageAnalytics.CollectTokens = _collectTokens.Checked;
         _settings.UsageAnalytics.CollectElapsedTime = _collectElapsed.Checked;
         _settings.UsageAnalytics.CollectTurnCount = _collectTurns.Checked;
+        _settings.UsageAnalytics.CollectToolUsage = _collectTools.Checked;
+        _settings.UsageAnalytics.CollectSkillUsage = _collectSkills.Checked;
         _settings.UsageAnalytics.DefaultPeriod =
             _usagePeriod.SelectedItem?.ToString() ?? "current-window";
         _settings.UsageAnalytics.DefaultMetric =
@@ -1260,6 +1291,10 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _groupOtherModels.Checked;
         _settings.UsageAnalytics.ShowEstimatedConsumption =
             _usageEstimate.Enabled && _usageEstimate.Checked;
+        _settings.UsageAnalytics.ShowAccountUsage =
+            _showAccountUsage.Checked;
+        _settings.UsageAnalytics.ShowToolAndSkillBreakdown =
+            _showActivityBreakdown.Checked;
         _settings.Diagnostics.LogRetentionDays =
             (int?)_logRetention.SelectedItem ?? 14;
     }

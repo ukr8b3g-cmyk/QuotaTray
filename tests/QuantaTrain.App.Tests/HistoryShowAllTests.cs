@@ -87,6 +87,65 @@ public sealed class HistoryShowAllTests
         });
     }
 
+    [Fact]
+    public void HistoryWindowIsOwnedModelessAndReused()
+    {
+        RunSta(() =>
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                $"quantatray-history-window-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                var localeRoot = Path.Combine(root, "locales");
+                Directory.CreateDirectory(localeRoot);
+                File.WriteAllText(
+                    Path.Combine(localeRoot, "en-US.json"),
+                    JsonSerializer.Serialize(new Dictionary<string, string>
+                    {
+                        ["History.Title"] = "Reset history",
+                        ["History.Empty"] = "Empty",
+                        ["Common.Close"] = "Close",
+                    }));
+                var localizer = new LocalizationService(localeRoot);
+                localizer.Load(new LanguageSettings
+                {
+                    Mode = "manual",
+                    Locale = "en-US",
+                });
+                using var owner = new Form();
+                owner.Show();
+                Application.DoEvents();
+                var store = new JsonlHistoryStore(Path.Combine(root, "history"));
+
+                PumpUntilCompleted(
+                    ResetHistoryDialog.ShowAsync(
+                        owner,
+                        store,
+                        localizer,
+                        CancellationToken.None));
+                var history = owner.OwnedForms.Single();
+                Assert.True(owner.Enabled);
+                Assert.True(history.Visible);
+
+                PumpUntilCompleted(
+                    ResetHistoryDialog.ShowAsync(
+                        owner,
+                        store,
+                        localizer,
+                        CancellationToken.None));
+                Assert.Single(owner.OwnedForms);
+                history.Close();
+                Application.DoEvents();
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        });
+    }
+
     private static string Row(string observedToUtc, string classification) =>
         JsonSerializer.Serialize(new { observedToUtc, classification });
 
@@ -126,5 +185,16 @@ public sealed class HistoryShowAllTests
         {
             ExceptionDispatchInfo.Capture(failure).Throw();
         }
+    }
+
+    private static void PumpUntilCompleted(Task task)
+    {
+        var timeout = DateTime.UtcNow.AddSeconds(5);
+        while (!task.IsCompleted && DateTime.UtcNow < timeout)
+        {
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
+        task.GetAwaiter().GetResult();
     }
 }

@@ -4,6 +4,8 @@ namespace QuantaTrain.App;
 
 internal static class ResetHistoryDialog
 {
+    private static Form? _form;
+
     public static async Task ShowAsync(
         IWin32Window owner,
         JsonlHistoryStore historyStore,
@@ -12,9 +14,23 @@ internal static class ResetHistoryDialog
     {
         try
         {
+            if (_form is { IsDisposed: false })
+            {
+                if (!_form.Visible)
+                {
+                    _form.Show(owner);
+                }
+                _form.WindowState = FormWindowState.Normal;
+                _form.BringToFront();
+                _form.Activate();
+                return;
+            }
             var history = await historyStore.ReadAllAsync(cancellationToken);
-            using var form = BuildForm(localizer, history);
-            form.ShowDialog(owner);
+            _form = BuildForm(localizer, history);
+            _form.FormClosed += (_, _) => _form = null;
+            _form.Show(owner);
+            _form.BringToFront();
+            _form.Activate();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -84,7 +100,7 @@ internal static class ResetHistoryDialog
             localizer.Text("Common.Close"),
             new Rectangle(0, 0, 104, 32));
         close.Dock = DockStyle.Right;
-        close.DialogResult = DialogResult.Cancel;
+        close.Click += (_, _) => form.Close();
         footer.Controls.Add(close);
 
         var content = new Panel
@@ -97,7 +113,6 @@ internal static class ResetHistoryDialog
         form.Controls.Add(content);
         form.Controls.Add(footer);
         form.Controls.Add(title);
-        form.CancelButton = close;
         return form;
     }
 }

@@ -63,8 +63,11 @@ internal class FramelessForm : Form
 {
     private const int CsDropShadow = 0x00020000;
     private const int WmNclButtonDown = 0x00A1;
+    private const int WmSizing = 0x0214;
     private const int WmExitSizeMove = 0x0232;
     private const int HtCaption = 2;
+    private const int HtBottom = 15;
+    private bool _deferRoundedRegion;
 
     public FramelessForm()
     {
@@ -96,16 +99,22 @@ internal class FramelessForm : Form
     protected override void OnSizeChanged(EventArgs eventArgs)
     {
         base.OnSizeChanged(eventArgs);
-        if (Width <= 0 || Height <= 0)
+        if (_deferRoundedRegion || Width <= 0 || Height <= 0)
         {
             return;
         }
 
+        UpdateRoundedRegion();
+    }
+
+    private void UpdateRoundedRegion()
+    {
         using var path = UiGeometry.RoundedRectangle(
             new Rectangle(0, 0, Width, Height),
             9);
-        Region?.Dispose();
+        var previous = Region;
         Region = new Region(path);
+        previous?.Dispose();
     }
 
     protected void MakeDraggable(Control control)
@@ -122,11 +131,41 @@ internal class FramelessForm : Form
         };
     }
 
+    protected void MakeVerticalResizeGrip(Control control)
+    {
+        control.Cursor = Cursors.SizeNS;
+        control.MouseDown += (_, eventArgs) =>
+        {
+            if (eventArgs.Button != MouseButtons.Left)
+            {
+                return;
+            }
+
+            ReleaseCapture();
+            SendMessage(Handle, WmNclButtonDown, HtBottom, 0);
+        };
+    }
+
     protected override void WndProc(ref Message message)
     {
+        if (message.Msg == WmSizing && !_deferRoundedRegion)
+        {
+            _deferRoundedRegion = true;
+            var previous = Region;
+            Region = null;
+            previous?.Dispose();
+        }
+
         base.WndProc(ref message);
         if (message.Msg == WmExitSizeMove)
         {
+            if (_deferRoundedRegion)
+            {
+                _deferRoundedRegion = false;
+                UpdateRoundedRegion();
+                Invalidate(true);
+                Update();
+            }
             MoveCompleted?.Invoke(this, EventArgs.Empty);
         }
     }

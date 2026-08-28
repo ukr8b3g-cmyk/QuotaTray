@@ -70,6 +70,16 @@ public sealed class CodexAccountClient
             : snapshot;
     }
 
+    public async Task<AccountUsageSnapshot> ReadUsageAsync(
+        CancellationToken cancellationToken)
+    {
+        var result = await _connection.SendRequestAsync(
+            "account/usage/read",
+            parameters: null,
+            cancellationToken).ConfigureAwait(false);
+        return ParseUsage(result, DateTimeOffset.UtcNow);
+    }
+
     public static RateLimitSnapshot ParseRateLimits(
         JsonElement result,
         DateTimeOffset observedAtUtc,
@@ -77,19 +87,30 @@ public sealed class CodexAccountClient
     {
         var buckets = new List<RateLimitBucket>();
         string? planType = null;
+        PurchasedCreditsSnapshot? purchasedCredits = null;
 
         if (result.TryGetProperty("rateLimitsByLimitId", out var byId) &&
             byId.ValueKind == JsonValueKind.Object)
         {
             foreach (var property in byId.EnumerateObject())
             {
-                ParseSnapshot(property.Value, property.Name, buckets, ref planType);
+                ParseSnapshot(
+                    property.Value,
+                    property.Name,
+                    buckets,
+                    ref planType,
+                    ref purchasedCredits);
             }
         }
         else if (result.TryGetProperty("rateLimits", out var single) &&
                  single.ValueKind == JsonValueKind.Object)
         {
-            ParseSnapshot(single, null, buckets, ref planType);
+            ParseSnapshot(
+                single,
+                null,
+                buckets,
+                ref planType,
+                ref purchasedCredits);
         }
 
         long? availableCount = null;
@@ -119,17 +140,61 @@ public sealed class CodexAccountClient
             availableCount,
             credits,
             planType,
-            codexVersion);
+            codexVersion,
+            purchasedCredits);
+    }
+
+    public static AccountUsageSnapshot ParseUsage(
+        JsonElement result,
+        DateTimeOffset observedAtUtc)
+    {
+        var summary = result.TryGetProperty("summary", out var summaryElement) &&
+                      summaryElement.ValueKind == JsonValueKind.Object
+            ? summaryElement
+            : result;
+        var daily = new List<AccountDailyUsage>();
+        if (result.TryGetProperty("dailyUsageBuckets", out var buckets) &&
+            buckets.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var bucket in buckets.EnumerateArray())
+            {
+                var dateText = TryGetString(bucket, "startDate");
+                var tokens = TryGetInt64(bucket, "tokens");
+                if (DateOnly.TryParse(dateText, out var date) && tokens is not null)
+                {
+                    daily.Add(new AccountDailyUsage(date, Math.Max(0, tokens.Value)));
+                }
+            }
+        }
+
+        return new AccountUsageSnapshot(
+            observedAtUtc,
+            TryGetInt64(summary, "lifetimeTokens"),
+            TryGetInt64(summary, "peakDailyTokens"),
+            TryGetInt64(summary, "longestRunningTurnSec"),
+            TryGetInt32(summary, "currentStreakDays"),
+            TryGetInt32(summary, "longestStreakDays"),
+            daily.OrderBy(item => item.Date).ToArray());
     }
 
     private static void ParseSnapshot(
         JsonElement snapshot,
         string? dictionaryLimitId,
         ICollection<RateLimitBucket> buckets,
-        ref string? planType)
+        ref string? planType,
+        ref PurchasedCreditsSnapshot? purchasedCredits)
     {
         var limitId = TryGetString(snapshot, "limitId") ?? dictionaryLimitId;
         planType ??= TryGetString(snapshot, "planType");
+        if (purchasedCredits is null &&
+            snapshot.TryGetProperty("credits", out var credits) &&
+            credits.ValueKind == JsonValueKind.Object)
+        {
+            purchasedCredits = new PurchasedCreditsSnapshot(
+                TryGetString(credits, "balance"),
+                TryGetBoolean(credits, "hasCredits") ?? false,
+                TryGetBoolean(credits, "unlimited") ?? false);
+        }
         ParseWindow(snapshot, "primary", limitId, BucketRole.Primary, buckets);
         ParseWindow(snapshot, "secondary", limitId, BucketRole.Secondary, buckets);
     }
@@ -165,6 +230,37 @@ public sealed class CodexAccountClient
         element.TryGetProperty(propertyName, out var property) &&
         property.ValueKind == JsonValueKind.String
             ? property.GetString()
+            : null;
+
+    private static long? TryGetInt64(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+        if (property.ValueKind == JsonValueKind.Number &&
+            property.TryGetInt64(out var number))
+        {
+            return number;
+        }
+        return property.ValueKind == JsonValueKind.String &&
+               long.TryParse(property.GetString(), out number)
+            ? number
+            : null;
+    }
+
+    private static int? TryGetInt32(JsonElement element, string propertyName)
+    {
+        var value = TryGetInt64(element, propertyName);
+        return value is >= int.MinValue and <= int.MaxValue
+            ? (int)value.Value
+            : null;
+    }
+
+    private static bool? TryGetBoolean(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) &&
+        property.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? property.GetBoolean()
             : null;
 
     private static DateTimeOffset? TryGetUnixTimestamp(

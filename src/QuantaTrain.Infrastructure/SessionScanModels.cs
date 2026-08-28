@@ -8,7 +8,8 @@ public sealed record SessionScanResult(
     IReadOnlyList<UsageAggregate> Rows,
     int ScannedFileCount,
     int SkippedFileCount,
-    int ErrorFileCount);
+    int ErrorFileCount,
+    IReadOnlyList<LocalActivityAggregate>? Activities = null);
 
 internal sealed record SessionScanIndexDocument(
     int SchemaVersion,
@@ -23,6 +24,7 @@ internal sealed record SessionScanIndexEntry(
     string PrefixSignature,
     string BoundarySignature,
     IReadOnlyList<UsageAggregate> Contributions,
+    IReadOnlyList<LocalActivityAggregate>? ActivityContributions,
     SessionParserContinuation Continuation);
 
 internal sealed record SessionParserContinuation(

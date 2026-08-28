@@ -16,13 +16,19 @@ public sealed record RateLimitBucket(
 
 public sealed record ResetCredit(DateTimeOffset? ExpiresAtUtc);
 
+public sealed record PurchasedCreditsSnapshot(
+    string? Balance,
+    bool HasCredits,
+    bool Unlimited);
+
 public sealed record RateLimitSnapshot(
     DateTimeOffset ObservedAtUtc,
     IReadOnlyList<RateLimitBucket> Buckets,
     long? ResetCreditCount,
     IReadOnlyList<ResetCredit>? ResetCredits,
     string? PlanType,
-    string? CodexVersion);
+    string? CodexVersion,
+    PurchasedCreditsSnapshot? PurchasedCredits = null);
 
 public sealed record WeeklyQuotaState(
     string? LimitId,
@@ -35,7 +41,8 @@ public sealed record WeeklyQuotaState(
     IReadOnlyList<ResetCredit>? ResetCredits,
     string? PlanType,
     DateTimeOffset ObservedAtUtc,
-    string? CodexVersion);
+    string? CodexVersion,
+    PurchasedCreditsSnapshot? PurchasedCredits = null);
 
 public enum ResetClassification
 {

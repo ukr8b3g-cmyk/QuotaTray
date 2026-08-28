@@ -7,7 +7,7 @@ namespace QuantaTrain.Infrastructure;
 
 public sealed class CodexSessionScanner
 {
-    private const int ParserVersion = 1;
+    private const int ParserVersion = 2;
     private const int SignatureBytes = 256;
     private const int MaximumMetadataLineBytes = 4 * 1024 * 1024;
     private readonly SessionScanIndexStore _indexStore;
@@ -43,7 +43,7 @@ public sealed class CodexSessionScanner
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.Enabled)
         {
-            return new SessionScanResult([], 0, 0, 0);
+            return new SessionScanResult([], 0, 0, 0, []);
         }
 
         await _scanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -108,6 +108,9 @@ public sealed class CodexSessionScanner
                     var contributions = appendOnly
                         ? previous!.Contributions.ToList()
                         : [];
+                    var activityContributions = appendOnly
+                        ? (previous!.ActivityContributions ?? []).ToList()
+                        : [];
                     var parsed = await ParseFileAsync(
                         path,
                         startOffset,
@@ -121,6 +124,9 @@ public sealed class CodexSessionScanner
                                     parsed.Turns),
                                 settings)))
                         .ToList();
+                    activityContributions = MergeActivities(
+                        activityContributions.Concat(parsed.Activities))
+                        .ToList();
 
                     currentEntries.Add(new SessionScanIndexEntry(
                         hash,
@@ -133,6 +139,7 @@ public sealed class CodexSessionScanner
                             Math.Min(SignatureBytes, info.Length),
                             cancellationToken).ConfigureAwait(false),
                         contributions,
+                        activityContributions,
                         parsed.Continuation));
                     scanned++;
                 }
@@ -152,6 +159,9 @@ public sealed class CodexSessionScanner
             progress?.Report(new SessionScanProgress(paths.Length, paths.Length));
             var allRows = MergeRows(
                 currentEntries.SelectMany(entry => entry.Contributions));
+            var allActivities = MergeActivities(
+                currentEntries.SelectMany(
+                    entry => entry.ActivityContributions ?? []));
             await _aggregateStore.ReplaceAllAsync(
                 allRows,
                 cancellationToken).ConfigureAwait(false);
@@ -162,7 +172,12 @@ public sealed class CodexSessionScanner
                     DateTimeOffset.UtcNow,
                     currentEntries),
                 cancellationToken).ConfigureAwait(false);
-            return new SessionScanResult(allRows, scanned, skipped, errors);
+            return new SessionScanResult(
+                allRows,
+                scanned,
+                skipped,
+                errors,
+                allActivities);
         }
         finally
         {
@@ -248,6 +263,7 @@ public sealed class CodexSessionScanner
         CancellationToken cancellationToken)
     {
         var turns = new List<UsageTurnRecord>();
+        var activities = new List<LocalActivityAggregate>();
         var state = initial;
         await using var stream = new FileStream(
             path,
@@ -281,6 +297,10 @@ public sealed class CodexSessionScanner
                     state,
                     turns,
                     settings);
+                ProcessActivity(
+                    document.RootElement,
+                    settings,
+                    activities);
             }
             catch (JsonException)
             {
@@ -289,7 +309,10 @@ public sealed class CodexSessionScanner
             }
         }
 
-        return new ParsedSessionFile(turns, state);
+        return new ParsedSessionFile(
+            turns,
+            MergeActivities(activities),
+            state);
     }
 
     private static SessionParserContinuation ProcessEvent(
@@ -460,7 +483,110 @@ public sealed class CodexSessionScanner
         line.Contains("\"task_complete\"", StringComparison.Ordinal) ||
         line.Contains("\"turn_started\"", StringComparison.Ordinal) ||
         line.Contains("\"turn_completed\"", StringComparison.Ordinal) ||
-        line.Contains("\"turn_aborted\"", StringComparison.Ordinal);
+        line.Contains("\"turn_aborted\"", StringComparison.Ordinal) ||
+        line.Contains("\"custom_tool_call\"", StringComparison.Ordinal) ||
+        line.Contains("\"function_call\"", StringComparison.Ordinal) ||
+        line.Contains("\"item_completed\"", StringComparison.Ordinal);
+
+    private static void ProcessActivity(
+        JsonElement root,
+        UsageAnalyticsSettings settings,
+        ICollection<LocalActivityAggregate> activities)
+    {
+        if ((!settings.CollectToolUsage && !settings.CollectSkillUsage) ||
+            root.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+        var timestamp = ReadTimestamp(root, "timestamp") ?? DateTimeOffset.UtcNow;
+        var date = DateOnly.FromDateTime(timestamp.LocalDateTime.Date);
+        var rootType = ReadString(root, "type");
+        if (string.Equals(rootType, "response_item", StringComparison.Ordinal) &&
+            root.TryGetProperty("payload", out var payload) &&
+            payload.ValueKind == JsonValueKind.Object)
+        {
+            var itemType = ReadString(payload, "type");
+            if (itemType is "custom_tool_call" or "function_call")
+            {
+                AddActivity(date, ReadString(payload, "name"), settings, activities);
+            }
+            return;
+        }
+        if (!string.Equals(rootType, "event_msg", StringComparison.Ordinal) ||
+            !root.TryGetProperty("payload", out var eventPayload) ||
+            ReadString(eventPayload, "type") != "item_completed" ||
+            !eventPayload.TryGetProperty("item", out var item) ||
+            ReadString(item, "type") != "Extension")
+        {
+            return;
+        }
+        AddActivity(date, ReadString(item, "kind"), settings, activities);
+    }
+
+    private static void AddActivity(
+        DateOnly date,
+        string? rawName,
+        UsageAnalyticsSettings settings,
+        ICollection<LocalActivityAggregate> activities)
+    {
+        if (string.IsNullOrWhiteSpace(rawName))
+        {
+            return;
+        }
+        var name = rawName.Trim();
+        var lower = name.ToLowerInvariant();
+        if (settings.CollectToolUsage)
+        {
+            var category = lower.Contains("browser") ||
+                           lower.Contains("chrome") ||
+                           lower.StartsWith("web.", StringComparison.Ordinal)
+                ? "Browser"
+                : lower.Contains("github") || lower == "gh"
+                    ? "GitHub"
+                    : lower is "exec" or "exec_command" ||
+                      lower.Contains("computer")
+                        ? "Computer Use"
+                        : "Other";
+            activities.Add(new LocalActivityAggregate(
+                date,
+                LocalActivityKind.Tool,
+                category,
+                1));
+        }
+        if (settings.CollectSkillUsage)
+        {
+            var skill = lower.Contains("image_gen") || lower.Contains("imagegen")
+                ? "Imagegen"
+                : lower.Contains("openai-doc") || lower.Contains("openai_docs")
+                    ? "OpenAI Docs"
+                    : lower.Contains("browser") ||
+                      lower.Contains("chrome") ||
+                      lower.StartsWith("web.", StringComparison.Ordinal)
+                        ? "Browser: Control In App Browser"
+                        : null;
+            if (skill is not null)
+            {
+                activities.Add(new LocalActivityAggregate(
+                    date,
+                    LocalActivityKind.Skill,
+                    skill,
+                    1));
+            }
+        }
+    }
+
+    private static IReadOnlyList<LocalActivityAggregate> MergeActivities(
+        IEnumerable<LocalActivityAggregate> rows) =>
+        rows.GroupBy(row => new { row.LocalDate, row.Kind, row.Name })
+            .Select(group => new LocalActivityAggregate(
+                group.Key.LocalDate,
+                group.Key.Kind,
+                group.Key.Name,
+                group.Sum(row => row.Count)))
+            .OrderBy(row => row.LocalDate)
+            .ThenBy(row => row.Kind)
+            .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
     private static UsageTokenTotals? ReadTokens(JsonElement element)
     {
@@ -552,6 +678,8 @@ public sealed class CodexSessionScanner
         flags |= settings.CollectTokens ? 1 << 3 : 0;
         flags |= settings.CollectElapsedTime ? 1 << 4 : 0;
         flags |= settings.CollectTurnCount ? 1 << 5 : 0;
+        flags |= settings.CollectToolUsage ? 1 << 6 : 0;
+        flags |= settings.CollectSkillUsage ? 1 << 7 : 0;
         return ParserVersion * 1000 + flags;
     }
 
@@ -636,5 +764,6 @@ public sealed class CodexSessionScanner
 
     private sealed record ParsedSessionFile(
         IReadOnlyList<UsageTurnRecord> Turns,
+        IReadOnlyList<LocalActivityAggregate> Activities,
         SessionParserContinuation Continuation);
 }

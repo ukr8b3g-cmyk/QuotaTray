@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.6"
+  #define MyAppVersion "0.2.7"
 #endif
 #define MyAppName "QuantaTray"
 #define MyAppExeName "QuantaTray.exe"
@@ -51,9 +51,14 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   InstalledExe: String;
   LegacyExe: String;
+  SettingsFile: String;
+  SettingsBackup: String;
   ResultCode: Integer;
 begin
   Result := '';
+  SettingsFile := ExpandConstant(
+    '{localappdata}\QuantaTray\settings.json');
+  SettingsBackup := SettingsFile + '.pre-v{#MyAppVersion}.bak';
   InstalledExe := ExpandConstant('{app}\{#MyAppExeName}');
   if FileExists(InstalledExe) then
   begin
@@ -85,6 +90,14 @@ begin
       ewWaitUntilTerminated,
       ResultCode);
     Sleep(500);
+  end;
+  if FileExists(SettingsFile) and not FileExists(SettingsBackup) then
+  begin
+    if CopyFile(SettingsFile, SettingsBackup, False) then
+      Log('Backed up existing QuantaTray settings to ' + SettingsBackup)
+    else
+      Log('Warning: could not back up QuantaTray settings to ' +
+        SettingsBackup);
   end;
 end;
 

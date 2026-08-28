@@ -1,6 +1,6 @@
 # QuantaTray
 
-[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 ## 日本語
 
@@ -12,8 +12,8 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 
 ### ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
@@ -21,12 +21,14 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 ### 主な機能
 
 - 週間利用枠の残量、使用済み割合、次回リセット日時、カウントダウン
-- リセット券の残数と有効期限（App Serverから取得できる場合）
-- 定期リセット、リセット券使用候補、予定外回復候補のローカル履歴
+- リセット券の残数・有効期限と、購入クレジット残高（App Serverから取得できる場合）
+- 日別・累計トークン、ピーク、連続利用日数の公式アカウント使用量
+- 定期リセット、リセット券使用候補、予定外回復候補のローカル履歴（最近4件）
 - プラン、接続状態、最終更新、自動更新状態
-- ミニ、コンパクト、詳細の3表示
-- 詳細画面の概要／使用分析タブ
+- ミニ、コンパクト、詳細の3表示と、それぞれ独立した画面位置記憶
+- 横幅を維持して高さを変更・縦スクロールできる詳細画面
 - モデル、推論レベル、サービスタイプ、トークン、使用時間、ターン数のローカル集計
+- 初期値オフのプラグイン／ツール・Skill回数集計
 - 9カテゴリに整理した設定、3年既定の履歴・集計保持、JSON／CSV出力
 - 日本語、英語（自動選択ではWindowsが日本語なら日本語、それ以外は英語）
 - タブ、表示切り替え、使用分析、主要設定のマウスオーバーヘルプ
@@ -55,7 +57,7 @@ QuantaTrayは利用状況を読み取って表示するだけで、リセット�
 
 #### 詳細表示 — 使用分析
 
-モデル別使用状況、トークン内訳、時間・ターン概要、推論レベル内訳を表示します。
+モデル別使用状況、トークン内訳、時間・ターン概要、推論レベル内訳に加え、取得可能な場合は購入クレジット残高と公式アカウント使用量を表示します。
 
 ![QuantaTray 詳細表示の使用分析画面](docs/images/usage-analysis-ja.png)
 
@@ -104,7 +106,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Installer版
 
-1. `QuantaTray-v0.2.6-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.7-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行します。
 3. インストール後、QuantaTrayがタスクトレイに常駐します。
 
@@ -116,7 +118,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Portable ZIP版
 
-1. `QuantaTray-v0.2.6-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.7-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -200,8 +202,8 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ### Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.6-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.7-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the files against `SHA256SUMS.txt`.
@@ -209,11 +211,13 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 ### Features
 
 - Weekly remaining allowance, used share, reset time, and countdown
-- Reset-credit count and expiry dates when available
-- Local history of scheduled resets, possible reset-credit use, and unexpected recovery candidates
-- Mini, compact, and detailed views
-- Overview and per-model usage-analysis tabs
+- Reset-credit count, expiry dates, and purchased-credit balance when available
+- Official account usage including daily and lifetime tokens, peak usage, and streaks
+- Local history of scheduled resets, possible reset-credit use, and unexpected recovery candidates, with four recent rows
+- Mini, compact, and detailed views with independently remembered positions
+- A height-resizable detailed view with vertical scrolling
 - Local-only aggregation of model, reasoning effort, service tier, tokens, elapsed time, and turns
+- Opt-in local plugin/tool and skill counters
 - Nine consolidated settings categories, three-year default retention, and JSON/CSV exports
 - Automatic 60-second quota refresh and manual refresh
 - Japanese and English UI; Auto uses Japanese for Japanese Windows display language and English otherwise
@@ -234,7 +238,7 @@ QuantaTray launches `codex app-server --stdio` in the background. The Codex desk
 
 ### Install
 
-For the installer, run `QuantaTray-v0.2.6-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
+For the installer, run `QuantaTray-v0.2.7-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
 
 ### Privacy and security
 

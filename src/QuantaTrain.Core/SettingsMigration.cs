@@ -2,7 +2,7 @@ namespace QuantaTrain.Core;
 
 public static class SettingsMigration
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 7;
 
     public static AppSettings Upgrade(AppSettings settings)
     {
@@ -18,6 +18,9 @@ public static class SettingsMigration
         settings.UsageAnalytics ??= new UsageAnalyticsSettings();
         settings.Diagnostics ??= new DiagnosticSettings();
         settings.Display.PanelPosition ??= new PanelPositionSettings();
+        settings.Display.MiniPanelPosition ??= new PanelPositionSettings();
+        settings.Display.CompactPanelPosition ??= new PanelPositionSettings();
+        settings.Display.DetailPanelPosition ??= new PanelPositionSettings();
 
         if (settings.SchemaVersion < 5)
         {
@@ -25,6 +28,32 @@ public static class SettingsMigration
             // Reset them once so OS-managed GDI scaling starts from safe sizes.
             settings.Display.DetailWindowHeightLogical = 600;
             settings.Display.SettingsWindowHeightLogical = 680;
+        }
+        if (settings.SchemaVersion < 6)
+        {
+            if (settings.Display.DetailWindowHeightLogical == 600)
+            {
+                settings.Display.DetailWindowHeightLogical = 700;
+            }
+            if (settings.ResetDetection.RecentHistoryCount == 3)
+            {
+                settings.ResetDetection.RecentHistoryCount = 4;
+            }
+            if (settings.Display.SettingsWindowHeightLogical == 680)
+            {
+                settings.Display.SettingsWindowHeightLogical = 720;
+            }
+        }
+        if (settings.SchemaVersion < 7)
+        {
+            // Older releases shared one position across all panel sizes. Seed each
+            // mode once, then let the three positions evolve independently.
+            settings.Display.MiniPanelPosition =
+                settings.Display.PanelPosition.Clone();
+            settings.Display.CompactPanelPosition =
+                settings.Display.PanelPosition.Clone();
+            settings.Display.DetailPanelPosition =
+                settings.Display.PanelPosition.Clone();
         }
         settings.Display.DetailWindowHeightLogical =
             Math.Clamp(settings.Display.DetailWindowHeightLogical, 520, 2160);

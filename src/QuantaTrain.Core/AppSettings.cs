@@ -2,7 +2,7 @@ namespace QuantaTrain.Core;
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 3;
+    public int SchemaVersion { get; set; } = 7;
     public GeneralSettings General { get; set; } = new();
     public DisplaySettings Display { get; set; } = new();
     public LanguageSettings Language { get; set; } = new();
@@ -66,15 +66,22 @@ public sealed class DisplaySettings
     public bool SnapToEdge { get; set; }
     public bool MiniClickThrough { get; set; }
     public bool RememberDetailHeight { get; set; } = true;
-    public int DetailWindowHeightLogical { get; set; } = 600;
+    public int DetailWindowHeightLogical { get; set; } = 700;
     public bool RememberSettingsHeight { get; set; } = true;
-    public int SettingsWindowHeightLogical { get; set; } = 680;
+    public int SettingsWindowHeightLogical { get; set; } = 720;
+    // Kept for backward compatibility with settings written before schema 7.
     public PanelPositionSettings PanelPosition { get; set; } = new();
+    public PanelPositionSettings MiniPanelPosition { get; set; } = new();
+    public PanelPositionSettings CompactPanelPosition { get; set; } = new();
+    public PanelPositionSettings DetailPanelPosition { get; set; } = new();
 
     internal DisplaySettings Clone()
     {
         var copy = (DisplaySettings)MemberwiseClone();
         copy.PanelPosition = PanelPosition.Clone();
+        copy.MiniPanelPosition = MiniPanelPosition.Clone();
+        copy.CompactPanelPosition = CompactPanelPosition.Clone();
+        copy.DetailPanelPosition = DetailPanelPosition.Clone();
         return copy;
     }
 }
@@ -132,7 +139,7 @@ public sealed class ResetDetectionSettings
     public bool DetectUnexpectedRecovery { get; set; } = true;
     public bool ConfirmRecovery { get; set; } = true;
     public int ConfirmationSeconds { get; set; } = 20;
-    public int RecentHistoryCount { get; set; } = 3;
+    public int RecentHistoryCount { get; set; } = 4;
 
     internal ResetDetectionSettings Clone() =>
         (ResetDetectionSettings)MemberwiseClone();
@@ -151,6 +158,8 @@ public sealed class UsageAnalyticsSettings
     public bool CollectTokens { get; set; } = true;
     public bool CollectElapsedTime { get; set; } = true;
     public bool CollectTurnCount { get; set; } = true;
+    public bool CollectToolUsage { get; set; }
+    public bool CollectSkillUsage { get; set; }
     public string DefaultPeriod { get; set; } = "current-window";
     public string DefaultMetric { get; set; } = "total-tokens";
     public string ChartStyle { get; set; } = "horizontal-bar";
@@ -163,6 +172,8 @@ public sealed class UsageAnalyticsSettings
     public bool ShowServiceTierBreakdown { get; set; } = true;
     public bool GroupOtherModels { get; set; } = true;
     public bool ShowEstimatedConsumption { get; set; }
+    public bool ShowAccountUsage { get; set; } = true;
+    public bool ShowToolAndSkillBreakdown { get; set; } = true;
 
     internal UsageAnalyticsSettings Clone() =>
         (UsageAnalyticsSettings)MemberwiseClone();

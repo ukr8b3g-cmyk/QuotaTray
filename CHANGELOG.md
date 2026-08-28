@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.7 - 2026-08-28
+
+- Enlarged and rebalanced the tray icon artwork so its numeric value remains legible, including `100`, without changing the Windows tray slot.
+- Changed recent reset history to four rows and made the full-history window owned, reusable, and modeless.
+- Added read-only purchased-credit balance and official account token usage from Codex App Server.
+- Added opt-in, privacy-limited local plugin/tool and skill counters.
+- Extended the usage dashboard vertically with DPI-aware scrolling while keeping Mini and Compact unchanged.
+- Added independent remembered positions for Mini, Compact, and Detail so switching panel sizes no longer moves another mode.
+- Added settings schema 7 migration for the v0.2.7 defaults and per-mode positions.
+
 ## Unreleased
 
 ## 0.2.6 - 2026-07-30

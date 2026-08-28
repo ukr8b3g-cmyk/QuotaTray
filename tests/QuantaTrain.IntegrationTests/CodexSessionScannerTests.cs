@@ -208,6 +208,56 @@ public sealed class CodexSessionScannerTests
         }
     }
 
+    [Fact]
+    public async Task OptionalActivityCollectionStoresOnlySanitizedCounts()
+    {
+        var root = CreateTemporaryDirectory();
+        try
+        {
+            var codexHome = Path.Combine(root, "codex");
+            var sessionDirectory = Path.Combine(codexHome, "sessions");
+            Directory.CreateDirectory(sessionDirectory);
+            await File.WriteAllLinesAsync(
+                Path.Combine(sessionDirectory, "session.jsonl"),
+                [
+                    """{"timestamp":"2026-07-26T01:00:00Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"private command"}}""",
+                    """{"timestamp":"2026-07-26T01:00:01Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"Extension","kind":"web.search","query":"private query"}}}""",
+                    """{"timestamp":"2026-07-26T01:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"Extension","kind":"image_gen.generation","revisedPrompt":"private prompt"}}}""",
+                ],
+                new UTF8Encoding(false));
+            var settings = EnabledSettings(codexHome);
+            settings.CollectToolUsage = true;
+            settings.CollectSkillUsage = true;
+
+            var result = await CreateScanner(root).ScanAsync(
+                settings,
+                null,
+                CancellationToken.None);
+
+            Assert.Contains(
+                result.Activities!,
+                row => row.Kind == LocalActivityKind.Tool &&
+                       row.Name == "Computer Use" && row.Count == 1);
+            Assert.Contains(
+                result.Activities!,
+                row => row.Kind == LocalActivityKind.Tool &&
+                       row.Name == "Browser" && row.Count == 1);
+            Assert.Contains(
+                result.Activities!,
+                row => row.Kind == LocalActivityKind.Skill &&
+                       row.Name == "Imagegen" && row.Count == 1);
+            var index = await File.ReadAllTextAsync(
+                Path.Combine(root, "scan-index.json"));
+            Assert.DoesNotContain("private command", index, StringComparison.Ordinal);
+            Assert.DoesNotContain("private query", index, StringComparison.Ordinal);
+            Assert.DoesNotContain("private prompt", index, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static CodexSessionScanner CreateScanner(string root) =>
         new(
             Path.Combine(root, "scan-index.json"),
