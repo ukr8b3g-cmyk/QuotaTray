@@ -7,6 +7,9 @@
 - Saved pre-change snapshots at `D:\Codex\_snapshots\QuotaTray\pre-reasoning-donut-20260927_114914` (2/2 files) and `D:\Codex\_snapshots\QuotaTray\pre-v028-setup-20260927_115811` (24/24 files).
 - Ran the full Release test suite: 96 passed, 0 failed. Built the v0.2.8 setup and portable ZIP from source commit `006e334`.
 - Verified installer and EXE version metadata, two SHA-256 entries, ten ZIP entries, and ZIP/publish EXE hash equality. The installer is unsigned; the running installed copy was not replaced.
+- Saved documentation snapshot at `D:\Codex\_snapshots\QuotaTray\pre-v028-publication-20260927_120902` (4/4 files matched).
+- Updated README and release notes, pushed `1afb860` to main, tagged `v0.2.8`, and published GitHub Release after workflow `36290691781` passed.
+- Downloaded the published installer, portable ZIP, and `SHA256SUMS.txt`; both assets matched their checksums, the ZIP contained ten entries, and the EXE reported version `0.2.8+1afb860`. GitHub `latest` resolves to v0.2.8.
 
 ## 2026-08-28 — v0.2.7 local implementation
 
