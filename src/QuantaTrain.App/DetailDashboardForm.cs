@@ -1740,10 +1740,14 @@ internal sealed class UsageDonutControl : Control
         for (var index = 0; index < _values.Count; index++)
         {
             var sweep = (float)(_values[index] * 360d / total);
-            using var pen = new Pen(
-                UsageVisuals.ReasoningColor(index),
-                14);
-            eventArgs.Graphics.DrawArc(pen, bounds, start, sweep);
+            // GDI+ can reject arcs smaller than a pixel even when their angles are valid.
+            if (sweep >= 0.5F)
+            {
+                using var pen = new Pen(
+                    UsageVisuals.ReasoningColor(index),
+                    14);
+                eventArgs.Graphics.DrawArc(pen, bounds, start, sweep);
+            }
             start += sweep;
         }
 

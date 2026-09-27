@@ -1138,6 +1138,31 @@ public sealed class RuntimeAppearanceTests
     }
 
     [Fact]
+    public void UsageDonutPaintsTinyReasoningShareWithoutGdiError()
+    {
+        RunSta(() =>
+        {
+            using var donut = new UsageDonutControl
+            {
+                Size = new Size(112, 112),
+            };
+            donut.SetValues(new Dictionary<string, long>
+            {
+                ["high"] = 999_997_222,
+                ["unknown"] = 2_778,
+            });
+            using var bitmap = new Bitmap(112, 112);
+            using var graphics = Graphics.FromImage(bitmap);
+            using var paintArgs = new PaintEventArgs(graphics, new Rectangle(0, 0, 112, 112));
+            typeof(UsageDonutControl)
+                .GetMethod("OnPaint", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(donut, [paintArgs]);
+
+            Assert.Equal(1_000_000_000, donut.Total);
+        });
+    }
+
+    [Fact]
     public void UsagePageHandlesDisabledAndPopulatedSnapshotsWithoutErrors()
     {
         RunSta(() =>

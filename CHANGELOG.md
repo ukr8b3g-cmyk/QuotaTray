@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+## 0.2.8 - 2026-09-27
+
+- Fixed the usage-analysis reasoning breakdown chart when a token category is too small for GDI+ to draw as an arc.
+
 ## 0.2.7 - 2026-08-28
 
 - Enlarged and rebalanced the tray icon artwork so its numeric value remains legible, including `100`, without changing the Windows tray slot.
@@ -9,8 +15,6 @@
 - Extended the usage dashboard vertically with DPI-aware scrolling while keeping Mini and Compact unchanged.
 - Added independent remembered positions for Mini, Compact, and Detail so switching panel sizes no longer moves another mode.
 - Added settings schema 7 migration for the v0.2.7 defaults and per-mode positions.
-
-## Unreleased
 
 ## 0.2.6 - 2026-07-30
 

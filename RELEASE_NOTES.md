@@ -1,3 +1,15 @@
+# QuantaTray v0.2.8
+
+## 日本語
+
+使用分析の「推論レベル内訳」で、割合が極めて小さい区分を描画する際に例外が出る問題を修正しました。数値と凡例は引き続き表示します。
+
+## English
+
+Fixed an exception in the usage-analysis reasoning breakdown when a category's share was too small for GDI+ to draw. Counts and legend entries remain visible.
+
+---
+
 # QuantaTray v0.2.7
 
 ## 日本語
