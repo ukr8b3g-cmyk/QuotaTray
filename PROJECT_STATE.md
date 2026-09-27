@@ -1,14 +1,15 @@
 # Project state
 
 - Authoritative checkout: `D:\Codex\QuotaTray`
-- Active branch: `main`
-- Target version: `0.2.7`
+- Active branch: `main` (v0.2.8 fix prepared on `fix/reasoning-donut-drawarc`)
+- Target version: `0.2.8`
 - Settings schema: `7`
 - Local test executable: `dist\portable\win-x64\QuantaTray.exe`
-- Local test ZIP: `dist\QuantaTray-v0.2.7-win-x64-portable.zip`
-- Current setup SHA-256: `031ec3bc9798ea41236cbea8090828d1d591a30e13c837b21a7085eba0201953`
-- Current portable SHA-256: `7d9a6f45ba4d47b5b70c1d1c9855ba02cd5bfc3b8018d3adfd8862a4dd3c7c6b`
+- Local test ZIP: `dist\QuantaTray-v0.2.8-win-x64-portable.zip`
+- Current setup SHA-256: `d71411a2d98a9c953120965c1d2dd811ff1f6d6ce5730b525d00fbfa5f54ac05`
+- Current portable SHA-256: `1f4a5b7a2aaad0c45d4fdc0ee4e92ee6de88e7662d49e6448f5f832ff4460672`
 - Formal v0.2.7 release: published from commit `2eafe79`; the one-shot release workflow removed itself successfully.
+- v0.2.8 installer and portable ZIP: built locally from source commit `006e334`; no v0.2.8 GitHub Release yet.
 
 ## v0.2.7 decisions
 
@@ -22,7 +23,7 @@
 
 ## Validation
 
-- `dotnet build QuantaTrain.slnx -c Debug --no-restore`
-- `dotnet test QuantaTrain.slnx -c Debug --no-build --no-restore`
-- Current result: 95 passed, 0 failed.
+- `dotnet test QuantaTrain.slnx -c Release --no-restore`
+- `.\packaging\scripts\build-release.ps1 -Version 0.2.8`
+- Current result: 96 passed, 0 failed (Release, 2026-09-27).
 - QA screenshots: `artifacts\qa-v0.2.7`

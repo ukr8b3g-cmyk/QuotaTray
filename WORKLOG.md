@@ -1,5 +1,13 @@
 # Work log
 
+## 2026-09-27 — v0.2.8 reasoning breakdown hotfix
+
+- Reproduced the reported `UsageDonutControl.OnPaint` `DrawArc` exception with a 0.001-degree token share and added a regression test.
+- Skipped subpixel arcs while preserving the chart totals and legend. The focused test failed before the fix and passed afterward.
+- Saved pre-change snapshots at `D:\Codex\_snapshots\QuotaTray\pre-reasoning-donut-20260927_114914` (2/2 files) and `D:\Codex\_snapshots\QuotaTray\pre-v028-setup-20260927_115811` (24/24 files).
+- Ran the full Release test suite: 96 passed, 0 failed. Built the v0.2.8 setup and portable ZIP from source commit `006e334`.
+- Verified installer and EXE version metadata, two SHA-256 entries, ten ZIP entries, and ZIP/publish EXE hash equality. The installer is unsigned; the running installed copy was not replaced.
+
 ## 2026-08-28 — v0.2.7 local implementation
 
 - Created pre-change snapshot at `D:\Codex\_snapshots\QuotaTray\pre-v0.2.7-20260828_123857-be39c92` (142/142 files verified).
