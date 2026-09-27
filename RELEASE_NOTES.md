@@ -2,54 +2,24 @@
 
 ## 日本語
 
-使用分析の「推論レベル内訳」で、割合が極めて小さい区分を描画する際に例外が出る問題を修正しました。数値と凡例は引き続き表示します。
+使用分析の「推論レベル内訳」で、割合が極めて小さい区分を描画する際に例外が出る問題を修正しました。描画できないほど小さい弧だけを省略し、数値と凡例は引き続き表示します。
+
+- 対応環境：Windows x64（Windows 11推奨）。公式Codex CLI／App Serverと、Codexを利用できるChatGPTアカウントが別途必要です。
+- Installer版：ユーザー単位でインストールし、管理者権限は不要です。Portable ZIP版：書き込み可能なフォルダーに全体を展開し、設定と履歴を展開先の `data` に保存します。
+- 認証：QuantaTrayは `codex app-server --stdio` を使用し、Codexの既存ログインを利用します。必要な場合はCodexの公式ブラウザログインを使用してください。
+- 既知の制限：Windows x64以外は未検証です。アプリ本体の自動更新はありません。App Serverから週間枠が返らない場合は推測値を表示しません。
+- 配布物はコード署名されていません。SmartScreenで発行元不明と表示された場合は、Releaseの `SHA256SUMS.txt` でダウンロードファイルを検証してください。
+
+QuantaTrayは非公式ソフトウェアで、OpenAIによる承認、提携、支援、保証を受けていません。
 
 ## English
 
-Fixed an exception in the usage-analysis reasoning breakdown when a category's share was too small for GDI+ to draw. Counts and legend entries remain visible.
+Fixed an exception in the usage-analysis reasoning breakdown when a category's share was too small for GDI+ to draw. Only the extremely small arc is omitted; counts and legend entries remain visible.
 
----
+- Requirements: Windows x64 (Windows 11 recommended), the official Codex CLI/App Server, and a ChatGPT account with Codex access.
+- Installer: per-user installation without administrator rights. Portable ZIP: extract the entire archive to a writable folder; settings and history stay in the adjacent `data` folder.
+- Authentication: QuantaTray uses `codex app-server --stdio` and its existing Codex login. Use the official Codex browser login if needed.
+- Known limits: platforms other than Windows x64 are untested; the app has no automatic updater; no weekly estimate is shown if the App Server does not return a weekly window.
+- The binaries are unsigned. If SmartScreen shows an unknown publisher, verify your download using the Release's `SHA256SUMS.txt`.
 
-# QuantaTray v0.2.7
-
-## 日本語
-
-v0.2.7では、タスクトレーの数値を読みやすくし、最近のリセット履歴を4件表示へ変更しました。「すべて表示」は親画面を操作不能にしない非モーダル画面になりました。
-
-使用分析には、Codex App Serverの正式な読み取り専用APIによる購入クレジット残高・日別トークン・累計・ピーク・連続利用日数を追加しました。ローカルのプラグイン／ツールとSkill回数は初期値オフで、会話本文・コマンド・パスを保存しません。詳細画面は横幅を維持し、DPI対応の縦スクロールで表示します。Mini／コンパクト表示のレイアウトは変更せず、3表示の位置は個別に記憶します。
-
-## English
-
-v0.2.7 improves tray-number legibility, shows four recent reset rows, and makes the full-history window modeless. It adds read-only purchased-credit and account token usage from Codex App Server, plus opt-in privacy-limited local tool and skill counters. The detailed dashboard keeps its width and uses DPI-aware vertical scrolling; Mini and Compact layouts are unchanged, and all three views remember their positions independently.
-
----
-
-# QuantaTray v0.2.6
-
-## 日本語
-
-QuantaTray v0.2.6では、Windows 11の4K・表示倍率200%環境で発生していた、文字・コントロールとトップレベル画面の倍率不一致を修正します。
-
-- PerMonitorV2上での独自サイズ補正を廃止
-- WindowsのDPI非対応GDIスケーリングをアプリ側で有効化し、「システム（拡張）」の互換性設定と同系統の一括拡大へ変更
-- Mini／Compact／Detail／Settingsを、内部レイアウトごと同じ倍率で拡大
-- v0.2.5で二重拡大された可能性があるDetail／Settingsの保存済み高さを一度だけ安全な既定値へ移行
-- マニフェスト、起動処理、設定移行の回帰テストを追加
-
-この方式では、画面と内部コントロールをWindowsが一体として拡大するため、個別の物理ピクセル計算や`WM_DPICHANGED`補正は行いません。
-
-## English
-
-QuantaTray v0.2.6 fixes the scale mismatch between top-level windows and their text and controls on Windows 11 systems using 4K resolution and 200% display scaling.
-
-- Removes the custom PerMonitorV2 top-level window resizing introduced in v0.2.5
-- Enables Windows DPI-unaware GDI scaling, using the same class of whole-window scaling as the working “System (Enhanced)” compatibility workaround
-- Scales Mini, Compact, Detail, and Settings together with their complete internal layouts
-- Migrates potentially doubled Detail and Settings saved heights from v0.2.5 back to safe defaults once
-- Adds regression checks for the manifest, startup path, and settings migration
-
-Windows now scales each complete window as one unit, so QuantaTray no longer performs separate physical-pixel or `WM_DPICHANGED` size calculations.
-
-- Installer: per-user installation, no administrator privileges required.
-- Portable ZIP: extract to a writable folder; data stays under `data/`.
-- This build is unsigned. Verify it with `SHA256SUMS.txt`.
+QuantaTray is unofficial and is not affiliated with, endorsed by, sponsored by, or warranted by OpenAI.
