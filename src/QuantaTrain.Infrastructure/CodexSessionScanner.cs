@@ -13,6 +13,7 @@ public sealed class CodexSessionScanner
     private const int SignatureBytes = 256;
     private const int MaximumMetadataLineBytes = 4 * 1024 * 1024;
     private const long MaximumDecompressedBytes = 512L * 1024 * 1024;
+    private readonly long _maximumDecompressedBytes;
     private readonly SessionScanIndexStore _indexStore;
     private readonly UsageAggregateStore _aggregateStore;
     private readonly SemaphoreSlim _scanGate = new(1, 1);
@@ -20,7 +21,22 @@ public sealed class CodexSessionScanner
     public CodexSessionScanner(
         string indexPath,
         UsageAggregateStore aggregateStore)
+        : this(indexPath, aggregateStore, MaximumDecompressedBytes)
     {
+    }
+
+    // Tests can lower the bound to exercise failure paths cheaply. No caller can
+    // increase the production limit or turn bounded decompression off.
+    internal CodexSessionScanner(
+        string indexPath,
+        UsageAggregateStore aggregateStore,
+        long maximumDecompressedBytes)
+    {
+        if (maximumDecompressedBytes <= 0 || maximumDecompressedBytes > MaximumDecompressedBytes)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumDecompressedBytes));
+        }
+        _maximumDecompressedBytes = maximumDecompressedBytes;
         _indexStore = new SessionScanIndexStore(indexPath);
         _aggregateStore = aggregateStore;
     }
@@ -156,10 +172,14 @@ public sealed class CodexSessionScanner
                     scanned++;
                 }
                 catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException or
+                    exception is IOException or InvalidDataException or UnauthorizedAccessException or
                     JsonException or FormatException or OverflowException or
                     InvalidOperationException or ZstdException)
                 {
+                    // InvalidDataException is not an IOException. A resource
+                    // limit/corrupt file must not abort other files or persistence.
+                    // Keep only compatible previous contributions; never publish
+                    // partially parsed content from this failed attempt.
                     errors++;
                     if (previous is not null)
                     {
@@ -277,7 +297,7 @@ public sealed class CodexSessionScanner
     private static string LogicalPath(string path) =>
         IsCompressed(path) ? path[..^4] : path;
 
-    private static async Task<ParsedSessionFile> ParseFileAsync(
+    private async Task<ParsedSessionFile> ParseFileAsync(
         string path,
         long startOffset,
         long snapshotLength,
@@ -324,7 +344,7 @@ public sealed class CodexSessionScanner
             {
                 break;
             }
-            if (decompressor is not null && offset + read > MaximumDecompressedBytes)
+            if (decompressor is not null && offset + read > _maximumDecompressedBytes)
             {
                 throw new InvalidDataException("Compressed session exceeds the scan limit.");
             }

@@ -1,6 +1,6 @@
 # QuantaTray
 
-[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
 ## 日本語
 
@@ -12,13 +12,15 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 
 ### ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-portable.zip)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-portable.zip)
 - [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
-v0.2.9では、Codex 0.160.1形式への互換性を改善しました。週間枠の任意項目、使用量の重複集計、サービスタイプ、圧縮ログ、書き込み途中の行、アカウント使用量の更新エラーに対応しています。ローカル使用分析は参考集計で、請求額や正確な課金使用量を示すものではありません。
+v0.2.10では、上限超過や破損のある圧縮ログで使用分析全体が停止する不具合と、有効なのに無効と表示される不具合を修正しました。読み取れたファイルの集計を続け、不完全な結果を明示します。ローカル使用分析は参考集計で、請求額や正確な課金使用量を示すものではありません。
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
+
+上限超過・読み取り失敗のファイルは、互換性のある走査キャッシュがある場合のみ前回分を維持し、それ以外は集計から除外します。旧形式キャッシュの再構築時などは過去の全件を復元できるとは限りません。結果が不完全な場合は画面に表示します。
 
 ### 主な機能
 
@@ -112,7 +114,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Installer版
 
-1. `QuantaTray-v0.2.9-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.10-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行します。
 3. インストール後、QuantaTrayがタスクトレイに常駐します。
 
@@ -124,7 +126,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Portable ZIP版
 
-1. `QuantaTray-v0.2.9-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.10-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -208,11 +210,11 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ### Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.9-win-x64-portable.zip)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.10-win-x64-portable.zip)
 - [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
 
-v0.2.9 improves compatibility with Codex 0.160.1 data formats: optional quota fields, duplicate usage snapshots, service tiers, compressed logs, incomplete rows, and account-usage refresh failures. Local usage analysis remains a best-effort estimate, not a billing record.
+v0.2.10 fixes local scans aborting on oversized or damaged compressed logs and the misleading disabled message when collection is enabled. Healthy files continue to be aggregated and incomplete results are clearly marked. Local usage analysis remains a best-effort estimate, not a billing record.
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the files against `SHA256SUMS.txt`.
 
@@ -231,7 +233,7 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 - Japanese and English UI; Auto uses Japanese for Japanese Windows display language and English otherwise
 - Mouse-over help for tabs, view switching, usage analysis, and key settings
 
-Local token figures prefer best-effort observed `token_usage_record` response usage per turn. Older files use deduplicated cumulative snapshots as a fallback; ambiguous or missing metadata may undercount. Copied fork histories can still overcount, and mid-turn model/tier changes are not attributed per response. These figures are neither billing totals nor current context occupancy. Optional `.jsonl.zst` files are streamed locally and raw/compressed siblings are counted once. Changed compressed files are reread, with a 512 MiB output limit and 64 MiB decoder-window limit; exceeded limits appear in the scan error count. QuantaTray does not change Codex's compression setting.
+Local token figures prefer best-effort observed `token_usage_record` response usage per turn. Older files use deduplicated cumulative snapshots as a fallback; ambiguous or missing metadata may undercount. Copied fork histories can still overcount, and mid-turn model/tier changes are not attributed per response. These figures are neither billing totals nor current context occupancy. Optional `.jsonl.zst` files are streamed locally and raw/compressed siblings are counted once. Changed compressed files are reread, with a 512 MiB output limit and 64 MiB decoder-window limit; exceeded limits appear in the scan error count. QuantaTray does not change Codex's compression setting. A failed file keeps its previous contribution only when a compatible scan cache exists; otherwise that file is excluded. Old incompatible parser caches are rebuilt, so partial results do not guarantee recovery of all earlier totals.
 
 Usage analysis is disabled by default. When enabled, it scans metadata only from known Codex session roots in read-only mode. It can scan every 1, 5, 15, or 30 minutes (5 minutes by default), or manually. Opening the usage tab can trigger an immediate scan; scans do not overlap and normally process only appended data.
 
@@ -248,7 +250,7 @@ QuantaTray launches `codex app-server --stdio` in the background. The Codex desk
 
 ### Install
 
-For the installer, run `QuantaTray-v0.2.9-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
+For the installer, run `QuantaTray-v0.2.10-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
 
 ### Privacy and security
 

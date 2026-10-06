@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.10 - 2026-10-06
+
+- Contain per-file `InvalidDataException`, including the 512 MiB decompression limit, so healthy files and scan-cache writes can complete after a rejected file.
+- Retain compatible previous contributions on file errors without restoring incompatible old parser caches or counting partially read failed files.
+- Keep the 512 MiB output, 64 MiB decoder-window and 4 MiB metadata-line bounds unchanged.
+- Replace misleading disabled placeholders with explicit waiting, scanning, failed, empty, partial-result and previous-result states; retain prior results on failed refreshes.
+- Show current scan state when Settings is opened during a scan, and keep diagnostics limited to error stage/type rather than session content or paths.
+- Add synthetic scanner and Windows UI regressions, including one streamed test beyond the real 512 MiB limit.
+- Publish new verified 0.2.10 packages without changing previous release assets.
+
 ## 0.2.9 - 2026-10-06
 
 - Tolerate null, absent and malformed optional quota-window/reset-credit fields without discarding valid weekly quota data.

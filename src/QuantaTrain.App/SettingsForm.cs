@@ -279,6 +279,27 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _usageScanStatus.Text = text;
     }
 
+    public void UpdateUsageScanStatus(
+        UsageAnalysisSnapshot? snapshot,
+        bool enabled,
+        bool scanning,
+        bool refreshFailed = false,
+        bool displayFailed = false)
+    {
+        _usageScanStatus.Text = UsageScanStatus.Text(
+            _localizer, snapshot, enabled, scanning, refreshFailed, displayFailed);
+        _usageScanStatus.ForeColor = enabled &&
+            (displayFailed || refreshFailed || snapshot?.ErrorFileCount > 0)
+                ? Theme.Yellow
+                : Theme.Muted;
+        _usageScanStatus.Height = Math.Max(24,
+            TextRenderer.MeasureText(
+                _usageScanStatus.Text,
+                _usageScanStatus.Font,
+                new Size(_usageScanStatus.Width, int.MaxValue),
+                TextFormatFlags.WordBreak).Height + 4);
+    }
+
     private void AddNav(
         Control parent,
         string symbol,
@@ -728,14 +749,16 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         _usageScanStatus.Font = Theme.Ui(8.3F);
         _usageScanStatus.ForeColor = Theme.Muted;
         _usageScanStatus.BackColor = Theme.Window;
-        _usageScanStatus.Text = _localizer.Text("Settings.UsageNotScanned");
+        UpdateUsageScanStatus(null, _settings.UsageAnalytics.Enabled, false);
         page.Controls.Add(_usageScanStatus);
-        page.Controls.Add(
-            Hint(
-                _localizer.Text("Settings.UsagePrivacyReadOnly"),
-                0,
-                542,
-                534));
+        var privacy = Hint(
+            _localizer.Text("Settings.UsagePrivacyReadOnly"),
+            0,
+            _usageScanStatus.Bottom + 6,
+            534);
+        _usageScanStatus.SizeChanged += (_, _) =>
+            privacy.Top = _usageScanStatus.Bottom + 6;
+        page.Controls.Add(privacy);
         return page;
     }
 

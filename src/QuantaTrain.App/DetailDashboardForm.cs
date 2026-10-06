@@ -4,6 +4,52 @@ using QuantaTrain.Core;
 
 namespace QuantaTrain.App;
 
+internal static class UsageScanStatus
+{
+    public static string Text(
+        LocalizationService localizer,
+        UsageAnalysisSnapshot? snapshot,
+        bool enabled,
+        bool scanning,
+        bool refreshFailed,
+        bool displayFailed = false)
+    {
+        if (!enabled)
+        {
+            return localizer.Text("Usage.Disabled");
+        }
+        if (displayFailed)
+        {
+            return localizer.Text("Usage.DisplayFailed");
+        }
+        if (snapshot is null)
+        {
+            return localizer.Text(scanning ? "Usage.Scanning" :
+                refreshFailed ? "Usage.ScanFailed" : "Settings.UsageNotScanned");
+        }
+
+        var lines = new List<string>();
+        if (scanning || refreshFailed)
+        {
+            lines.Add(localizer.Text(scanning
+                ? "Usage.ScanningPrevious"
+                : "Usage.ScanFailedPrevious"));
+        }
+        if (snapshot.ErrorFileCount > 0)
+        {
+            lines.Add(localizer.Text("Usage.PartialResults", snapshot.ErrorFileCount));
+        }
+        else if (snapshot.Rows.Count == 0 && (snapshot.Activities?.Count ?? 0) == 0)
+        {
+            lines.Add(localizer.Text("Usage.NoData"));
+        }
+        lines.Add($"{snapshot.RefreshedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm:ss}   " +
+            localizer.Text("Usage.FileResult", snapshot.ScannedFileCount,
+                snapshot.SkippedFileCount, snapshot.ErrorFileCount));
+        return string.Join(Environment.NewLine, lines);
+    }
+}
+
 internal sealed class DetailForm : FixedWidthResizableForm
 {
     private readonly LocalizationService _localizer;
@@ -275,14 +321,18 @@ internal sealed class DetailForm : FixedWidthResizableForm
     public void UpdateUsage(
         UsageAnalysisSnapshot? snapshot,
         UsageAnalyticsSettings settings,
-        bool scanning) =>
-        UpdateUsage(snapshot, null, settings, scanning);
+        bool scanning,
+        bool refreshFailed = false,
+        bool displayFailed = false) =>
+        UpdateUsage(snapshot, null, settings, scanning, refreshFailed, displayFailed);
 
     public void UpdateUsage(
         UsageAnalysisSnapshot? snapshot,
         AccountUsageSnapshot? accountUsage,
         UsageAnalyticsSettings settings,
-        bool scanning)
+        bool scanning,
+        bool refreshFailed = false,
+        bool displayFailed = false)
     {
         _syncingUsageFilters = true;
         _period.SelectedIndex = settings.DefaultPeriod switch
@@ -300,29 +350,22 @@ internal sealed class DetailForm : FixedWidthResizableForm
         };
         _syncingUsageFilters = false;
         PopulateAccountUsage(accountUsage, settings);
-        if (!settings.Enabled)
+        UpdateUsageScanStatus(snapshot, settings.Enabled, scanning, refreshFailed, displayFailed);
+        if (!settings.Enabled || snapshot is null)
         {
-            _usageStatus.Text = _localizer.Text("Usage.Disabled");
-            _modelRows.Controls.Clear();
+            var placeholder = _localizer.Text(
+                !settings.Enabled ? "Usage.EnableInSettings" :
+                scanning ? "Usage.Scanning" :
+                refreshFailed ? "Usage.ScanFailed" : "Settings.UsageNotScanned");
+            PopulatePlaceholder(_modelRows, placeholder);
             PopulatePlaceholder(
                 _tokenDetails,
-                _localizer.Text("Usage.EnableInSettings"));
+                !settings.Enabled ? placeholder : "—");
             PopulatePlaceholder(_timeDetails, "—");
             PopulatePlaceholder(_reasoningLegend, "—");
             _reasoningDonut.SetValues(
                 new Dictionary<string, long>(StringComparer.Ordinal));
             PopulateActivities([], settings);
-            return;
-        }
-
-        if (scanning)
-        {
-            _usageStatus.Text = _localizer.Text("Usage.Scanning");
-            return;
-        }
-        if (snapshot is null)
-        {
-            _usageStatus.Text = _localizer.Text("Status.Stale");
             return;
         }
 
@@ -348,9 +391,14 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _reasoningDonut.SetValues(reasoning);
         PopulateReasoningLegend(reasoning, total);
         PopulateActivities(snapshot.Activities ?? [], settings);
-        _usageStatus.Text =
-            $"{snapshot.RefreshedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm:ss}   " +
-            $"{_localizer.Text("Usage.FileResult", snapshot.ScannedFileCount, snapshot.SkippedFileCount, snapshot.ErrorFileCount)}";
+        if (snapshot.Rows.Count == 0 && snapshot.ErrorFileCount > 0)
+        {
+            // A failed file may be absent after a cache-version rebuild. Do not
+            // present a partial scan with no readable rows as a genuine zero.
+            PopulatePlaceholder(_modelRows, _localizer.Text("Usage.PartialNoData"));
+            PopulatePlaceholder(_tokenDetails, "—");
+            PopulatePlaceholder(_timeDetails, "—");
+        }
     }
 
     public void PositionNearTray()
@@ -358,6 +406,21 @@ internal sealed class DetailForm : FixedWidthResizableForm
         var area = Screen.PrimaryScreen?.WorkingArea ??
             Screen.GetWorkingArea(Cursor.Position);
         Location = new Point(area.Right - Width - 12, area.Bottom - Height - 12);
+    }
+
+    public void UpdateUsageScanStatus(
+        UsageAnalysisSnapshot? snapshot,
+        bool enabled,
+        bool scanning,
+        bool refreshFailed,
+        bool displayFailed = false)
+    {
+        _usageStatus.Text = UsageScanStatus.Text(
+            _localizer, snapshot, enabled, scanning, refreshFailed, displayFailed);
+        _usageStatus.ForeColor = enabled &&
+            (displayFailed || refreshFailed || snapshot?.ErrorFileCount > 0)
+                ? Theme.Yellow
+                : Theme.Muted;
     }
 
     private Panel BuildOverviewPage()
@@ -484,14 +547,14 @@ internal sealed class DetailForm : FixedWidthResizableForm
         ]);
 
         var account = Card(
-            new Rectangle(16, 58, 750, 190),
+            new Rectangle(16, 126, 750, 190),
             "Usage.AccountTitle");
         _accountChart.Bounds = new Rectangle(16, 42, 430, 132);
         _accountSummary.Bounds = new Rectangle(462, 42, 272, 132);
         account.Controls.AddRange([_accountChart, _accountSummary]);
 
         var models = Card(
-            new Rectangle(16, 258, 750, 246),
+            new Rectangle(16, 326, 750, 246),
             "Usage.ModelStatus");
         var modelHeader = new Panel
         {
@@ -526,34 +589,35 @@ internal sealed class DetailForm : FixedWidthResizableForm
         models.Controls.AddRange([modelHeader, _modelRows]);
 
         var token = Card(
-            new Rectangle(16, 514, 242, 160),
+            new Rectangle(16, 582, 242, 160),
             "Usage.TokenBreakdown");
         _tokenDetails.Bounds = new Rectangle(16, 42, 210, 108);
         token.Controls.Add(_tokenDetails);
 
         var time = Card(
-            new Rectangle(268, 514, 228, 160),
+            new Rectangle(268, 582, 228, 160),
             "Usage.TimeTurnSummary");
         _timeDetails.Bounds = new Rectangle(16, 42, 196, 108);
         time.Controls.Add(_timeDetails);
 
         var reasoning = Card(
-            new Rectangle(506, 514, 260, 160),
+            new Rectangle(506, 582, 260, 160),
             "Usage.ReasoningBreakdown");
         _reasoningDonut.Bounds = new Rectangle(16, 45, 112, 112);
         _reasoningLegend.Bounds = new Rectangle(138, 46, 106, 100);
         reasoning.Controls.AddRange([_reasoningDonut, _reasoningLegend]);
         var tools = Card(
-            new Rectangle(16, 684, 370, 150),
+            new Rectangle(16, 752, 370, 150),
             "Usage.ToolCalls");
         _toolRows.Bounds = new Rectangle(16, 42, 338, 94);
         tools.Controls.Add(_toolRows);
         var skills = Card(
-            new Rectangle(396, 684, 370, 150),
+            new Rectangle(396, 752, 370, 150),
             "Usage.SkillsUsed");
         _skillRows.Bounds = new Rectangle(16, 42, 338, 94);
         skills.Controls.Add(_skillRows);
-        _usageStatus.Bounds = new Rectangle(16, 842, 750, 20);
+        _usageStatus.AutoSize = false;
+        _usageStatus.Bounds = new Rectangle(16, 58, 750, 60);
         _usageStatus.ForeColor = Theme.Muted;
         page.Controls.AddRange(
         [

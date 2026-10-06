@@ -57,6 +57,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private bool _signedIn;
     private bool _confirmationPending;
     private bool _usageScanPending;
+    private bool _usageRefreshFailed;
+    private bool _usageDisplayFailed;
+    private string _usageRefreshStage = "Usage refresh";
     private DateTimeOffset? _lastUsageRefreshUtc;
     private int _connectionFailureCount;
     private readonly HashSet<string> _notifiedCreditExpiries =
@@ -722,7 +725,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 _usageSnapshot,
                 _accountUsageSnapshot,
                 _settings.UsageAnalytics,
-                _usageScanPending);
+                _usageScanPending,
+                _usageRefreshFailed,
+                _usageDisplayFailed);
         }
         return _detailForm;
     }
@@ -818,15 +823,12 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _codex is null
                 ? _localizer.Text("Status.Stale")
                 : $"{_localizer.Text("Status.Latest")}  Codex {_codex.Version}");
-        if (_usageSnapshot is not null)
-        {
-            form.SetUsageScanStatus(
-                _localizer.Text(
-                    "Usage.FileResult",
-                    _usageSnapshot.ScannedFileCount,
-                    _usageSnapshot.SkippedFileCount,
-                    _usageSnapshot.ErrorFileCount));
-        }
+        form.UpdateUsageScanStatus(
+            _usageSnapshot,
+            _settings.UsageAnalytics.Enabled,
+            _usageScanPending,
+            _usageRefreshFailed,
+            _usageDisplayFailed);
         _settingsForm = form;
         form.FormClosed += (_, _) =>
         {
@@ -1140,29 +1142,128 @@ internal sealed class QuantaTrainContext : ApplicationContext
             return;
         }
 
-        // Claim the refresh before the history/account awaits, not just the
-        // local scan, so repeated manual requests cannot overlap.
+        // Claim and render the refresh before history/account awaits so opening
+        // either form during those waits shows the same in-progress state.
         _usageScanPending = true;
+        _usageRefreshFailed = false;
+        _usageDisplayFailed = false;
         try
         {
-            await RefreshUsageCoreAsync();
+            await RenderUsageViewsSafelyAsync(UpdateUsageViews, _logger);
+            var result = await RefreshUsageSnapshotAsync(
+                _usageSnapshot,
+                RefreshUsageCoreAsync,
+                _logger,
+                _lifetime.Token,
+                () => _usageRefreshStage);
+            _usageSnapshot = result.Snapshot;
+            _usageRefreshFailed = result.Failed;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
+            _usageRefreshFailed = true;
             await _logger.WarningSafelyAsync(
-                $"Usage refresh failed ({exception.GetType().Name}).");
+                $"Usage display refresh failed ({exception.GetType().Name}).");
         }
         finally
         {
             _usageScanPending = false;
+            _lastUsageRefreshUtc = DateTimeOffset.UtcNow;
+            if (!_lifetime.IsCancellationRequested)
+            {
+                // Rendering may reject unusual aggregate values too. Keep this
+                // inside a safe boundary even though it runs from finally.
+                if (!await RenderUsageViewsSafelyAsync(UpdateUsageViews, _logger))
+                {
+                    _usageDisplayFailed = true;
+                    // A status-only fallback must not repeat aggregation that
+                    // may have caused the rendering failure.
+                    await RenderUsageViewsSafelyAsync(() =>
+                    {
+                        _settingsForm?.UpdateUsageScanStatus(
+                            _usageSnapshot, _settings.UsageAnalytics.Enabled,
+                            scanning: false, refreshFailed: _usageRefreshFailed,
+                            displayFailed: true);
+                        _detailForm?.UpdateUsageScanStatus(
+                            _usageSnapshot, _settings.UsageAnalytics.Enabled,
+                            scanning: false, refreshFailed: _usageRefreshFailed,
+                            displayFailed: true);
+                    }, _logger);
+                }
+            }
         }
     }
 
-    private async Task RefreshUsageCoreAsync()
+    internal static async Task<bool> RenderUsageViewsSafelyAsync(
+        Action render,
+        RedactedLogger logger)
     {
+        try
+        {
+            render();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            await logger.WarningSafelyAsync(
+                $"Usage display refresh failed ({exception.GetType().Name}).");
+            return false;
+        }
+    }
+
+    internal static async Task<(UsageAnalysisSnapshot? Snapshot, bool Failed)>
+        RefreshUsageSnapshotAsync(
+            UsageAnalysisSnapshot? previousSnapshot,
+            Func<Task<UsageAnalysisSnapshot?>> refresh,
+            RedactedLogger logger,
+            CancellationToken cancellationToken,
+            Func<string>? diagnosticStage = null)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await refresh();
+            cancellationToken.ThrowIfCancellationRequested();
+            return (snapshot, false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Includes InvalidDataException from a bounded session scan. Neither
+            // its message nor its stack may enter diagnostics: both can contain
+            // session paths or data. A failed refresh is not an empty result.
+            await logger.WarningSafelyAsync(
+                $"{diagnosticStage?.Invoke() ?? "Usage refresh"} failed ({exception.GetType().Name}).");
+            return (previousSnapshot, true);
+        }
+    }
+
+    private void UpdateUsageViews()
+    {
+        _detailForm?.UpdateUsage(
+            _usageSnapshot,
+            _accountUsageSnapshot,
+            _settings.UsageAnalytics,
+            _usageScanPending,
+            _usageRefreshFailed,
+            _usageDisplayFailed);
+        _settingsForm?.UpdateUsageScanStatus(
+            _usageSnapshot,
+            _settings.UsageAnalytics.Enabled,
+            _usageScanPending,
+            _usageRefreshFailed,
+            _usageDisplayFailed);
+    }
+
+    private async Task<UsageAnalysisSnapshot?> RefreshUsageCoreAsync()
+    {
+        _usageRefreshStage = "Usage history read";
         var resetEvents = await _historyStore.ReadRecentEventsAsync(
             32,
             _lifetime.Token);
@@ -1171,104 +1272,39 @@ internal sealed class QuantaTrainContext : ApplicationContext
             DateTimeOffset.UtcNow,
             _polling?.Current ?? _previousState,
             resetEvents);
+        _usageRefreshStage = "Account usage refresh";
         await RefreshAccountUsageAsync();
-        if (_lifetime.IsCancellationRequested)
-        {
-            return;
-        }
-        // A period/filter change can be coalesced during the account wait.
-        // Read its latest value after each await that may outlive that change.
-        var period = ResolveCurrentPeriod();
+        _lifetime.Token.ThrowIfCancellationRequested();
         if (!_settings.UsageAnalytics.Enabled)
         {
-            _usageSnapshot = UsageAnalysisSnapshot.Empty(
-                period.FromUtc,
-                period.ToUtc);
-            _detailForm?.UpdateUsage(
-                _usageSnapshot,
-                _accountUsageSnapshot,
-                _settings.UsageAnalytics,
-                scanning: false);
-            _settingsForm?.SetUsageScanStatus(
-                _localizer.Text("Usage.Disabled"));
-            return;
+            return _usageSnapshot;
         }
 
-        try
-        {
-            _detailForm?.UpdateUsage(
-                _usageSnapshot,
-                _accountUsageSnapshot,
-                _settings.UsageAnalytics,
-                scanning: true);
-            _settingsForm?.SetUsageScanStatus(
-                _localizer.Text("Usage.Scanning"));
-            var result = await _sessionScanner.ScanAsync(
-                _settings.UsageAnalytics,
-                null,
-                _lifetime.Token);
-            period = ResolveCurrentPeriod();
-            var fromDate = DateOnly.FromDateTime(
-                period.FromUtc.LocalDateTime.Date);
-            var toDate = DateOnly.FromDateTime(
-                period.ToUtc.LocalDateTime.Date);
-            var rows = result.Rows
-                .Where(row =>
-                    row.Key.LocalDate >= fromDate &&
-                    row.Key.LocalDate <= toDate)
-                .ToArray();
-            _usageSnapshot = new UsageAnalysisSnapshot(
-                period.FromUtc,
-                period.ToUtc,
-                period.IsStartEstimated,
-                rows,
-                DateTimeOffset.UtcNow,
-                result.ScannedFileCount,
-                result.SkippedFileCount,
-                result.ErrorFileCount,
-                (result.Activities ?? [])
-                    .Where(row =>
-                        row.LocalDate >= fromDate && row.LocalDate <= toDate)
-                    .ToArray());
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or
-            FormatException or System.Text.Json.JsonException or
-            InvalidOperationException)
-        {
-            await _logger.WarningSafelyAsync(
-                $"Local usage scan failed ({exception.GetType().Name}).");
-            _usageSnapshot = new UsageAnalysisSnapshot(
-                period.FromUtc,
-                period.ToUtc,
-                period.IsStartEstimated,
-                [],
-                DateTimeOffset.UtcNow,
-                0,
-                0,
-                1);
-        }
-        finally
-        {
-            _lastUsageRefreshUtc = DateTimeOffset.UtcNow;
-            if (!_lifetime.IsCancellationRequested)
-            {
-                _detailForm?.UpdateUsage(
-                    _usageSnapshot,
-                    _accountUsageSnapshot,
-                    _settings.UsageAnalytics,
-                    scanning: false);
-                if (_usageSnapshot is not null)
-                {
-                    _settingsForm?.SetUsageScanStatus(
-                        _localizer.Text(
-                            "Usage.FileResult",
-                            _usageSnapshot.ScannedFileCount,
-                            _usageSnapshot.SkippedFileCount,
-                            _usageSnapshot.ErrorFileCount));
-                }
-            }
-        }
+        _usageRefreshStage = "Local usage scan";
+        var result = await _sessionScanner.ScanAsync(
+            _settings.UsageAnalytics,
+            null,
+            _lifetime.Token);
+        // Read the latest period after awaits that may outlive a filter change.
+        _usageRefreshStage = "Local usage snapshot";
+        var period = ResolveCurrentPeriod();
+        var fromDate = DateOnly.FromDateTime(period.FromUtc.LocalDateTime.Date);
+        var toDate = DateOnly.FromDateTime(period.ToUtc.LocalDateTime.Date);
+        var rows = result.Rows
+            .Where(row => row.Key.LocalDate >= fromDate && row.Key.LocalDate <= toDate)
+            .ToArray();
+        return new UsageAnalysisSnapshot(
+            period.FromUtc,
+            period.ToUtc,
+            period.IsStartEstimated,
+            rows,
+            DateTimeOffset.UtcNow,
+            result.ScannedFileCount,
+            result.SkippedFileCount,
+            result.ErrorFileCount,
+            (result.Activities ?? [])
+                .Where(row => row.LocalDate >= fromDate && row.LocalDate <= toDate)
+                .ToArray());
     }
 
     private async Task RefreshAccountUsageAsync()
@@ -1319,7 +1355,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _usageSnapshot,
             _accountUsageSnapshot,
             _settings.UsageAnalytics,
-            _usageScanPending);
+            _usageScanPending,
+            _usageRefreshFailed,
+            _usageDisplayFailed);
 
         var oldIcon = _notifyIcon.Icon;
         _notifyIcon.Icon = IconFactory.Create(displayedState?.RemainingPercent);
