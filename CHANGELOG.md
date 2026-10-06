@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.9 - 2026-10-06
 
 - Tolerate null, absent and malformed optional quota-window/reset-credit fields without discarding valid weekly quota data.
 - Prefer best-effort observed `token_usage_record` response usage; legacy snapshot fallback no longer adds repeated notifications or context-only estimates.
@@ -8,6 +8,8 @@
 - Read optional `.jsonl.zst` rollouts with bounded streaming decompression and count raw/compressed siblings once; rebuild old parser caches.
 - Retry incomplete trailing JSONL/UTF-8 rows on the next scan rather than checkpointing past them.
 - Keep account usage refresh RPC/timeout failures and shutdown cancellation inside a privacy-safe UI boundary, retaining the last successful snapshot.
+- Bundle native .NET libraries for self-contained portable launches, copy complete publish output, and include third-party notices in the installer.
+- Verify Windows x64 package metadata, archive contents, and SHA-256 checksums before publishing a new release.
 - Repair invalid YAML in two legacy DPI maintenance workflows and make both explicitly manual-only.
 
 ## 0.2.8 - 2026-09-27
