@@ -41,9 +41,12 @@ function Assert-AppMetadata([string]$Path) {
 }
 
 $setupInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
-if ($setupInfo.FileVersion -ne "$Version.0" -or
-    $setupInfo.ProductVersion -ne $Version -or
-    $setupInfo.ProductName -ne 'QuantaTray') { throw 'Incorrect installer version/product.' }
+Write-Host "Installer metadata: FileVersion=$($setupInfo.FileVersion), ProductVersion=$($setupInfo.ProductVersion), ProductName=$($setupInfo.ProductName)"
+$fileVersion = '{0}.{1}.{2}.{3}' -f $setupInfo.FileMajorPart, $setupInfo.FileMinorPart, $setupInfo.FileBuildPart, $setupInfo.FilePrivatePart
+$productVersion = '{0}.{1}.{2}.{3}' -f $setupInfo.ProductMajorPart, $setupInfo.ProductMinorPart, $setupInfo.ProductBuildPart, $setupInfo.ProductPrivatePart
+if ($fileVersion -ne "$Version.0" -or $productVersion -ne "$Version.0" -or
+    $setupInfo.ProductVersion -notmatch ('^' + [regex]::Escape($Version) + '(\.0)?$') -or
+    $setupInfo.ProductName -ne 'QuantaTray') { throw 'Incorrect installer numeric version/product.' }
 # Inno Setup's bootstrap architecture can differ from its x64-only payload.
 $iss = Get-Content -LiteralPath (Join-Path $repo 'packaging\inno\QuantaTrain.iss') -Raw
 foreach ($setting in @('PrivilegesRequired=lowest', 'ArchitecturesAllowed=x64compatible',
