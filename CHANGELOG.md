@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Tolerate null, absent and malformed optional quota-window/reset-credit fields without discarding valid weekly quota data.
+- Prefer best-effort observed `token_usage_record` response usage; legacy snapshot fallback no longer adds repeated notifications or context-only estimates.
+- Read service tier from `thread_settings_applied` while preserving older turn-context metadata support.
+- Read optional `.jsonl.zst` rollouts with bounded streaming decompression and count raw/compressed siblings once; rebuild old parser caches.
+- Retry incomplete trailing JSONL/UTF-8 rows on the next scan rather than checkpointing past them.
+- Keep account usage refresh RPC/timeout failures and shutdown cancellation inside a privacy-safe UI boundary, retaining the last successful snapshot.
+- Repair invalid YAML in two legacy DPI maintenance workflows and make both explicitly manual-only.
+
 ## 0.2.8 - 2026-09-27
 
 - Fixed the usage-analysis reasoning breakdown chart when a token category is too small for GDI+ to draw as an arc.

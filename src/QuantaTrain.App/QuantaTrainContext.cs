@@ -426,6 +426,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 eventArgs.State is not null)
             {
                 await RefreshAccountUsageAsync();
+                if (_lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
                 _connectionFailureCount = 0;
                 if (_confirmationPending)
                 {
@@ -1131,20 +1135,50 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private async Task RefreshUsageAsync()
     {
-        if (_usageScanPending)
+        if (_exiting || _usageScanPending)
         {
             return;
         }
 
+        // Claim the refresh before the history/account awaits, not just the
+        // local scan, so repeated manual requests cannot overlap.
+        _usageScanPending = true;
+        try
+        {
+            await RefreshUsageCoreAsync();
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            await _logger.WarningSafelyAsync(
+                $"Usage refresh failed ({exception.GetType().Name}).");
+        }
+        finally
+        {
+            _usageScanPending = false;
+        }
+    }
+
+    private async Task RefreshUsageCoreAsync()
+    {
         var resetEvents = await _historyStore.ReadRecentEventsAsync(
             32,
             _lifetime.Token);
-        var period = UsagePeriodResolver.Resolve(
+        UsagePeriod ResolveCurrentPeriod() => UsagePeriodResolver.Resolve(
             _settings.UsageAnalytics.DefaultPeriod,
             DateTimeOffset.UtcNow,
             _polling?.Current ?? _previousState,
             resetEvents);
         await RefreshAccountUsageAsync();
+        if (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        // A period/filter change can be coalesced during the account wait.
+        // Read its latest value after each await that may outlive that change.
+        var period = ResolveCurrentPeriod();
         if (!_settings.UsageAnalytics.Enabled)
         {
             _usageSnapshot = UsageAnalysisSnapshot.Empty(
@@ -1160,20 +1194,20 @@ internal sealed class QuantaTrainContext : ApplicationContext
             return;
         }
 
-        _usageScanPending = true;
-        _detailForm?.UpdateUsage(
-            _usageSnapshot,
-            _accountUsageSnapshot,
-            _settings.UsageAnalytics,
-            scanning: true);
-        _settingsForm?.SetUsageScanStatus(
-            _localizer.Text("Usage.Scanning"));
         try
         {
+            _detailForm?.UpdateUsage(
+                _usageSnapshot,
+                _accountUsageSnapshot,
+                _settings.UsageAnalytics,
+                scanning: true);
+            _settingsForm?.SetUsageScanStatus(
+                _localizer.Text("Usage.Scanning"));
             var result = await _sessionScanner.ScanAsync(
                 _settings.UsageAnalytics,
                 null,
                 _lifetime.Token);
+            period = ResolveCurrentPeriod();
             var fromDate = DateOnly.FromDateTime(
                 period.FromUtc.LocalDateTime.Date);
             var toDate = DateOnly.FromDateTime(
@@ -1202,9 +1236,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
             FormatException or System.Text.Json.JsonException or
             InvalidOperationException)
         {
-            await _logger.WarningAsync(
-                exception.Message,
-                CancellationToken.None);
+            await _logger.WarningSafelyAsync(
+                $"Local usage scan failed ({exception.GetType().Name}).");
             _usageSnapshot = new UsageAnalysisSnapshot(
                 period.FromUtc,
                 period.ToUtc,
@@ -1217,44 +1250,37 @@ internal sealed class QuantaTrainContext : ApplicationContext
         }
         finally
         {
-            _usageScanPending = false;
             _lastUsageRefreshUtc = DateTimeOffset.UtcNow;
-            _detailForm?.UpdateUsage(
-                _usageSnapshot,
-                _accountUsageSnapshot,
-                _settings.UsageAnalytics,
-                scanning: false);
-            if (_usageSnapshot is not null)
+            if (!_lifetime.IsCancellationRequested)
             {
-                _settingsForm?.SetUsageScanStatus(
-                    _localizer.Text(
-                        "Usage.FileResult",
-                        _usageSnapshot.ScannedFileCount,
-                        _usageSnapshot.SkippedFileCount,
-                        _usageSnapshot.ErrorFileCount));
+                _detailForm?.UpdateUsage(
+                    _usageSnapshot,
+                    _accountUsageSnapshot,
+                    _settings.UsageAnalytics,
+                    scanning: false);
+                if (_usageSnapshot is not null)
+                {
+                    _settingsForm?.SetUsageScanStatus(
+                        _localizer.Text(
+                            "Usage.FileResult",
+                            _usageSnapshot.ScannedFileCount,
+                            _usageSnapshot.SkippedFileCount,
+                            _usageSnapshot.ErrorFileCount));
+                }
             }
         }
     }
 
     private async Task RefreshAccountUsageAsync()
     {
-        if (!_settings.UsageAnalytics.ShowAccountUsage || _accountClient is null)
+        if (_exiting || !_settings.UsageAnalytics.ShowAccountUsage || _accountClient is null)
         {
             return;
         }
-        try
-        {
-            _accountUsageSnapshot = await _accountClient.ReadUsageAsync(
-                _lifetime.Token);
-        }
-        catch (Exception exception) when (
-            exception is IOException or InvalidOperationException or
-            JsonException or FormatException)
-        {
-            await _logger.WarningAsync(
-                exception.Message,
-                CancellationToken.None);
-        }
+        _accountUsageSnapshot = await AccountUsageRefresher.TryReadAsync(
+            _accountClient.ReadUsageAsync,
+            _logger,
+            _lifetime.Token) ?? _accountUsageSnapshot;
     }
 
     private void SetSignedIn(bool signedIn)

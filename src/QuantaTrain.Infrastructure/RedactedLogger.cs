@@ -31,6 +31,20 @@ public sealed class RedactedLogger
         }
     }
 
+    public async Task WarningSafelyAsync(string message)
+    {
+        try
+        {
+            await WarningAsync(message, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            // A diagnostic write failure must not turn a handled refresh failure
+            // into an unhandled exception in an async UI event handler.
+        }
+    }
+
     private void RotateIfNeeded()
     {
         var current = Path.Combine(_directory, "quantatray.log");

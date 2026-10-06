@@ -1,6 +1,6 @@
 # Privacy Policy / プライバシー方針
 
-最終更新：2026-07-26
+最終更新：2026-10-06
 
 ## 要約
 
@@ -59,6 +59,8 @@ QuantaTrayには開発者運営のAPI、テレメトリー送信先、広告サ�
 
 走査時は、モデル、推論レベル、サービスタイプ、トークン数、開始・完了時刻に関係する既知のイベント行だけを処理します。メッセージ本文、ツール出力、コマンド、差分、作業ディレクトリ、リポジトリパス、セッションID、アカウント情報は集計・保存しません。セッションファイルを変更せず、リセット券使用を含む書き込みAPIも呼び出しません。
 
+非圧縮JSONLとZstandard圧縮JSONLの両方を読み取れます。圧縮内容はメモリ上で上限付きで逐次展開し、展開済みセッションファイルを保存しません。応答使用量レコードからは数値だけを集計し、応答ID・スレッドID・セッションIDは保存しません。書込み途中の最終行は次回に再試行し、キャッシュには行境界のバイト位置を保存します。
+
 集計結果と走査キャッシュは端末内だけに保存され、QuantaTrayまたは開発者のサーバーへ送信されません。設定から機能を無効化すると以後の走査を行いません。
 
 ## 保存場所
@@ -95,6 +97,8 @@ OpenAI、ChatGPT、Codexは各権利者の商標です。
 QuantaTray is a local-first, read-only Windows utility. It has no developer-operated backend, telemetry, advertising, or externally transmitted analytics. It communicates with OpenAI only through the separately installed official Codex App Server.
 
 Optional local usage analysis is off by default. When explicitly enabled, it scans only known Codex session roots and stores aggregate model, reasoning, service-tier, token, elapsed-time, and turn-count metadata plus a path-hashed incremental index. It never stores message content, commands, diffs, repository paths, session identifiers, or account data, and sends no aggregate data to the developer.
+
+Plain and Zstandard-compressed rollouts are supported. Decompression is bounded and streamed in memory, without writing decompressed session files. Only numeric usage metadata from response records is retained; response, thread and session IDs are not stored. Incomplete last rows are retried using a byte-boundary checkpoint.
 
 QuantaTray does not directly read or store browser cookies, saved passwords, Codex credential files, access tokens, account identifiers, conversations, source code, or project files. It stores only local settings, observed quota state, inferred reset history, optional aggregate usage metadata, and bounded redacted diagnostics.
 

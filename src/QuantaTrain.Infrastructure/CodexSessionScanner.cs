@@ -2,14 +2,17 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using QuantaTrain.Core;
+using ZstdSharp;
+using ZstdSharp.Unsafe;
 
 namespace QuantaTrain.Infrastructure;
 
 public sealed class CodexSessionScanner
 {
-    private const int ParserVersion = 2;
+    private const int ParserVersion = 3;
     private const int SignatureBytes = 256;
     private const int MaximumMetadataLineBytes = 4 * 1024 * 1024;
+    private const long MaximumDecompressedBytes = 512L * 1024 * 1024;
     private readonly SessionScanIndexStore _indexStore;
     private readonly UsageAggregateStore _aggregateStore;
     private readonly SemaphoreSlim _scanGate = new(1, 1);
@@ -67,12 +70,14 @@ public sealed class CodexSessionScanner
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new SessionScanProgress(position, paths.Length));
                 var path = paths[position];
-                var hash = HashPath(path);
+                var compressed = IsCompressed(path);
+                var hash = HashPath(LogicalPath(path));
                 previousByHash.TryGetValue(hash, out var previous);
                 try
                 {
                     var info = new FileInfo(path);
                     if (previous is not null &&
+                        compressed == previous.Compressed &&
                         info.Length == previous.SizeBytes &&
                         info.LastWriteTimeUtc == previous.LastWriteUtc.UtcDateTime)
                     {
@@ -86,10 +91,14 @@ public sealed class CodexSessionScanner
                         0,
                         Math.Min(SignatureBytes, info.Length),
                         cancellationToken).ConfigureAwait(false);
-                    var appendOnly = previous is not null &&
+                    var appendOnly = !compressed && previous is { Compressed: false } &&
                         info.Length >= previous.SizeBytes &&
                         string.Equals(
-                            prefix,
+                            await HashSliceAsync(
+                                path,
+                                0,
+                                Math.Min(SignatureBytes, previous.SizeBytes),
+                                cancellationToken).ConfigureAwait(false),
                             previous.PrefixSignature,
                             StringComparison.Ordinal) &&
                         string.Equals(
@@ -101,7 +110,7 @@ public sealed class CodexSessionScanner
                             previous.BoundarySignature,
                             StringComparison.Ordinal);
 
-                    var startOffset = appendOnly ? previous!.SizeBytes : 0;
+                    var startOffset = appendOnly ? previous!.CommittedBytes : 0;
                     var continuation = appendOnly
                         ? previous!.Continuation
                         : SessionParserContinuation.Empty;
@@ -114,6 +123,7 @@ public sealed class CodexSessionScanner
                     var parsed = await ParseFileAsync(
                         path,
                         startOffset,
+                        info.Length,
                         continuation,
                         settings,
                         cancellationToken).ConfigureAwait(false);
@@ -140,13 +150,15 @@ public sealed class CodexSessionScanner
                             cancellationToken).ConfigureAwait(false),
                         contributions,
                         activityContributions,
-                        parsed.Continuation));
+                        parsed.Continuation,
+                        parsed.CommittedBytes,
+                        compressed));
                     scanned++;
                 }
                 catch (Exception exception) when (
                     exception is IOException or UnauthorizedAccessException or
                     JsonException or FormatException or OverflowException or
-                    InvalidOperationException)
+                    InvalidOperationException or ZstdException)
                 {
                     errors++;
                     if (previous is not null)
@@ -235,7 +247,11 @@ public sealed class CodexSessionScanner
             string[] directories;
             try
             {
-                files = Directory.GetFiles(directory, "*.jsonl");
+                files = Directory.GetFiles(directory, "*.jsonl*")
+                    .Where(path => path.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase) || IsCompressed(path))
+                    .GroupBy(LogicalPath, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.OrderBy(IsCompressed).First())
+                    .ToArray();
                 directories = Directory.GetDirectories(directory);
             }
             catch (Exception exception) when (
@@ -255,9 +271,16 @@ public sealed class CodexSessionScanner
         }
     }
 
+    private static bool IsCompressed(string path) =>
+        path.EndsWith(".jsonl.zst", StringComparison.OrdinalIgnoreCase);
+
+    private static string LogicalPath(string path) =>
+        IsCompressed(path) ? path[..^4] : path;
+
     private static async Task<ParsedSessionFile> ParseFileAsync(
         string path,
         long startOffset,
+        long snapshotLength,
         SessionParserContinuation initial,
         UsageAnalyticsSettings settings,
         CancellationToken cancellationToken)
@@ -265,54 +288,98 @@ public sealed class CodexSessionScanner
         var turns = new List<UsageTurnRecord>();
         var activities = new List<LocalActivityAggregate>();
         var state = initial;
-        await using var stream = new FileStream(
+        await using var file = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.ReadWrite | FileShare.Delete,
             64 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        stream.Seek(startOffset, SeekOrigin.Begin);
-        using var reader = new StreamReader(
-            stream,
-            new UTF8Encoding(false, true),
-            detectEncodingFromByteOrderMarks: startOffset == 0,
-            64 * 1024,
-            leaveOpen: false);
-
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)
-               is { } line)
+        file.Seek(startOffset, SeekOrigin.Begin);
+        using var decompressor = IsCompressed(path)
+            ? new DecompressionStream(file, leaveOpen: true)
+            : null;
+        // Bound zstd's internal window as well as emitted bytes and line storage.
+        decompressor?.SetParameter(ZSTD_dParameter.ZSTD_d_windowLogMax, 26);
+        Stream stream = decompressor is null ? file : decompressor;
+        var buffer = new byte[64 * 1024];
+        using var line = new MemoryStream();
+        var offset = startOffset;
+        var committed = startOffset;
+        var oversized = false;
+        var encoding = new UTF8Encoding(false, true);
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (Encoding.UTF8.GetByteCount(line) > MaximumMetadataLineBytes ||
-                !IsRelevantLine(line))
+            var count = decompressor is null
+                ? (int)Math.Min(buffer.Length, snapshotLength - offset)
+                : buffer.Length;
+            if (count <= 0)
             {
-                continue;
+                break;
             }
-            try
+            var read = await stream.ReadAsync(
+                buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+            if (read == 0)
             {
-                using var document = JsonDocument.Parse(line);
-                state = ProcessEvent(
-                    document.RootElement,
-                    state,
-                    turns,
-                    settings);
-                ProcessActivity(
-                    document.RootElement,
-                    settings,
-                    activities);
+                break;
             }
-            catch (JsonException)
+            if (decompressor is not null && offset + read > MaximumDecompressedBytes)
             {
-                // A concurrently written or damaged row must not discard the
-                // valid metadata already collected from the rest of the file.
+                throw new InvalidDataException("Compressed session exceeds the scan limit.");
+            }
+            for (var position = 0; position < read; position++)
+            {
+                offset++;
+                if (buffer[position] != (byte)'\n')
+                {
+                    if (!oversized && line.Length < MaximumMetadataLineBytes)
+                    {
+                        line.WriteByte(buffer[position]);
+                    }
+                    else
+                    {
+                        oversized = true;
+                    }
+                    continue;
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                // A checkpoint always ends at a complete JSONL row. Incomplete
+                // UTF-8 and JSON suffixes are retried from this byte next scan.
+                committed = offset;
+                if (!oversized)
+                {
+                    try
+                    {
+                        var text = encoding.GetString(line.GetBuffer(), 0, (int)line.Length);
+                        if (committed - line.Length - 1 == 0)
+                        {
+                            text = text.TrimStart('\uFEFF');
+                        }
+                        if (IsRelevantLine(text))
+                        {
+                            using var document = JsonDocument.Parse(text);
+                            state = ProcessEvent(document.RootElement, state, turns, settings);
+                            ProcessActivity(document.RootElement, settings, activities);
+                        }
+                    }
+                    catch (Exception exception) when (
+                        exception is JsonException or DecoderFallbackException or
+                        ArgumentOutOfRangeException or OverflowException)
+                    {
+                        // Discard only the damaged, complete row; never raw text.
+                    }
+                }
+                line.SetLength(0);
+                oversized = false;
             }
         }
 
         return new ParsedSessionFile(
             turns,
             MergeActivities(activities),
-            state);
+            state,
+            committed);
     }
 
     private static SessionParserContinuation ProcessEvent(
@@ -348,6 +415,26 @@ public sealed class CodexSessionScanner
             };
         }
 
+        if (string.Equals(rootType, "compacted", StringComparison.Ordinal) &&
+            root.TryGetProperty("payload", out var checkpoint) &&
+            checkpoint.ValueKind == JsonValueKind.Object)
+        {
+            // Resume reconstruction stops at a compaction checkpoint. Its
+            // optional record seeds the next counter; it is not new usage.
+            var baseline = checkpoint.TryGetProperty("latest_token_usage_record", out var record) &&
+                record.ValueKind == JsonValueKind.Object &&
+                record.TryGetProperty("thread_token_usage", out var tokens)
+                    ? ReadTokens(tokens)
+                    : null;
+            return state with { PreviousObservedCumulative = baseline };
+        }
+
+        if (string.Equals(rootType, "token_usage_record", StringComparison.Ordinal) &&
+            root.TryGetProperty("payload", out var usagePayload))
+        {
+            return ApplyObservedUsage(usagePayload, state);
+        }
+
         if (!string.Equals(rootType, "event_msg", StringComparison.Ordinal) ||
             !root.TryGetProperty("payload", out var eventPayload) ||
             eventPayload.ValueKind != JsonValueKind.Object)
@@ -356,6 +443,20 @@ public sealed class CodexSessionScanner
         }
 
         var eventType = ReadString(eventPayload, "type");
+        if (eventType == "thread_settings_applied" &&
+            eventPayload.TryGetProperty("thread_settings", out var threadSettings) &&
+            threadSettings.ValueKind == JsonValueKind.Object)
+        {
+            // This is a full settings snapshot. Missing/null tier means unknown,
+            // so a previous priority setting must not leak into later turns.
+            return state with
+            {
+                Model = ReadString(threadSettings, "model") ?? state.Model,
+                ReasoningEffort = ReadString(threadSettings, "reasoning_effort") ?? "unknown",
+                ServiceTier = ReadString(threadSettings, "service_tier") ?? "unknown",
+            };
+        }
+
         if (string.Equals(eventType, "task_started", StringComparison.Ordinal) ||
             string.Equals(eventType, "turn_started", StringComparison.Ordinal))
         {
@@ -372,6 +473,7 @@ public sealed class CodexSessionScanner
                 ReasoningEffort = state.ReasoningEffort,
                 ServiceTier = state.ServiceTier,
                 PreviousCumulative = state.PreviousCumulative,
+                PreviousObservedCumulative = state.PreviousObservedCumulative,
             };
         }
 
@@ -398,6 +500,7 @@ public sealed class CodexSessionScanner
                 ReasoningEffort = state.ReasoningEffort,
                 ServiceTier = state.ServiceTier,
                 PreviousCumulative = state.PreviousCumulative,
+                PreviousObservedCumulative = state.PreviousObservedCumulative,
             };
         }
 
@@ -418,27 +521,97 @@ public sealed class CodexSessionScanner
             out var cumulativeElement)
             ? ReadTokens(cumulativeElement)
             : null;
-        UsageTokenTotals delta;
-        if (info.TryGetProperty("last_token_usage", out var lastElement))
-        {
-            delta = ReadTokens(lastElement) ?? UsageTokenTotals.Empty;
-        }
-        else if (cumulative is not null)
-        {
-            delta = Difference(cumulative, state.PreviousCumulative);
-        }
-        else
+        var last = info.TryGetProperty("last_token_usage", out var lastElement)
+            ? ReadTokens(lastElement)
+            : null;
+        // token_count is a snapshot also re-emitted for rate-limit changes,
+        // reconnects and context estimates. It is not one billable response.
+        // Without a cumulative progression, a last-only row is ambiguous.
+        if (cumulative is null)
         {
             return state;
         }
-
-        return state with
+        // Codex can replace its cumulative counter with a synthetic full-context
+        // marker. It contributes no usage but becomes the next delta baseline,
+        // even if the context window is below an earlier lifetime-like total.
+        if (!HasTokenComponents(cumulative) && last is not null &&
+            !HasTokenComponents(last) &&
+            ReadLong(info, "model_context_window") == cumulative.TotalTokens)
+        {
+            return state with { PreviousCumulative = cumulative };
+        }
+        var previous = state.PreviousCumulative;
+        var next = state with { PreviousCumulative = cumulative };
+        if (previous is not null &&
+            cumulative.EffectiveTotalTokens <= previous.EffectiveTotalTokens)
+        {
+            // Keep the high-water mark when older snapshots are replayed.
+            return state;
+        }
+        var delta = last ?? Difference(cumulative, previous);
+        if (!HasTokenComponents(delta))
+        {
+            // A context-window estimate/full marker carries only total_tokens.
+            return next;
+        }
+        if (previous is not null)
+        {
+            delta = Minimum(delta, Difference(cumulative, previous));
+        }
+        if (delta.EffectiveTotalTokens == 0 || !HasTokenComponents(delta))
+        {
+            return next;
+        }
+        return next with
         {
             ActiveTurn = true,
             CurrentTokens = state.CurrentTokens + delta,
-            PreviousCumulative = cumulative ?? state.PreviousCumulative,
         };
     }
+
+    private static SessionParserContinuation ApplyObservedUsage(
+        JsonElement payload,
+        SessionParserContinuation state)
+    {
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("usage", out var usageElement) ||
+            ReadTokens(usageElement) is null ||
+            !payload.TryGetProperty("turn_token_usage", out var turnElement) ||
+            ReadTokens(turnElement) is not { } turnUsage ||
+            !payload.TryGetProperty("thread_token_usage", out var threadElement) ||
+            ReadTokens(threadElement) is not { } threadUsage)
+        {
+            return state;
+        }
+        // Response records contain observed per-turn/thread cumulative totals.
+        // Replaying a record (even non-adjacently) must not add its usage again.
+        if (state.PreviousObservedCumulative is { } previous &&
+            threadUsage.EffectiveTotalTokens <= previous.EffectiveTotalTokens)
+        {
+            return state;
+        }
+        var delta = state.PreviousObservedCumulative is { } baseline
+            ? Minimum(turnUsage, Difference(threadUsage, baseline))
+            : turnUsage;
+        return state with
+        {
+            ActiveTurn = true,
+            ObservedTokens = (state.ObservedTokens ?? UsageTokenTotals.Empty) + delta,
+            PreviousObservedCumulative = threadUsage,
+        };
+    }
+
+    private static bool HasTokenComponents(UsageTokenTotals tokens) =>
+        tokens.InputTokens > 0 || tokens.CacheWriteInputTokens > 0 || tokens.OutputTokens > 0;
+
+    private static UsageTokenTotals Minimum(UsageTokenTotals left, UsageTokenTotals right) =>
+        new(
+            Math.Min(left.InputTokens, right.InputTokens),
+            Math.Min(left.CachedInputTokens, right.CachedInputTokens),
+            Math.Min(left.CacheWriteInputTokens, right.CacheWriteInputTokens),
+            Math.Min(left.OutputTokens, right.OutputTokens),
+            Math.Min(left.ReasoningOutputTokens, right.ReasoningOutputTokens),
+            Math.Min(left.TotalTokens, right.TotalTokens));
 
     private static void FinalizeTurn(
         SessionParserContinuation state,
@@ -468,7 +641,7 @@ public sealed class CodexSessionScanner
                 : "unknown",
             settings.CollectServiceTier ? state.ServiceTier : "unknown",
             settings.CollectTokens
-                ? state.CurrentTokens
+                ? state.ObservedTokens ?? state.CurrentTokens
                 : UsageTokenTotals.Empty,
             settings.CollectElapsedTime ? duration : 0,
             settings.CollectElapsedTime
@@ -478,6 +651,9 @@ public sealed class CodexSessionScanner
 
     private static bool IsRelevantLine(string line) =>
         line.Contains("\"turn_context\"", StringComparison.Ordinal) ||
+        line.Contains("\"thread_settings_applied\"", StringComparison.Ordinal) ||
+        line.Contains("\"token_usage_record\"", StringComparison.Ordinal) ||
+        line.Contains("\"compacted\"", StringComparison.Ordinal) ||
         line.Contains("\"token_count\"", StringComparison.Ordinal) ||
         line.Contains("\"task_started\"", StringComparison.Ordinal) ||
         line.Contains("\"task_complete\"", StringComparison.Ordinal) ||
@@ -765,5 +941,6 @@ public sealed class CodexSessionScanner
     private sealed record ParsedSessionFile(
         IReadOnlyList<UsageTurnRecord> Turns,
         IReadOnlyList<LocalActivityAggregate> Activities,
-        SessionParserContinuation Continuation);
+        SessionParserContinuation Continuation,
+        long CommittedBytes);
 }

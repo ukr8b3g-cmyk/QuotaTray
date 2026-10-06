@@ -25,7 +25,9 @@ internal sealed record SessionScanIndexEntry(
     string BoundarySignature,
     IReadOnlyList<UsageAggregate> Contributions,
     IReadOnlyList<LocalActivityAggregate>? ActivityContributions,
-    SessionParserContinuation Continuation);
+    SessionParserContinuation Continuation,
+    long CommittedBytes,
+    bool Compressed);
 
 internal sealed record SessionParserContinuation(
     bool ActiveTurn,
@@ -34,7 +36,9 @@ internal sealed record SessionParserContinuation(
     string ReasoningEffort,
     string ServiceTier,
     UsageTokenTotals CurrentTokens,
-    UsageTokenTotals? PreviousCumulative)
+    UsageTokenTotals? PreviousCumulative,
+    UsageTokenTotals? ObservedTokens,
+    UsageTokenTotals? PreviousObservedCumulative)
 {
     public static readonly SessionParserContinuation Empty = new(
         false,
@@ -43,5 +47,7 @@ internal sealed record SessionParserContinuation(
         "unknown",
         "unknown",
         UsageTokenTotals.Empty,
+        null,
+        null,
         null);
 }

@@ -26,13 +26,13 @@ jobs:
           $tests = Get-Content $testPath -Raw
           $old = '            Assert.Equal(new Size(240, 338), compact.ClientSize);'
           $new = @'
-            Assert.True(
-                compact.ClientSize.Width >= 286,
-                $"Compact width was {compact.ClientSize.Width}.");
-            Assert.True(
-                compact.ClientSize.Height >= 384,
-                $"Compact height was {compact.ClientSize.Height}.");
-'@
+                      Assert.True(
+                          compact.ClientSize.Width >= 286,
+                          $"Compact width was {compact.ClientSize.Width}.");
+                      Assert.True(
+                          compact.ClientSize.Height >= 384,
+                          $"Compact height was {compact.ClientSize.Height}.");
+          '@
           if (-not $tests.Contains($old)) { throw 'Old compact size assertion was not found.' }
           $tests = $tests.Replace($old, $new.TrimEnd())
           Set-Content $testPath $tests -NoNewline

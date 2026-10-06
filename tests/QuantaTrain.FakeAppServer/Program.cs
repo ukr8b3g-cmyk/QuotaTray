@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+var usageScenario = args.FirstOrDefault(argument => argument.StartsWith("--usage=", StringComparison.Ordinal));
+
 while (await Console.In.ReadLineAsync() is { } line)
 {
     JsonDocument document;
@@ -21,6 +23,20 @@ while (await Console.In.ReadLineAsync() is { } line)
         }
 
         var method = root.GetProperty("method").GetString();
+        if (method == "account/usage/read" && usageScenario == "--usage=unsupported")
+        {
+            await Console.Out.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                id,
+                error = new { code = -32601, message = "synthetic-private-account-payload" },
+            }));
+            await Console.Out.FlushAsync();
+            continue;
+        }
+        if (method == "account/usage/read" && usageScenario == "--usage=timeout")
+        {
+            continue;
+        }
         object result = method switch
         {
             "initialize" => new { serverInfo = new { name = "fake", version = "1.0" } },
@@ -45,6 +61,18 @@ while (await Console.In.ReadLineAsync() is { } line)
                 },
                 rateLimitsByLimitId = (object?)null,
                 rateLimitResetCredits = new { availableCount = 2, credits = (object?)null },
+            },
+            "account/usage/read" => new
+            {
+                summary = new
+                {
+                    lifetimeTokens = 150,
+                    peakDailyTokens = 50,
+                    longestRunningTurnSec = (long?)null,
+                    currentStreakDays = (int?)null,
+                    longestStreakDays = (int?)null,
+                },
+                dailyUsageBuckets = Array.Empty<object>(),
             },
             _ => new { },
         };

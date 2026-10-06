@@ -78,6 +78,8 @@ QuantaTrayは利用状況を読み取って表示するだけで、リセット�
 
 本文、応答、コマンド、差分、作業パス、メールアドレス、アカウントIDは保存しません。
 
+ローカルトークン数は、記録があるターンでは `token_usage_record` の応答使用量を優先し、旧形式は重複を除いた累積スナップショットから参考値を集計します。請求額や現在のコンテキスト使用量を表すものではなく、欠損・古い形式では少なく集計される場合があります。履歴をコピーするフォークでは重複が残る場合があり、ターン途中のモデル・サービス種別変更は厳密な応答別分類には対応しません。圧縮済み `.jsonl.zst` も対応し、同名の非圧縮ファイルと二重計上しません。圧縮ファイルは変更時に再読込し、展開上限512 MiB・デコーダー窓64 MiBを超える場合はエラー件数に含めます。Codex側の圧縮設定は変更しません。
+
 ### 設定
 
 設定画面は幅800 logical px固定で、必要に応じて高さだけ変更できます。一般、表示、通知、クォータ／リセット、履歴／データ保存、使用状況の取得、使用状況の表示、詳細設定、情報の9カテゴリです。
@@ -228,6 +230,8 @@ The current binaries are not code-signed. If Windows SmartScreen shows an unknow
 - Automatic 60-second quota refresh and manual refresh
 - Japanese and English UI; Auto uses Japanese for Japanese Windows display language and English otherwise
 - Mouse-over help for tabs, view switching, usage analysis, and key settings
+
+Local token figures prefer best-effort observed `token_usage_record` response usage per turn. Older files use deduplicated cumulative snapshots as a fallback; ambiguous or missing metadata may undercount. Copied fork histories can still overcount, and mid-turn model/tier changes are not attributed per response. These figures are neither billing totals nor current context occupancy. Optional `.jsonl.zst` files are streamed locally and raw/compressed siblings are counted once. Changed compressed files are reread, with a 512 MiB output limit and 64 MiB decoder-window limit; exceeded limits appear in the scan error count. QuantaTray does not change Codex's compression setting.
 
 Usage analysis is disabled by default. When enabled, it scans metadata only from known Codex session roots in read-only mode. It can scan every 1, 5, 15, or 30 minutes (5 minutes by default), or manually. Opening the usage tab can trigger an immediate scan; scans do not overlap and normally process only appended data.
 

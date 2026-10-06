@@ -119,7 +119,8 @@ public sealed class CodexAccountClient
             summary.ValueKind == JsonValueKind.Object)
         {
             if (summary.TryGetProperty("availableCount", out var count) &&
-                count.TryGetInt64(out var countValue))
+                count.ValueKind == JsonValueKind.Number &&
+                count.TryGetInt64(out var countValue) && countValue >= 0)
             {
                 availableCount = countValue;
             }
@@ -128,6 +129,7 @@ public sealed class CodexAccountClient
                 creditArray.ValueKind == JsonValueKind.Array)
             {
                 credits = creditArray.EnumerateArray()
+                    .Where(credit => credit.ValueKind == JsonValueKind.Object)
                     .Select(credit => new ResetCredit(
                         TryGetUnixTimestamp(credit, "expiresAt")))
                     .ToArray();
@@ -184,6 +186,11 @@ public sealed class CodexAccountClient
         ref string? planType,
         ref PurchasedCreditsSnapshot? purchasedCredits)
     {
+        if (snapshot.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
         var limitId = TryGetString(snapshot, "limitId") ?? dictionaryLimitId;
         planType ??= TryGetString(snapshot, "planType");
         if (purchasedCredits is null &&
@@ -209,13 +216,16 @@ public sealed class CodexAccountClient
         if (!snapshot.TryGetProperty(propertyName, out var window) ||
             window.ValueKind != JsonValueKind.Object ||
             !window.TryGetProperty("usedPercent", out var used) ||
-            !used.TryGetDouble(out var usedPercent))
+            used.ValueKind != JsonValueKind.Number ||
+            !used.TryGetDouble(out var usedPercent) ||
+            !double.IsFinite(usedPercent))
         {
             return;
         }
 
         long? duration = window.TryGetProperty("windowDurationMins", out var durationElement) &&
-            durationElement.TryGetInt64(out var durationValue)
+            durationElement.ValueKind == JsonValueKind.Number &&
+            durationElement.TryGetInt64(out var durationValue) && durationValue > 0
                 ? durationValue
                 : null;
         buckets.Add(new RateLimitBucket(
@@ -227,6 +237,7 @@ public sealed class CodexAccountClient
     }
 
     private static string? TryGetString(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(propertyName, out var property) &&
         property.ValueKind == JsonValueKind.String
             ? property.GetString()
@@ -234,7 +245,8 @@ public sealed class CodexAccountClient
 
     private static long? TryGetInt64(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var property))
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var property))
         {
             return null;
         }
@@ -258,6 +270,7 @@ public sealed class CodexAccountClient
     }
 
     private static bool? TryGetBoolean(JsonElement element, string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(propertyName, out var property) &&
         property.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? property.GetBoolean()
@@ -266,8 +279,12 @@ public sealed class CodexAccountClient
     private static DateTimeOffset? TryGetUnixTimestamp(
         JsonElement element,
         string propertyName) =>
+        element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(propertyName, out var property) &&
-        property.TryGetInt64(out var timestamp)
+        property.ValueKind == JsonValueKind.Number &&
+        property.TryGetInt64(out var timestamp) &&
+        timestamp >= DateTimeOffset.MinValue.ToUnixTimeSeconds() &&
+        timestamp <= DateTimeOffset.MaxValue.ToUnixTimeSeconds()
             ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
             : null;
 

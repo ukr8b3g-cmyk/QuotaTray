@@ -228,7 +228,7 @@
   "Help.Rescan": "Read newly added Codex session metadata now. A running scan is not duplicated.",
   "Help.Model": "Model identifier recorded in local Codex session metadata.",
   "Help.Share": "Share of the selected metric within the displayed period.",
-  "Help.TotalTokens": "Total tokens reported in local session usage metadata.",
+  "Help.TotalTokens": "Best-effort locally recorded response usage. Older snapshots are deduplicated and missing metadata may undercount. Not billing totals or current context occupancy.",
   "Help.ElapsedTime": "Elapsed activity time inferred from local session timestamps.",
   "Help.TurnCount": "Number of locally recorded turns in the displayed period.",
   "Help.Reasoning": "Breakdown of recorded reasoning-effort levels for this model.",

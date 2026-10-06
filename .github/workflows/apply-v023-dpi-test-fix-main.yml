@@ -1,11 +1,8 @@
 name: apply-v0.2.3-dpi-test-fix-main
 
 on:
+  # This one-time maintenance workflow commits directly to main; run it manually only.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/apply-v023-dpi-test-fix-main.yml'
 
 permissions:
   contents: write
@@ -29,13 +26,13 @@ jobs:
           $testPath = 'tests/QuantaTrain.App.Tests/RuntimeAppearanceTests.cs'
           $tests = Get-Content $testPath -Raw
           $replacement = @'
-Assert.True(
-                compact.ClientSize.Width >= 286,
-                $"Compact width was {compact.ClientSize.Width}.");
-            Assert.True(
-                compact.ClientSize.Height >= 384,
-                $"Compact height was {compact.ClientSize.Height}.");
-'@
+          Assert.True(
+                          compact.ClientSize.Width >= 286,
+                          $"Compact width was {compact.ClientSize.Width}.");
+                      Assert.True(
+                          compact.ClientSize.Height >= 384,
+                          $"Compact height was {compact.ClientSize.Height}.");
+          '@
           $tests = $tests.Replace('Assert.Equal(new Size(240, 338), compact.ClientSize);', $replacement.TrimEnd())
           Set-Content $testPath $tests -NoNewline
 
