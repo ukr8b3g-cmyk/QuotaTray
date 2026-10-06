@@ -102,7 +102,26 @@ Implementation boundaries:
 
 Regression coverage is in `CodexNullableAccountParsingTests`,
 `AccountUsageRefresherTests`, and `CodexSessionCompatibilityTests`. All fixtures
-are synthetic; no user session logs or credentials are accessed. Runtime test
-results for this patch are recorded below after execution. Windows visual QA,
+are synthetic; no user session logs or credentials are accessed. Windows visual QA,
 signed-in Codex 0.160.1 operation, packaging installation and memory-soak tests
 are outside this compatibility test pass and remain unverified.
+
+
+### Executed Windows CI
+
+[Build run 37426184884](https://github.com/ukr8b3g-cmyk/QuotaTray/actions/runs/37426184884)
+verified implementation commit `a77b31f030a1f86f56dbc175321cc3c5536e7adc` on
+Windows Server 2025 with .NET SDK 10.0.401 / runtime 10.0.12:
+
+- Restore: passed
+- Release solution build: passed, 0 warnings and 0 errors
+- Core: 32 passed, 0 failed/skipped
+- Integration: 90 passed, 0 failed/skipped (77 new compatibility regressions)
+- Windows App: 51 passed, 0 failed/skipped
+- Total: 173 passed
+- Forbidden runtime behavior check: passed
+
+The process tests use only the repository's synthetic App Server, including the
+production 15-second RPC timeout. This is executed C#/.NET validation, not a
+signed-in live Codex compatibility claim. No SDK was installed in the cloud
+editing workspace and no release, installer or tag was published by this pass.
