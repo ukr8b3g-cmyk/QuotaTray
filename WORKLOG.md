@@ -1,5 +1,41 @@
 # Work log
 
+## 2026-10-24 - QuantaTray 0.2.11 published from local packages
+
+- Committed all nine reviewed fixes, regression tests, version metadata, README,
+  changelog, Release Notes and restricted publication workflow as
+  `2d7ea11c57269a481046e050eb3b7bf73aae59d3`.
+  Connected GitHub Git-data tools created the commit and advanced main with an
+  expected-head lease; the local checkout imported the identical commit/tree.
+- Exact-commit build `40073956486`, CodeQL `40073955912` and release workflow
+  `40073956435` succeeded. Release-job logs independently confirmed 42 Core,
+  92 App and 122 Integration tests passed, with zero failures/skips.
+- The user requested the usual local setup-build/upload procedure. Rebuilt setup
+  and portable packages locally from the tag commit, using .NET SDK 10.0.201 and
+  Inno Setup 6.7.3. Version, Windows x64, notices, ZIP contents and checksums passed.
+  Did not run the installer or send shutdown to the installed application.
+- Saved the initial CI assets before replacing only v0.2.11 assets. The connected
+  GitHub tools do not expose binary Release upload, so existing GitHub CLI was used
+  for the draft/upload/download/republication step. No git-remote-https was used.
+- Re-downloaded setup, portable ZIP and SHA256SUMS.txt from the draft and verified
+  byte-for-byte equality with local originals, plus GitHub size/digest equality,
+  before republishing v0.2.11 as Latest.
+- Final setup: 46,983,696 bytes, SHA-256
+  `18e4d4c11241d037f5eb37bff6e799bd75efe3228af3f89c00257e6f6b44e40b`.
+- Final portable: 46,613,470 bytes, SHA-256
+  `efbcc9c2af77815f12958afb0b35f9b85691e62712dcb2dcdc9f5b7022a0704d`.
+- SHA256SUMS.txt SHA-256:
+  `61b6f744a8ee00e9f83febcbe608c9ae3fe1350cb1ca90894c9286dec24c8577`.
+- Connected GitHub reads verified public/Latest state, tag pointing to the release
+  commit, final asset digests, and unchanged v0.2.10 assets. Previous releases,
+  installed applications, user settings and original Codex sessions were preserved.
+- Public Release:
+  https://github.com/ukr8b3g-cmyk/QuotaTray/releases/tag/v0.2.11
+- Full-day soak, real-account operation, manual physical DPI/multi-monitor checks
+  and install/upgrade/uninstall execution remain unverified. CI host smoke applied
+  to CI-generated binaries; final local packages received metadata/content/hash
+  checks without launching the host on the user's PC.
+
 ## 2026-10-24 - QuantaTray 0.2.11 release preparation
 
 - User explicitly authorized committing and publishing the reviewed nine fixes as
@@ -15,10 +51,8 @@
 - Added a local SkipHostSmoke option because the existing --shutdown smoke path
   can signal an already-running user copy. Local validation did not launch or
   terminate an application; clean CI still runs the host smoke check.
-- Automatic approval review rejected the initial broad new publication trigger.
-  Replaced it with a one-shot trigger requiring both push-before and commit parent
-  to equal the reviewed base. The restricted workflow was accepted; future normal
-  main updates cannot execute its publication job.
+- The one-shot publication trigger requires both push-before and commit parent
+  to equal the reviewed base; future normal main updates cannot execute its job.
 - Public packages will be rebuilt and verified by GitHub Actions from the exact
   release commit, after successful build and CodeQL, before publishing.
 

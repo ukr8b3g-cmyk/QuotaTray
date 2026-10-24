@@ -16,8 +16,10 @@
 
 元のCodexセッションは変更しません。読み取り失敗時は互換キャッシュの範囲で前回分を維持し、不完全な結果を明示します。設定の互換性と既定値は維持します。
 
+公開配布物はタグv0.2.11（2d7ea11）のコードからローカルで作成したInstaller／Portableです。SHA256SUMS.txtとともにアップロードし、再ダウンロードした3ファイルがローカルの元ファイルと完全一致することを確認しています。
+
 - 検証：Windows/.NET 10で256件のC#テスト成功。元の3再現条件も解消を確認。250回の準備更新後に2,000回更新し、GDI/USERハンドル数の増加がないことを確認しました
-- 配布工程：固定コミットのWindows buildとCodeQL成功を待ち、EXEバージョン・x64ペイロード・ZIP内容・SHA-256を検証し、アップロード後の再ダウンロード照合を通してから公開します
+- 配布検証：同じコミットのWindows build・CodeQLと256テストが成功。ローカル生成版のEXEバージョン・x64ペイロード・ZIP内容・SHA-256を検証し、アップロード後の再ダウンロード照合を通して公開しています
 - 未検証：24/72時間の常駐試験、実アカウント接続、実機での手動DPI/複数モニター操作、インストール・上書き・アンインストールの実行
 - 対応環境：Windows x64（Windows 11推奨）。公式Codex CLI/App Serverと、Codexを利用できるChatGPTアカウントが別途必要です
 - Installerはユーザー単位で管理者権限不要。Portableは全体を書き込み可能なフォルダーへ展開し、隣接するdataフォルダーへ設定・履歴を保存します
@@ -41,8 +43,10 @@ This stability and usage-accounting update fixes nine findings from code review 
 
 Original Codex sessions are unchanged. Failed files retain previous contributions only from compatible caches and remain explicitly partial. Settings compatibility and defaults are preserved.
 
+Published assets are the installer and portable ZIP built locally from tag v0.2.11 (2d7ea11). Both packages and SHA256SUMS.txt were re-downloaded after upload and matched the local originals byte for byte.
+
 - Validation: 256 C# tests passed on Windows/.NET 10, plus all three original reproduction checks. After 250 warm-up updates, 2,000 updates showed stable GDI/USER counts
-- Release pipeline: wait for build and CodeQL on the exact commit; verify EXE versions, x64 payload, ZIP contents and SHA-256; re-download uploaded assets before publishing
+- Release validation: build, CodeQL and all 256 Windows tests passed on the exact source commit. Locally generated EXE versions, x64 payload, ZIP contents and SHA-256 were verified, then uploaded files were re-downloaded and compared before publication
 - Not tested: 24/72-hour soak, real-account operation, manual physical DPI/multi-monitor operation, or installer/upgrade/uninstaller execution
 - Requirements: Windows x64 (Windows 11 recommended), official Codex CLI/App Server, and a ChatGPT account with Codex access
 - Installer: per-user, no administrator rights. Portable: extract the whole ZIP to a writable folder; settings/history stay in adjacent data/

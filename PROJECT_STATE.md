@@ -1,14 +1,18 @@
 # Project state
 
-## QuantaTray 0.2.11 release preparation - 2026-10-24
+## QuantaTray 0.2.11 published - 2026-10-24
 
 - Release version: `0.2.11`. All nine reviewed fixes and their regression tests are included.
 - README, changelog, bilingual Release Notes and installer metadata are updated.
-- Local version build: zero warnings/errors; 255 normal tests passed. The separate 2,000-update test passed during repair validation.
+- Local version build: zero warnings/errors; 255 normal tests passed. Exact-commit Windows CI passed Core 42 + App 92 + Integration 122 = 256, zero failures/skips.
 - Local installer and portable ZIP passed version, x64, content and checksum checks. Local host execution was skipped to avoid signaling an already-running application.
-- The public packages will be rebuilt from the release commit in GitHub Actions, then verified and re-downloaded before publication. Their hashes may differ from the local pre-commit packages.
+- Release/tag source: `2d7ea11c57269a481046e050eb3b7bf73aae59d3`; [GitHub Release](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/tag/v0.2.11) is public and Latest.
+- Final published packages were built locally from that commit, following the user's requested procedure. The initially published CI assets were backed up and replaced only in v0.2.11, after returning it to draft and verifying all three re-downloaded files against local originals.
+- Final SHA-256: setup `18e4d4c11241d037f5eb37bff6e799bd75efe3228af3f89c00257e6f6b44e40b`; portable `efbcc9c2af77815f12958afb0b35f9b85691e62712dcb2dcdc9f5b7022a0704d`.
+- Public setup size: 46,983,696 bytes; portable: 46,613,470 bytes. EXE version is `0.2.11+2d7ea11c57269a481046e050eb3b7bf73aae59d3`. The installer is `0.2.11.0`, unsigned.
+- CI: [build 40073956486](https://github.com/ukr8b3g-cmyk/QuotaTray/actions/runs/40073956486), [CodeQL 40073955912](https://github.com/ukr8b3g-cmyk/QuotaTray/actions/runs/40073955912), [release 40073956435](https://github.com/ukr8b3g-cmyk/QuotaTray/actions/runs/40073956435): all succeeded for the release commit.
 - Release workflow is restricted to the direct successor of reviewed base `a3a8ff9090facb63bbd446575dda2d7df1b56007`; later ordinary pushes cannot execute its release job.
-- Publication completion, public asset hashes and CI evidence will be recorded after verification. Existing releases and installed applications are preserved.
+- Connected GitHub reads confirmed the final public digests, exact tag commit, Latest state, and unchanged v0.2.10 asset IDs/digests. Local dist matches the final published local-build files; neither installed applications nor user settings were changed.
 - Pre-publication snapshot: `D:\Codex\_snapshots\QuotaTray\pre-v0211-release-20261024_161505` (162 checkout files and two workspace records verified).
 
 ## Pre-publication repair evidence

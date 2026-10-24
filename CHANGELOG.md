@@ -12,7 +12,7 @@
 - Preserve effective token totals when reported totals are absent in part of the input, without double-counting cached-input or reasoning-output subsets.
 - Dispose replaced dashboard controls and their owned fonts to bound resources during repeated refreshes.
 - Add regression coverage for all nine fixes. Windows validation: 256 distinct C# tests passed, plus the original three reproduction checks; the 2,000-refresh test kept GDI/USER counts stable. Full-day soak, real-account operation and installer execution remain unverified.
-- Publish new Windows x64 installer and portable packages with checksums; preserve previous releases and settings compatibility.
+- Publish locally built Windows x64 installer and portable packages from the release tag, verify uploaded bytes by re-download, and preserve previous releases and settings compatibility.
 
 ## 0.2.10 - 2026-10-06
 
