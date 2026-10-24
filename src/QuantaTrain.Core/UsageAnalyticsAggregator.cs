@@ -70,6 +70,12 @@ public static class UsageAnalyticsAggregator
         return visible;
     }
 
+    public static UsageModelSummary SummarizeTotal(IEnumerable<UsageAggregate> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        return Summarize("all-models", rows);
+    }
+
     public static string NormalizeReasoningEffort(string? value) =>
         value?.Trim().ToLowerInvariant() switch
         {

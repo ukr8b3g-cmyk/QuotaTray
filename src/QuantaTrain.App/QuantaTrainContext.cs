@@ -56,6 +56,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private string? _viewError;
     private bool _signedIn;
     private bool _confirmationPending;
+    private long _accountGeneration;
     private bool _usageScanPending;
     private bool _usageRefreshFailed;
     private bool _usageDisplayFailed;
@@ -86,14 +87,15 @@ internal sealed class QuantaTrainContext : ApplicationContext
             : new PanelPositionSettings();
         _historyStore = new JsonlHistoryStore(_paths.HistoryDirectory);
         _quotaStateStore = new JsonQuotaStateStore(_paths.StateFile);
-        _retentionMaintenance = new RetentionMaintenance(
-            _paths.HistoryDirectory,
-            _paths.UsageDirectory,
-            _paths.LogsDirectory);
         _usageStore = new UsageAggregateStore(_paths.UsageDirectory);
         _sessionScanner = new CodexSessionScanner(
             Path.Combine(_paths.CacheDirectory, "session-scan-index.json"),
             _usageStore);
+        _retentionMaintenance = new RetentionMaintenance(
+            _paths.HistoryDirectory,
+            _paths.UsageDirectory,
+            _paths.LogsDirectory,
+            _sessionScanner);
         _logger = new RedactedLogger(_paths.LogsDirectory);
         _localizer = new LocalizationService(Path.Combine(AppContext.BaseDirectory, "locales"));
         _localizer.Load(_settings.Language);
@@ -403,6 +405,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
     {
         PostToUi(async () =>
         {
+            if (!ReferenceEquals(sender, _polling)) return;
+            var generation = Interlocked.Read(ref _accountGeneration);
             var visibleState = eventArgs.Error is not null &&
                                !_settings.General.ShowCachedOnFailure
                 ? null
@@ -429,7 +433,9 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 eventArgs.State is not null)
             {
                 await RefreshAccountUsageAsync();
-                if (_lifetime.IsCancellationRequested)
+                if (_lifetime.IsCancellationRequested ||
+                    !ReferenceEquals(sender, _polling) ||
+                    generation != Interlocked.Read(ref _accountGeneration))
                 {
                     return;
                 }
@@ -469,31 +475,31 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private async Task ConfirmResetAsync(WeeklyQuotaState before)
     {
-        if (_polling is null)
+        var polling = _polling;
+        var candidate = polling?.Current;
+        if (polling is null || candidate is null)
         {
             return;
         }
 
         _confirmationPending = true;
+        var generation = Interlocked.Read(ref _accountGeneration);
+        var candidateSequence = polling.SuccessSequence;
         try
         {
             await Task.Delay(
                 TimeSpan.FromSeconds(
                     _settings.ResetDetection.ConfirmationSeconds),
                 _lifetime.Token);
-            var confirmedState = await _polling.RefreshAsync(_lifetime.Token);
-            if (confirmedState is null)
-            {
-                return;
-            }
-
-            var resetEvent = ResetClassifier.Classify(before, confirmedState, confirmed: true);
-            if (resetEvent is not null)
-            {
-                await RecordResetAsync(resetEvent);
-            }
-            await SetQuotaBaselineAsync(confirmedState);
-            UpdateViews(confirmedState, false, null);
+            await ResetConfirmation.ApplyAsync(
+                before, candidate, candidateSequence,
+                () => polling.RefreshAsync(_lifetime.Token),
+                () => ReferenceEquals(polling, _polling) && !polling.IsDisposed &&
+                      generation == Interlocked.Read(ref _accountGeneration) && !_exiting,
+                RecordResetAsync, SetQuotaBaselineAsync,
+                state => UpdateViews(state, false, null), _lifetime.Token,
+                () => polling.RefreshSequence,
+                () => polling.Current!);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -546,6 +552,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
     {
         if (success)
         {
+            Interlocked.Increment(ref _accountGeneration);
             PostToUi(async () =>
             {
                 SetSignedIn(true);
@@ -556,6 +563,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void HandleAccountUpdated(object? sender, EventArgs eventArgs)
     {
+        Interlocked.Increment(ref _accountGeneration);
         PostToUi(async () =>
         {
             if (_accountClient is null)
@@ -574,6 +582,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void HandleConnectionExited(object? sender, EventArgs eventArgs)
     {
+        Interlocked.Increment(ref _accountGeneration);
         PostToUi(async () =>
         {
             UpdateViews(_polling?.Current, false, "Codex App Server exited.");
@@ -1633,50 +1642,22 @@ internal sealed class QuantaTrainContext : ApplicationContext
             return;
         }
 
-        var temporary = $"{dialog.FileName}.{Guid.NewGuid():N}.tmp";
         try
         {
-            await using var stream = new FileStream(
-                temporary,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                64 * 1024,
-                FileOptions.Asynchronous);
-            using var writer = new Utf8JsonWriter(
-                stream,
-                new JsonWriterOptions { Indented = true });
-            writer.WriteStartArray();
-            foreach (var path in Directory.EnumerateFiles(
-                         _paths.HistoryDirectory,
-                         "*.jsonl").OrderBy(item => item, StringComparer.Ordinal))
-            {
-                await foreach (var line in File.ReadLinesAsync(
-                                   path,
-                                   _lifetime.Token))
-                {
-                    try
-                    {
-                        using var document = JsonDocument.Parse(line);
-                        document.RootElement.WriteTo(writer);
-                    }
-                    catch (JsonException)
-                    {
-                        // Damaged rows are omitted from an otherwise valid export.
-                    }
-                }
-            }
-            writer.WriteEndArray();
-            await writer.FlushAsync(_lifetime.Token);
-            await stream.FlushAsync(_lifetime.Token);
-            File.Move(temporary, dialog.FileName, overwrite: true);
+            await HistoryExportService.ExportJsonAsync(
+                _paths.HistoryDirectory, dialog.FileName, _lifetime.Token);
+            _notifyIcon.ShowBalloonTip(3000, "QuantaTray",
+                _localizer.Text("History.ExportSucceeded"), ToolTipIcon.Info);
         }
-        finally
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
-            if (File.Exists(temporary))
-            {
-                File.Delete(temporary);
-            }
+        }
+        catch (Exception exception)
+        {
+            await _logger.WarningSafelyAsync(
+                $"History export failed ({exception.GetType().Name}).");
+            MessageBox.Show(_localizer.Text("History.ExportFailed"),
+                "QuantaTray", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 

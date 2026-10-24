@@ -31,7 +31,7 @@ public sealed record UsageTokenTotals(
             SafeAdd(left.CacheWriteInputTokens, right.CacheWriteInputTokens),
             SafeAdd(left.OutputTokens, right.OutputTokens),
             SafeAdd(left.ReasoningOutputTokens, right.ReasoningOutputTokens),
-            SafeAdd(left.TotalTokens, right.TotalTokens));
+            SafeAdd(left.EffectiveTotalTokens, right.EffectiveTotalTokens));
 
     private static long SafeAdd(params long[] values)
     {

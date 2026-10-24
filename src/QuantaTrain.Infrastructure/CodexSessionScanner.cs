@@ -17,11 +17,14 @@ public sealed class CodexSessionScanner
     private readonly SessionScanIndexStore _indexStore;
     private readonly UsageAggregateStore _aggregateStore;
     private readonly SemaphoreSlim _scanGate = new(1, 1);
+    private readonly TimeProvider _timeProvider;
+    private int? _retentionDays;
 
     public CodexSessionScanner(
         string indexPath,
-        UsageAggregateStore aggregateStore)
-        : this(indexPath, aggregateStore, MaximumDecompressedBytes)
+        UsageAggregateStore aggregateStore,
+        TimeProvider? timeProvider = null)
+        : this(indexPath, aggregateStore, MaximumDecompressedBytes, timeProvider)
     {
     }
 
@@ -30,7 +33,8 @@ public sealed class CodexSessionScanner
     internal CodexSessionScanner(
         string indexPath,
         UsageAggregateStore aggregateStore,
-        long maximumDecompressedBytes)
+        long maximumDecompressedBytes,
+        TimeProvider? timeProvider = null)
     {
         if (maximumDecompressedBytes <= 0 || maximumDecompressedBytes > MaximumDecompressedBytes)
         {
@@ -39,7 +43,55 @@ public sealed class CodexSessionScanner
         _maximumDecompressedBytes = maximumDecompressedBytes;
         _indexStore = new SessionScanIndexStore(indexPath);
         _aggregateStore = aggregateStore;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
+
+    // Share the scan gate so maintenance cannot race a cache publication.
+    public async Task ApplyRetentionAsync(
+        int? retentionDays,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken)
+    {
+        await _scanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _retentionDays = retentionDays;
+            if (retentionDays is null) return;
+            var cutoff = RetentionCutoff(nowUtc, retentionDays.Value);
+            var index = await _indexStore.ReadForRetentionAsync(cancellationToken).ConfigureAwait(false);
+            if (index is { SchemaVersion: 1 })
+            {
+                await _indexStore.WriteAsync(
+                    index with { Files = RetainEntries(index.Files, cutoff) },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            await _aggregateStore.PruneAsync(cutoff, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
+    }
+
+    private static DateOnly RetentionCutoff(DateTimeOffset nowUtc, int days) =>
+        DateOnly.FromDateTime(nowUtc.LocalDateTime.Date.AddDays(-days));
+
+    private static SessionScanIndexEntry[] RetainEntries(
+        IEnumerable<SessionScanIndexEntry> entries, DateOnly cutoff) =>
+        entries.Select(entry => entry with
+        {
+            Contributions = entry.Contributions.Where(row => row.Key.LocalDate >= cutoff).ToArray(),
+            ActivityContributions = entry.ActivityContributions?
+                .Where(row => row.LocalDate >= cutoff).ToArray(),
+            // Filtering cannot expand the range of a previously truncated entry.
+            RetainedFromLocalDate = entry.RetainedFromLocalDate is { } previous && previous > cutoff
+                ? previous : cutoff,
+        }).ToArray();
+
+    private static bool CoversRetention(SessionScanIndexEntry entry, DateOnly? cutoff) =>
+        entry.RetentionCoverageKnown &&
+        (entry.RetainedFromLocalDate is null ||
+         cutoff is not null && entry.RetainedFromLocalDate.Value <= cutoff.Value);
 
     public async Task ResetCacheAsync(CancellationToken cancellationToken)
     {
@@ -69,6 +121,8 @@ public sealed class CodexSessionScanner
         try
         {
             var effectiveParserVersion = GetParserVersion(settings);
+            var cutoff = _retentionDays is null ? (DateOnly?)null :
+                RetentionCutoff(_timeProvider.GetUtcNow(), _retentionDays.Value);
             var paths = ResolveSessionPaths(settings).ToArray();
             var index = await _indexStore.ReadAsync(
                 effectiveParserVersion,
@@ -89,10 +143,11 @@ public sealed class CodexSessionScanner
                 var compressed = IsCompressed(path);
                 var hash = HashPath(LogicalPath(path));
                 previousByHash.TryGetValue(hash, out var previous);
+                var canReuse = previous is not null && CoversRetention(previous, cutoff);
                 try
                 {
                     var info = new FileInfo(path);
-                    if (previous is not null &&
+                    if (canReuse && previous is not null &&
                         compressed == previous.Compressed &&
                         info.Length == previous.SizeBytes &&
                         info.LastWriteTimeUtc == previous.LastWriteUtc.UtcDateTime)
@@ -107,7 +162,7 @@ public sealed class CodexSessionScanner
                         0,
                         Math.Min(SignatureBytes, info.Length),
                         cancellationToken).ConfigureAwait(false);
-                    var appendOnly = !compressed && previous is { Compressed: false } &&
+                    var appendOnly = canReuse && !compressed && previous is { Compressed: false } &&
                         info.Length >= previous.SizeBytes &&
                         string.Equals(
                             await HashSliceAsync(
@@ -168,7 +223,9 @@ public sealed class CodexSessionScanner
                         activityContributions,
                         parsed.Continuation,
                         parsed.CommittedBytes,
-                        compressed));
+                        compressed,
+                        appendOnly ? previous!.RetainedFromLocalDate : null,
+                        RetentionCoverageKnown: true));
                     scanned++;
                 }
                 catch (Exception exception) when (
@@ -189,6 +246,11 @@ public sealed class CodexSessionScanner
             }
 
             progress?.Report(new SessionScanProgress(paths.Length, paths.Length));
+            if (_retentionDays is not null)
+            {
+                currentEntries = RetainEntries(currentEntries,
+                    RetentionCutoff(_timeProvider.GetUtcNow(), _retentionDays.Value)).ToList();
+            }
             var allRows = MergeRows(
                 currentEntries.SelectMany(entry => entry.Contributions));
             var allActivities = MergeActivities(

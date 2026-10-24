@@ -31,6 +31,9 @@ internal sealed class SessionScanIndexStore
         CancellationToken cancellationToken) =>
         AtomicJsonFile.WriteAsync(_path, document, cancellationToken);
 
+    public Task<SessionScanIndexDocument?> ReadForRetentionAsync(CancellationToken cancellationToken) =>
+        AtomicJsonFile.ReadAsync<SessionScanIndexDocument>(_path, cancellationToken);
+
     public Task DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

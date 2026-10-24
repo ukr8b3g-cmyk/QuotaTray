@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version
+    [string]$Version,
+    [switch]$SkipHostSmoke
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,6 +64,11 @@ foreach ($pattern in @('Microsoft.NETCore.App.Runtime.win-x64-*\LICENSE.TXT',
 }
 
 $expanded = Join-Path ([IO.Path]::GetTempPath()) ('quantatray-package-' + [Guid]::NewGuid().ToString('N'))
+$expanded = [IO.Path]::GetFullPath($expanded)
+$temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+if (-not $expanded.StartsWith($temporaryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing package verification cleanup outside temp: $expanded"
+}
 try {
     Expand-Archive -LiteralPath $zip -DestinationPath $expanded
     foreach ($required in @('QuantaTray.exe', 'portable.flag', 'data\README.txt',
@@ -92,14 +98,19 @@ try {
         if (-not $expectedPortable.Contains($relative)) { throw "Unexpected portable file: $relative" }
     }
     Assert-AppMetadata (Join-Path $expanded 'QuantaTray.exe')
-    # This exits before constructing the app context: no Codex, login, or session scan.
-    $process = Start-Process -FilePath (Join-Path $expanded 'QuantaTray.exe') -ArgumentList '--shutdown' -PassThru
-    if (-not $process.WaitForExit(30000)) {
-        $process.Kill($true)
-        throw 'Portable host smoke check timed out.'
+    # --shutdown can signal an already running copy for this Windows user.
+    # Local package checks must skip it; clean CI runners can exercise the host.
+    if ($SkipHostSmoke) {
+        Write-Host 'Portable host smoke check skipped; existing application is left running.'
+    } else {
+        $process = Start-Process -FilePath (Join-Path $expanded 'QuantaTray.exe') -ArgumentList '--shutdown' -WindowStyle Hidden -PassThru
+        if (-not $process.WaitForExit(30000)) {
+            $process.Kill($true)
+            throw 'Portable host smoke check timed out.'
+        }
+        if ($process.ExitCode -ne 0) { throw "Portable host smoke check failed: $($process.ExitCode)" }
+        Write-Host 'Portable host/WinForms smoke check passed; no installer execution or signed-in UI test performed.'
     }
-    if ($process.ExitCode -ne 0) { throw "Portable host smoke check failed: $($process.ExitCode)" }
-    Write-Host 'Portable host/WinForms smoke check passed; no installer execution or signed-in UI test performed.'
 }
 finally {
     if (Test-Path -LiteralPath $expanded) { Remove-Item -LiteralPath $expanded -Recurse -Force }

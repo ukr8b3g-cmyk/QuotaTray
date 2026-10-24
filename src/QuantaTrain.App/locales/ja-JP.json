@@ -1,4 +1,7 @@
 {
+  "Usage.HiddenModels": "合計（全{1}モデル中{0}表示）",
+  "History.ExportSucceeded": "履歴をエクスポートしました。",
+  "History.ExportFailed": "履歴をエクスポートできませんでした。保存先とアクセス権を確認して、再試行してください。",
   "Common.Remaining": "残り {0}%",
   "Common.Refresh": "今すぐ更新",
   "Common.Settings": "設定",

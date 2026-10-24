@@ -1,13 +1,169 @@
 using System.Drawing;
+using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using QuantaTrain.Core;
 using QuantaTrain.Infrastructure;
+using Xunit.Abstractions;
 
 namespace QuantaTrain.App.Tests;
 
-public sealed class UsageRefreshStateTests
+public sealed class UsageRefreshStateTests(ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingTotalTokensCannotMakeFooterSharesAndDonutDisagree(bool groupOther)
+    {
+        RunSta(() =>
+        {
+            using var form = new DetailForm(Localizer("en-US"));
+            var date = new DateOnly(2026, 10, 24);
+            var rows = new[]
+            {
+                new UsageAggregate(new(date, "model-a", "high", "standard"),
+                    new(80, 60, 0, 20, 5, 100), 1, 1000, 0, 1, 0, 0),
+                new UsageAggregate(new(date, "model-b", "high", "standard"),
+                    new(40, 30, 0, 10, 3, 0), 1, 1000, 0, 1, 0, 0),
+            };
+            form.UpdateUsage(Snapshot() with { Rows = rows },
+                new UsageAnalyticsSettings { Enabled = true, GroupOtherModels = groupOther }, false);
+            var models = Field<Control>(form, "_modelRows");
+            Assert.Contains(Labels(models.Controls[0]), label => label.Text == "67%");
+            Assert.Contains(Labels(models.Controls[1]), label => label.Text == "33%");
+            Assert.Contains(Labels(models.Controls[models.Controls.Count - 1]), label => label.Text == "150");
+            Assert.Contains(Labels(Field<Control>(form, "_tokenDetails")), label => label.Text == "150");
+            Assert.Equal(150, Field<UsageDonutControl>(form, "_reasoningDonut").Total);
+        });
+    }
+
+    [Fact]
+    public void TwoThousandRefreshesKeepNativeHandlesAndMemoryBounded()
+    {
+        RunSta(() =>
+        {
+            using var form = new DetailForm(Localizer("en-US"));
+            var settings = new UsageAnalyticsSettings { Enabled = true };
+            var snapshot = Snapshot();
+            var now = DateTimeOffset.UtcNow;
+            var quota = new WeeklyQuotaState("weekly", BucketRole.Secondary, 80, 20,
+                10080, now.AddDays(3), 2, [new ResetCredit(now.AddDays(4))], "pro", now, "test");
+            var account = new AccountUsageSnapshot(now, 100, 20, 5, 1, 2, []);
+            void Refresh()
+            {
+                form.UpdateState(quota, false, null, []);
+                form.UpdateUsage(snapshot, account, settings, false);
+                foreach (var child in Descendants(form)) _ = child.Handle;
+            }
+            (uint Gdi, uint User, int Handles, long Bytes) Resources()
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                using var process = Process.GetCurrentProcess();
+                process.Refresh();
+                return (GetGuiResources(process.Handle, 0), GetGuiResources(process.Handle, 1),
+                    process.HandleCount, process.PrivateMemorySize64);
+            }
+            for (var i = 0; i < 250; i++) Refresh();
+            var before = Resources();
+            for (var i = 0; i < 2000; i++)
+            {
+                settings.GroupOtherModels = i % 2 == 0;
+                Refresh();
+            }
+            var after = Resources();
+            output.WriteLine($"250 warm-up + 2000 refreshes: GDI {before.Gdi}->{after.Gdi}; " +
+                $"USER {before.User}->{after.User}; handles {before.Handles}->{after.Handles}; " +
+                $"private bytes {before.Bytes}->{after.Bytes}");
+            Assert.True(before.Gdi > 0 && before.User > 0);
+            Assert.True(after.Gdi <= before.Gdi + 16, $"GDI: {before.Gdi}->{after.Gdi}");
+            Assert.True(after.User <= before.User + 16, $"USER: {before.User}->{after.User}");
+            Assert.True(after.Handles <= before.Handles + 32,
+                $"Handles: {before.Handles}->{after.Handles}");
+            Assert.True(after.Bytes <= before.Bytes + 32L * 1024 * 1024,
+                $"Private bytes: {before.Bytes}->{after.Bytes}");
+        });
+    }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetGuiResources(IntPtr process, uint flags);
+
+    [Fact]
+    public void EveryDashboardRefreshDisposesRemovedControlsAndDescendants()
+    {
+        RunSta(() =>
+        {
+            using var form = new DetailForm(Localizer("en-US"));
+            var settings = new UsageAnalyticsSettings { Enabled = true };
+            var account = new AccountUsageSnapshot(DateTimeOffset.UtcNow, 100, 20, 5, 1, 2, []);
+            var fields = new[] { "_modelRows", "_tokenDetails", "_timeDetails",
+                "_reasoningLegend", "_accountSummary", "_toolRows", "_skillRows", "_history", "_credits" };
+            foreach (var enabled in new[] { true, false, true })
+            {
+                settings.Enabled = enabled;
+                form.UpdateUsage(Snapshot(), account, settings, false);
+                form.UpdateState(null, false, null, []);
+                var old = fields.SelectMany(name => Descendants(Field<Control>(form, name))).ToArray();
+                Assert.NotEmpty(old);
+                foreach (var child in old) _ = child.Handle;
+                form.UpdateUsage(Snapshot(), account, settings, false);
+                form.UpdateState(null, false, null, []);
+                Assert.All(old, child => Assert.True(child.IsDisposed, child.GetType().Name));
+            }
+        });
+    }
+
+    private static IEnumerable<Control> Descendants(Control control)
+    {
+        foreach (Control child in control.Controls)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
+    }
+
+    [Theory]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(20)]
+    public void GroupOtherSettingCannotChangeWholePeriodTotals(int modelCount)
+    {
+        RunSta(() =>
+        {
+            using var form = new DetailForm(Localizer("en-US"));
+            var rows = Enumerable.Range(1, modelCount).Select(index =>
+                new UsageAggregate(
+                    new UsageAggregateKey(new DateOnly(2026, 10, 24), $"model-{index}", "high", "fast"),
+                    new UsageTokenTotals(index * 10, index, index, index * 2, index, index * 13),
+                    index, index * 1000, index * 2000, index, 0, 0)).ToArray();
+            var snapshot = Snapshot() with { Rows = rows };
+            var settings = new UsageAnalyticsSettings { Enabled = true, GroupOtherModels = true };
+            string[] Totals(string field) => Labels(Field<Control>(form, field)).Select(label => label.Text).ToArray();
+            form.UpdateUsage(snapshot, settings, false);
+            var tokens = Totals("_tokenDetails");
+            var time = Totals("_timeDetails");
+            var reasoning = Totals("_reasoningLegend");
+            var total = Field<UsageDonutControl>(form, "_reasoningDonut").Total;
+            settings.GroupOtherModels = false;
+            form.UpdateUsage(snapshot, settings, false);
+            Assert.Equal(tokens, Totals("_tokenDetails"));
+            Assert.Equal(time, Totals("_timeDetails"));
+            Assert.Equal(reasoning, Totals("_reasoningLegend"));
+            Assert.Equal(total, Field<UsageDonutControl>(form, "_reasoningDonut").Total);
+            var modelRows = Field<Control>(form, "_modelRows");
+            Assert.Contains(Labels(modelRows), label => label.Text ==
+                rows.Sum(row => row.Tokens.EffectiveTotalTokens).ToString("N0"));
+            var expectedShare = 100d * rows.Max(row => row.Tokens.EffectiveTotalTokens) /
+                rows.Sum(row => row.Tokens.EffectiveTotalTokens);
+            Assert.Contains(Labels(modelRows.Controls[0]),
+                label => label.Text == $"{expectedShare:0}%");
+            Assert.All(modelRows.Controls.Cast<Control>(),
+                child => Assert.True(child.Bottom <= modelRows.ClientSize.Height));
+        });
+    }
+
     [Theory]
     [InlineData("en-US")]
     [InlineData("ja-JP")]

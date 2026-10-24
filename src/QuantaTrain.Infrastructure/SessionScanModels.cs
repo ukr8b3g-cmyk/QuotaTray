@@ -27,7 +27,9 @@ internal sealed record SessionScanIndexEntry(
     IReadOnlyList<LocalActivityAggregate>? ActivityContributions,
     SessionParserContinuation Continuation,
     long CommittedBytes,
-    bool Compressed);
+    bool Compressed,
+    DateOnly? RetainedFromLocalDate = null,
+    bool RetentionCoverageKnown = false);
 
 internal sealed record SessionParserContinuation(
     bool ActiveTurn,

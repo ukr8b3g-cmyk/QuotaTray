@@ -10,15 +10,18 @@ public sealed class RetentionMaintenance
     private readonly string _usageRoot;
     private readonly string _logsRoot;
     private DateTimeOffset? _lastRunUtc;
+    private readonly CodexSessionScanner? _sessionScanner;
 
     public RetentionMaintenance(
         string historyRoot,
         string usageRoot,
-        string logsRoot)
+        string logsRoot,
+        CodexSessionScanner? sessionScanner = null)
     {
         _historyRoot = historyRoot;
         _usageRoot = usageRoot;
         _logsRoot = logsRoot;
+        _sessionScanner = sessionScanner;
     }
 
     public async Task<bool> RunIfDueAsync(
@@ -36,12 +39,22 @@ public sealed class RetentionMaintenance
         }
 
         _lastRunUtc = nowUtc;
+        if (_sessionScanner is not null)
+        {
+            await _sessionScanner.ApplyRetentionAsync(retentionDays, nowUtc, cancellationToken)
+                .ConfigureAwait(false);
+        }
         if (retentionDays is not null)
         {
             var cutoff = DateOnly.FromDateTime(
                 nowUtc.UtcDateTime.Date.AddDays(-retentionDays.Value));
             await PruneHistoryAsync(cutoff, cancellationToken).ConfigureAwait(false);
-            await PruneUsageAsync(cutoff, cancellationToken).ConfigureAwait(false);
+            if (_sessionScanner is null)
+            {
+                await PruneUsageAsync(
+                    DateOnly.FromDateTime(nowUtc.LocalDateTime.Date.AddDays(-retentionDays.Value)),
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
         PruneLogs(
             nowUtc.UtcDateTime.Date.AddDays(-Math.Max(1, logRetentionDays)),

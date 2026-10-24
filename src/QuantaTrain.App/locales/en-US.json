@@ -1,4 +1,7 @@
 {
+  "Usage.HiddenModels": "Total ({0}/{1} models shown)",
+  "History.ExportSucceeded": "History exported successfully.",
+  "History.ExportFailed": "History could not be exported. Check the destination and access permissions, then try again.",
   "Common.Remaining": "Remaining {0}%",
   "Common.Refresh": "Refresh now",
   "Common.Settings": "Settings",

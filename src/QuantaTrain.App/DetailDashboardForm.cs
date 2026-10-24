@@ -373,20 +373,16 @@ internal sealed class DetailForm : FixedWidthResizableForm
             snapshot.Rows,
             settings.MaxIndividualModels,
             settings.GroupOtherModels);
-        var total = summaries.Sum(
-            summary => summary.Tokens.EffectiveTotalTokens);
-        PopulateModelRows(summaries, settings);
-        var tokens = summaries.Aggregate(
-            UsageTokenTotals.Empty,
-            (current, summary) => current + summary.Tokens);
+        var totals = UsageAnalyticsAggregator.SummarizeTotal(snapshot.Rows);
+        var total = totals.Tokens.EffectiveTotalTokens;
+        PopulateModelRows(summaries, settings, totals,
+            snapshot.Rows.Select(row => row.Key.Model).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var tokens = totals.Tokens;
         PopulateTokenDetails(tokens);
-        var elapsed = summaries.Sum(summary => summary.ElapsedMilliseconds);
-        var turns = summaries.Sum(summary => summary.TurnCount);
+        var elapsed = totals.ElapsedMilliseconds;
+        var turns = totals.TurnCount;
         PopulateTimeDetails(elapsed, turns, tokens);
-        var reasoning = summaries
-            .SelectMany(summary => summary.ReasoningTokens)
-            .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Sum(item => item.Value));
+        var reasoning = totals.ReasoningTokens;
         _reasoningDonut.CenterCaption = _localizer.Text("Common.Total");
         _reasoningDonut.SetValues(reasoning);
         PopulateReasoningLegend(reasoning, total);
@@ -629,17 +625,18 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
     private void PopulateModelRows(
         IReadOnlyList<UsageModelSummary> summaries,
-        UsageAnalyticsSettings settings)
+        UsageAnalyticsSettings settings,
+        UsageModelSummary totals,
+        int modelCount)
     {
         _modelRows.SuspendLayout();
-        _modelRows.Controls.Clear();
+        DisposeChildren(_modelRows);
         var maximum = Math.Max(
             1,
             summaries.Select(item => MetricValue(item, settings.DefaultMetric))
                 .DefaultIfEmpty(1)
                 .Max());
-        var metricTotal = summaries.Sum(
-            item => MetricValue(item, settings.DefaultMetric));
+        var metricTotal = MetricValue(totals, settings.DefaultMetric);
         for (var index = 0; index < summaries.Count; index++)
         {
             var summary = summaries[index];
@@ -740,23 +737,27 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 BackColor = Theme.Border,
             };
             var totalLabel = Caption(_localizer.Text("Common.Total"), 0, 4);
+            if (!settings.GroupOtherModels && modelCount > summaries.Count)
+            {
+                totalLabel.Text = _localizer.Text("Usage.HiddenModels", summaries.Count, modelCount);
+            }
             totalLabel.Font = Theme.Ui(8.2F, FontStyle.Bold);
             totalLabel.Size = new Size(260, 19);
             var share = Caption("100%", 270, 4);
             share.Size = new Size(52, 19);
             var tokens = Caption(
-                $"{summaries.Sum(item => item.Tokens.EffectiveTotalTokens):N0}",
+                $"{totals.Tokens.EffectiveTotalTokens:N0}",
                 326,
                 4);
             tokens.Size = new Size(96, 19);
             var elapsed = Caption(
                 FormatDuration(
-                    summaries.Sum(item => item.ElapsedMilliseconds)),
+                    totals.ElapsedMilliseconds),
                 428,
                 4);
             elapsed.Size = new Size(72, 19);
             var turns = Caption(
-                $"{summaries.Sum(item => item.TurnCount):N0}",
+                $"{totals.TurnCount:N0}",
                 504,
                 4);
             turns.Size = new Size(42, 19);
@@ -768,7 +769,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         }
         if (summaries.Count == 0)
         {
-            _modelRows.Controls.Add(new Label
+            _modelRows.Controls.Add(new DashboardLabel
             {
                 Text = _localizer.Text("Usage.NoData"),
                 ForeColor = Theme.Muted,
@@ -900,7 +901,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         };
 
     private static Label ValueLabel() =>
-        new()
+        new DashboardLabel()
         {
             AutoSize = true,
             Font = Theme.Ui(8.5F),
@@ -909,7 +910,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         };
 
     private static Label Caption(string text, int x, int y) =>
-        new()
+        new DashboardLabel()
         {
             Text = text,
             Location = new Point(x, y),
@@ -990,7 +991,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         IEnumerable<string> values)
     {
         panel.SuspendLayout();
-        panel.Controls.Clear();
+        DisposeChildren(panel);
         foreach (var value in values)
         {
             var (symbol, color) = HistoryVisual(value);
@@ -1000,7 +1001,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 Margin = new Padding(0, 0, 0, 4),
                 Size = new Size(panel.ClientSize.Width - 2, 39),
             };
-            var icon = new Label
+            var icon = new DashboardLabel
             {
                 Text = symbol,
                 Font = new Font("Segoe Fluent Icons", 8.5F),
@@ -1009,7 +1010,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 Bounds = new Rectangle(7, 6, 25, 25),
                 TextAlign = ContentAlignment.MiddleCenter,
             };
-            var text = new Label
+            var text = new DashboardLabel
             {
                 Text = value,
                 Font = Theme.Ui(8.4F),
@@ -1027,6 +1028,42 @@ internal sealed class DetailForm : FixedWidthResizableForm
             panel.Controls.Add(row);
         }
         panel.ResumeLayout();
+    }
+
+    private static void DisposeChildren(Control parent)
+    {
+        foreach (var child in parent.Controls.Cast<Control>().ToArray())
+        {
+            child.Dispose();
+        }
+    }
+
+    private sealed class DashboardLabel : Label
+    {
+        private Font? _ownedFont;
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override Font Font
+        {
+            get => base.Font;
+            set
+            {
+                var previous = _ownedFont;
+                base.Font = value;
+                _ownedFont = value;
+                if (!ReferenceEquals(previous, value)) previous?.Dispose();
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                _ownedFont?.Dispose();
+                _ownedFont = null;
+            }
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -1087,7 +1124,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         AccountUsageSnapshot? usage,
         UsageAnalyticsSettings settings)
     {
-        _accountSummary.Controls.Clear();
+        DisposeChildren(_accountSummary);
         if (!settings.ShowAccountUsage || usage is null)
         {
             _accountChart.SetValues([]);
@@ -1138,7 +1175,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         IEnumerable<LocalActivityAggregate> activities)
     {
         panel.SuspendLayout();
-        panel.Controls.Clear();
+        DisposeChildren(panel);
         var rows = activities
             .GroupBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
             .Select(group => new
@@ -1163,7 +1200,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         }
         if (rows.Length == 0)
         {
-            panel.Controls.Add(new Label
+            panel.Controls.Add(new DashboardLabel
             {
                 Text = _localizer.Text("Usage.NoActivityData"),
                 Size = new Size(338, 32),
@@ -1186,7 +1223,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private void PopulateTokenDetails(UsageTokenTotals tokens)
     {
         _tokenDetails.SuspendLayout();
-        _tokenDetails.Controls.Clear();
+        DisposeChildren(_tokenDetails);
         var rows = new (string Label, long Value, Color Color)[]
         {
             (_localizer.Text("Usage.InputTokens"), tokens.InputTokens, UsageVisuals.TokenColor(0)),
@@ -1227,7 +1264,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         UsageTokenTotals tokens)
     {
         _timeDetails.SuspendLayout();
-        _timeDetails.Controls.Clear();
+        DisposeChildren(_timeDetails);
         var rows = new (string Symbol, string Label, string Value, Color Color)[]
         {
             (FluentSymbol.Clock, _localizer.Text("Usage.TotalTime"), FormatDuration(elapsed), Theme.Blue),
@@ -1255,7 +1292,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         long total)
     {
         _reasoningLegend.SuspendLayout();
-        _reasoningLegend.Controls.Clear();
+        DisposeChildren(_reasoningLegend);
         var rows = reasoning
             .OrderByDescending(item => item.Value)
             .Take(5)
@@ -1280,8 +1317,8 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
     private static void PopulatePlaceholder(Control panel, string text)
     {
-        panel.Controls.Clear();
-        panel.Controls.Add(new Label
+        DisposeChildren(panel);
+        panel.Controls.Add(new DashboardLabel
         {
             Text = text,
             Bounds = panel.ClientRectangle,
@@ -1327,7 +1364,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         int y,
         int width)
     {
-        parent.Controls.Add(new Label
+        parent.Controls.Add(new DashboardLabel
         {
             Text = symbol,
             Bounds = new Rectangle(0, y, 15, 18),
@@ -1358,7 +1395,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         int labelWidth = 124)
     {
         var style = bold ? FontStyle.Bold : FontStyle.Regular;
-        parent.Controls.Add(new Label
+        parent.Controls.Add(new DashboardLabel
         {
             Text = label,
             Bounds = new Rectangle(labelX, y, labelWidth, 18),
@@ -1369,7 +1406,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
         });
-        parent.Controls.Add(new Label
+        parent.Controls.Add(new DashboardLabel
         {
             Text = value,
             Bounds = new Rectangle(
@@ -1389,7 +1426,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private void PopulateCreditCards(WeeklyQuotaState? state)
     {
         _credits.SuspendLayout();
-        _credits.Controls.Clear();
+        DisposeChildren(_credits);
         var details = state?.ResetCredits?.Take(3).ToArray() ?? [];
         if (details.Length > 0)
         {
@@ -1408,7 +1445,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         }
         else
         {
-            _credits.Controls.Add(new Label
+            _credits.Controls.Add(new DashboardLabel
             {
                 Text = _localizer.Text("Credits.None"),
                 Font = Theme.Ui(8.4F),
@@ -1460,6 +1497,11 @@ internal sealed class DetailForm : FixedWidthResizableForm
             Theme.Green);
         active.AutoSize = false;
         active.Size = new Size(88, 20);
+        foreach (var label in new[] { available, expires, active })
+        {
+            var font = label.Font;
+            label.Disposed += (_, _) => font.Dispose();
+        }
         card.Controls.AddRange([available, expires, active]);
         return card;
     }

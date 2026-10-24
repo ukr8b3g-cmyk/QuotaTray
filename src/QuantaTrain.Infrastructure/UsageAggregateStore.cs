@@ -85,4 +85,35 @@ public sealed class UsageAggregateStore
         }
         return result;
     }
+
+    public async Task PruneAsync(DateOnly cutoff, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (var path in Directory.EnumerateFiles(_root, "*.json"))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var document = await AtomicJsonFile.ReadAsync<UsageMonthDocument>(
+                    path, cancellationToken).ConfigureAwait(false);
+                if (document is null) continue;
+                var retained = document.Rows.Where(row => row.Key.LocalDate >= cutoff).ToArray();
+                if (retained.Length == document.Rows.Count) continue;
+                if (retained.Length == 0)
+                {
+                    File.Delete(path);
+                }
+                else
+                {
+                    await AtomicJsonFile.WriteAsync(path,
+                        document with { Rows = retained, GeneratedAtUtc = DateTimeOffset.UtcNow },
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 }

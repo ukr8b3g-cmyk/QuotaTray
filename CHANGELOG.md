@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.11 - 2026-10-24
+
+- Close history-export streams before moving temporary files on Windows, clean temporary files on failure/cancellation, and report export outcomes without crashing the app.
+- Require a fresh successful quota observation before confirming a reset; cached results from timeouts, disconnections or missing weekly buckets cannot confirm it.
+- Preserve newer polling success, failure and updating states while reset-history persistence completes, using the latest successful observation as the baseline.
+- Apply retention consistently to stored aggregates, cached contributions and activity counts, including unchanged scans and cache rebuilds.
+- Automatically reparse truncated caches when retention is extended or made unlimited, including after restart; retry failed reparses without claiming complete coverage.
+- Resolve the current usage period from matching, confirmed resets within the current quota window instead of stale, future or unrelated history.
+- Keep whole-period token, time, turn and reasoning totals independent of top-model display/grouping; use the full-period denominator for model shares.
+- Preserve effective token totals when reported totals are absent in part of the input, without double-counting cached-input or reasoning-output subsets.
+- Dispose replaced dashboard controls and their owned fonts to bound resources during repeated refreshes.
+- Add regression coverage for all nine fixes. Windows validation: 256 distinct C# tests passed, plus the original three reproduction checks; the 2,000-refresh test kept GDI/USER counts stable. Full-day soak, real-account operation and installer execution remain unverified.
+- Publish new Windows x64 installer and portable packages with checksums; preserve previous releases and settings compatibility.
+
 ## 0.2.10 - 2026-10-06
 
 - Contain per-file `InvalidDataException`, including the 512 MiB decompression limit, so healthy files and scan-cache writes can complete after a rejected file.

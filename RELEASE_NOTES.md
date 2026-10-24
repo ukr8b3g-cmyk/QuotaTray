@@ -1,42 +1,54 @@
-# QuantaTray v0.2.10
+# QuantaTray v0.2.11
 
 ## 日本語
 
-使用分析が空のままになる不具合と、有効なのに無効と案内される表示を修正しました。
+コードレビューと再レビューで確認した9件を修正した安定性・集計修正版です。
 
-- 圧縮ログの展開上限超過・破損などをファイル単位で扱い、他の読み取れるファイルの集計・保存を続けます
-- 512 MiBの展開上限、64 MiBのデコーダーウィンドウ上限、4 MiBのメタデータ行上限は維持します
-- 収集中・未収集・取得失敗・空の結果・不完全な結果を区別し、更新失敗時は前回の表示結果を維持します
-- 設定画面を収集中に開いても、現在の状態を表示します
+- 履歴JSONはファイルを閉じてから保存先へ移動し、失敗・キャンセル時の一時ファイルを整理します。保存結果を案内します
+- 再確認の通信失敗や週間枠なしの結果を、リセット確認済みとして保存しません
+- 履歴保存中に新しい通信結果が届いても、古い成功結果で表示を戻しません。基準値には最新の成功観測を使います
+- 保持期限を集計と走査キャッシュの寄与・活動回数に適用し、通常走査やキャッシュ再構築で期限切れデータが復活しないようにします
+- 保持期間を延ばした場合や無期限へ変更した場合は必要なファイルを自動再解析します。旧キャッシュも必要に応じて初回に再解析します
+- 古い・未来の・別プランや枠の履歴を現在の集計期間から除外し、現在の週間枠を使います
+- モデル一覧の上位件数や「その他」の設定にかかわらず、全期間のトークン・時間・ターン・推論別合計と割合を維持します
+- 総トークン数が欠けたログが混在しても、入力・出力等から得られる有効総量を合算します
+- 詳細画面の更新で不要になった部品と、その部品が所有するフォントを解放します
 
-重要：読み取れなかったファイルの過去分を使えるのは、互換性のある走査キャッシュがある場合だけです。旧形式キャッシュの再構築時などは、そのファイルの集計が除外されます。「不完全な結果」は全履歴の復元を意味しません。元のCodexセッションファイルを変更することはありません。
+元のCodexセッションは変更しません。読み取り失敗時は互換キャッシュの範囲で前回分を維持し、不完全な結果を明示します。設定の互換性と既定値は維持します。
 
-- 検証：Windows CIの全テストに加え、512 MiBを超える合成圧縮データ、他ファイルの継続集計・保存、キャッシュ・キャンセル・表示状態の回帰テストを実行します。リリース工程でEXEバージョン、x64ペイロード、ZIP内容、SHA-256とアップロード後の再ダウンロードを検証します
-- 対応環境：Windows x64（Windows 11推奨）。公式Codex CLI／App Serverと、Codexを利用できるChatGPTアカウントが別途必要です
-- Installer版：ユーザー単位、管理者権限不要。Portable版：書き込み可能なフォルダーへ全体を展開し、設定と履歴を隣接するdataフォルダーに保存します。.NETのネイティブ実行ファイルは起動時に一時フォルダーへ展開される場合があります
-- 認証：Codex App Serverが既存のCodexログインを利用します。必要な場合は公式ブラウザログインを使用してください
-- 制限：ローカル使用分析は参考集計で、請求明細や現在のコンテキスト量ではありません。フォークされた履歴などで過大・過小集計する場合があります。実アカウント接続、実機UI／DPI、新規・上書きインストール／アンインストール、長時間メモリ試験は未検証です
-- 配布物は未署名です。Windows SmartScreenで発行元不明の警告が出る場合があります。同梱のSHA256SUMS.txtと照合してください
-- 自動更新はありません。利用者のPCへのインストール・アプリ再起動はこの公開作業では行いません
+- 検証：Windows/.NET 10で256件のC#テスト成功。元の3再現条件も解消を確認。250回の準備更新後に2,000回更新し、GDI/USERハンドル数の増加がないことを確認しました
+- 配布工程：固定コミットのWindows buildとCodeQL成功を待ち、EXEバージョン・x64ペイロード・ZIP内容・SHA-256を検証し、アップロード後の再ダウンロード照合を通してから公開します
+- 未検証：24/72時間の常駐試験、実アカウント接続、実機での手動DPI/複数モニター操作、インストール・上書き・アンインストールの実行
+- 対応環境：Windows x64（Windows 11推奨）。公式Codex CLI/App Serverと、Codexを利用できるChatGPTアカウントが別途必要です
+- Installerはユーザー単位で管理者権限不要。Portableは全体を書き込み可能なフォルダーへ展開し、隣接するdataフォルダーへ設定・履歴を保存します
+- 認証はCodex App Serverが既存ログインを利用し、必要時は公式ブラウザログインを使用します。ローカル分析は請求明細や現在のコンテキスト量ではありません
+- 配布物は未署名です。SmartScreen警告が出る場合があります。SHA256SUMS.txtと照合してください
+- 自動更新はありません。この公開作業では利用者PCへのインストールや稼働アプリの再起動を行いません
 
 ## English
 
-Fixes local usage analysis remaining empty and the misleading disabled message when collection is enabled.
+This stability and usage-accounting update fixes nine findings from code review and follow-up review.
 
-- Isolate oversized or damaged compressed files so other readable files are still aggregated and persisted
-- Preserve the 512 MiB output, 64 MiB decoder-window and 4 MiB metadata-line safety limits
-- Distinguish waiting, scanning, failure, empty and partial results; retain the previous display snapshot when refresh fails
-- Show current scan state when Settings opens during a scan
+- Close history-export files before replacing the destination on Windows; clean temporary files and report success/failure safely
+- Do not confirm a reset from a failed refresh or a response without a weekly bucket
+- Preserve newer polling results during history persistence and use the latest successful observation as the baseline
+- Enforce retention for aggregates, cached contributions and activity counts, including unchanged scans and cache rebuilds
+- Automatically reparse when retention is extended or made unlimited; older caches are reparsed on first use when necessary
+- Resolve the current period from matching history within the current quota window, rejecting stale/future/unrelated events
+- Keep whole-period token/time/turn/reasoning totals and model shares independent of the top-model/Other display setting
+- Preserve effective totals when reported token totals are missing from part of the input
+- Dispose replaced dashboard controls and their owned fonts
 
-Important: a failed file's previous contribution is retained only when a compatible scan cache exists. Rebuilding an old incompatible cache can exclude that file's contribution. Partial results do not mean all historical totals were recovered. Original Codex session files are never modified.
+Original Codex sessions are unchanged. Failed files retain previous contributions only from compatible caches and remain explicitly partial. Settings compatibility and defaults are preserved.
 
-- Validation: all Windows CI tests plus synthetic regressions for output beyond 512 MiB, continued scanning/persistence, caches, cancellation and UI states. The release pipeline verifies executable versions, x64 payload, ZIP contents, SHA-256 and re-downloaded uploaded assets
+- Validation: 256 C# tests passed on Windows/.NET 10, plus all three original reproduction checks. After 250 warm-up updates, 2,000 updates showed stable GDI/USER counts
+- Release pipeline: wait for build and CodeQL on the exact commit; verify EXE versions, x64 payload, ZIP contents and SHA-256; re-download uploaded assets before publishing
+- Not tested: 24/72-hour soak, real-account operation, manual physical DPI/multi-monitor operation, or installer/upgrade/uninstaller execution
 - Requirements: Windows x64 (Windows 11 recommended), official Codex CLI/App Server, and a ChatGPT account with Codex access
-- Installer: per-user, no administrator rights. Portable: extract the entire ZIP to a writable folder; settings/history stay in adjacent data/. Native .NET runtime files may be extracted to a temporary directory at launch
-- Authentication: App Server reuses the existing Codex login; use the official browser login when needed
-- Limits: local analytics are best-effort, not billing or current-context figures. Forked or incomplete histories can overcount or undercount. Signed-in operation, physical UI/DPI, install/upgrade/uninstall execution and long-running memory tests remain unverified
-- Binaries are unsigned; Windows SmartScreen may warn about an unknown publisher. Verify downloads against SHA256SUMS.txt
-- No automatic updater. This publication does not install or restart the app on the user's computer
+- Installer: per-user, no administrator rights. Portable: extract the whole ZIP to a writable folder; settings/history stay in adjacent data/
+- Authentication: App Server reuses the existing Codex login, with official browser login when needed. Local analytics are best-effort usage estimates, not billing or context-occupancy figures
+- Binaries are unsigned; SmartScreen may warn. Verify downloads against SHA256SUMS.txt
+- No automatic updater. This publication does not install or restart the application on the user's PC
 
 QuantaTrayは非公式ソフトウェアで、OpenAIによる承認、提携、支援、保証を受けていません。
 

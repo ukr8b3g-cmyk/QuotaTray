@@ -4,6 +4,31 @@ namespace QuantaTrain.Core.Tests;
 
 public sealed class UsageAnalyticsAggregatorTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedReportedAndMissingTotalsRemainAdditiveWithinAndAcrossModels(bool sameModel)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var turns = new[]
+        {
+            new UsageTurnRecord(now, now.AddSeconds(1), "model-a", "high", "standard",
+                new UsageTokenTotals(80, 60, 0, 20, 5, 100), 1000, UsageTimeQuality.Exact),
+            new UsageTurnRecord(now, now.AddSeconds(1), sameModel ? "model-a" : "model-b", "high", "standard",
+                new UsageTokenTotals(40, 30, 0, 10, 3, 0), 1000, UsageTimeQuality.Exact),
+        };
+        var rows = UsageAnalyticsAggregator.Aggregate(turns);
+        var total = UsageAnalyticsAggregator.SummarizeTotal(rows);
+        Assert.Equal(150, total.Tokens.EffectiveTotalTokens);
+        Assert.Equal(150, total.ReasoningTokens.Values.Sum());
+        Assert.Equal(150, total.ServiceTierTokens.Values.Sum());
+        Assert.Equal(90, total.Tokens.CachedInputTokens);
+        Assert.Equal(8, total.Tokens.ReasoningOutputTokens);
+        foreach (var group in new[] { true, false })
+            Assert.Equal(150, UsageAnalyticsAggregator.SummarizeModels(rows, 5, group)
+                .Sum(model => model.Tokens.EffectiveTotalTokens));
+    }
+
     [Fact]
     public void AggregatesTokensWithoutDoubleCountingCachedOrReasoningSubsets()
     {

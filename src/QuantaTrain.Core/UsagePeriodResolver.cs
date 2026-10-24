@@ -29,7 +29,20 @@ public static class UsagePeriodResolver
         WeeklyQuotaState? quotaState,
         IReadOnlyList<ResetEvent>? resetEvents)
     {
+        var windowStart = quotaState?.ResetsAtUtc > nowUtc &&
+                          quotaState.WindowDurationMinutes is > 0
+            ? quotaState.ResetsAtUtc.Value.AddMinutes(-quotaState.WindowDurationMinutes.Value)
+            : nowUtc.AddDays(-7);
+        if (windowStart > nowUtc) windowStart = nowUtc.AddDays(-7);
         var latestReset = resetEvents?
+            .Where(item => item.Confirmed &&
+                item.ObservedToUtc >= windowStart && item.ObservedToUtc <= nowUtc &&
+                item.ObservedFromUtc <= item.ObservedToUtc &&
+                (quotaState is null ||
+                 item.After.LimitId == quotaState.LimitId &&
+                 item.After.Role == quotaState.Role &&
+                 item.After.WindowDurationMinutes == quotaState.WindowDurationMinutes &&
+                 item.After.PlanType == quotaState.PlanType))
             .Where(item => item.Classification is
                 ResetClassification.ScheduledReset or
                 ResetClassification.UnexpectedResetCandidate)
@@ -44,16 +57,6 @@ public static class UsagePeriodResolver
                     ResetClassification.UnexpectedResetCandidate);
         }
 
-        if (quotaState?.ResetsAtUtc is not null &&
-            quotaState.WindowDurationMinutes is > 0)
-        {
-            return new UsagePeriod(
-                quotaState.ResetsAtUtc.Value.AddMinutes(
-                    -quotaState.WindowDurationMinutes.Value),
-                nowUtc,
-                true);
-        }
-
-        return new UsagePeriod(nowUtc.AddDays(-7), nowUtc, true);
+        return new UsagePeriod(windowStart, nowUtc, true);
     }
 }

@@ -2,6 +2,12 @@ using QuantaTrain.Core;
 
 namespace QuantaTrain.Infrastructure;
 
+public sealed record PollingRefreshResult(
+    WeeklyQuotaState? State, string? Error, long SuccessSequence, long RefreshSequence = 0)
+{
+    public bool Succeeded => State is not null && Error is null;
+}
+
 public sealed class PollingStateChangedEventArgs(
     WeeklyQuotaState? state,
     bool isUpdating,
@@ -14,25 +20,38 @@ public sealed class PollingStateChangedEventArgs(
 
 public sealed class PollingCoordinator : IAsyncDisposable
 {
-    private readonly CodexAccountClient _client;
+    private readonly CodexAccountClient? _client;
+    private readonly Func<CancellationToken, Task<RateLimitSnapshot>> _readRateLimits;
     private readonly TimeSpan _interval;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _singleFlightLock = new();
-    private Task<WeeklyQuotaState?>? _inFlight;
+    private Task<PollingRefreshResult>? _inFlight;
     private Task? _loop;
     private bool _disposed;
+    private long _refreshSequence;
 
     public PollingCoordinator(CodexAccountClient client, TimeSpan interval)
+        : this(client.ReadRateLimitsAsync, interval)
     {
         _client = client;
-        _interval = interval;
         _client.RateLimitsUpdated += HandleRateLimitsUpdated;
+    }
+
+    internal PollingCoordinator(
+        Func<CancellationToken, Task<RateLimitSnapshot>> readRateLimits,
+        TimeSpan interval)
+    {
+        _readRateLimits = readRateLimits;
+        _interval = interval;
     }
 
     public event EventHandler<PollingStateChangedEventArgs>? StateChanged;
 
     public WeeklyQuotaState? Current { get; private set; }
     public DateTimeOffset? LastSuccessUtc { get; private set; }
+    public long SuccessSequence { get; private set; }
+    public long RefreshSequence => Interlocked.Read(ref _refreshSequence);
+    public bool IsDisposed => _disposed;
 
     public void Start()
     {
@@ -40,7 +59,7 @@ public sealed class PollingCoordinator : IAsyncDisposable
         _loop ??= RunLoopAsync(_lifetime.Token);
     }
 
-    public Task<WeeklyQuotaState?> RefreshAsync(CancellationToken cancellationToken)
+    public Task<PollingRefreshResult> RefreshAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         lock (_singleFlightLock)
@@ -55,12 +74,13 @@ public sealed class PollingCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task<WeeklyQuotaState?> RefreshCoreAsync(CancellationToken cancellationToken)
+    private async Task<PollingRefreshResult> RefreshCoreAsync(CancellationToken cancellationToken)
     {
+        var refreshSequence = Interlocked.Increment(ref _refreshSequence);
         StateChanged?.Invoke(this, new PollingStateChangedEventArgs(Current, true, null));
         try
         {
-            var snapshot = await _client.ReadRateLimitsAsync(cancellationToken)
+            var snapshot = await _readRateLimits(cancellationToken)
                 .ConfigureAwait(false);
             var weekly = WeeklyBucketSelector.BuildState(snapshot);
             if (weekly is null)
@@ -71,13 +91,14 @@ public sealed class PollingCoordinator : IAsyncDisposable
                         Current,
                         false,
                         "Weekly usage limit is unavailable."));
-                return Current;
+                return new(Current, "Weekly usage limit is unavailable.", SuccessSequence, refreshSequence);
             }
 
             Current = weekly;
             LastSuccessUtc = weekly.ObservedAtUtc;
+            SuccessSequence++;
             StateChanged?.Invoke(this, new PollingStateChangedEventArgs(Current, false, null));
-            return Current;
+            return new(Current, null, SuccessSequence, refreshSequence);
         }
         catch (Exception exception) when (
             exception is not OperationCanceledException ||
@@ -89,7 +110,7 @@ public sealed class PollingCoordinator : IAsyncDisposable
                     Current,
                     false,
                     Redaction.Redact(exception.Message)));
-            return Current;
+            return new(Current, Redaction.Redact(exception.Message), SuccessSequence, refreshSequence);
         }
     }
 
@@ -115,7 +136,10 @@ public sealed class PollingCoordinator : IAsyncDisposable
         }
 
         _disposed = true;
-        _client.RateLimitsUpdated -= HandleRateLimitsUpdated;
+        if (_client is not null)
+        {
+            _client.RateLimitsUpdated -= HandleRateLimitsUpdated;
+        }
         _lifetime.Cancel();
         if (_loop is not null)
         {
