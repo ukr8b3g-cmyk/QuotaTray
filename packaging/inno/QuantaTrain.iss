@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.12"
+  #define MyAppVersion "0.2.13"
 #endif
 #define MyAppName "QuantaTray"
 #define MyAppExeName "QuantaTray.exe"

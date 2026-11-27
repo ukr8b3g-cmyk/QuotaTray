@@ -180,6 +180,10 @@
           "type": "boolean",
           "default": true
         },
+        "notifyNewRelease": {
+          "type": "boolean",
+          "default": false
+        },
         "persistentConnectionFailure": {
           "type": "boolean",
           "default": true

@@ -27,6 +27,10 @@ internal sealed class QuantaTrainContext : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _activationTimer;
     private readonly System.Windows.Forms.Timer _usageRefreshTimer;
+    private readonly ReleaseUpdateChecker _releaseChecker;
+    private CancellationTokenSource? _releaseChecks;
+    private bool _checkingRelease;
+    private readonly ReleaseTrayLink _releaseLink;
     private readonly DataPaths _paths;
     private readonly JsonSettingsStore _settingsStore;
     private readonly JsonlHistoryStore _historyStore;
@@ -74,6 +78,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _singleInstance = singleInstance;
         _ = _dispatcher.Handle;
         _paths = DataPathResolver.Resolve(AppContext.BaseDirectory);
+        _releaseChecker = new ReleaseUpdateChecker(
+            Path.Combine(_paths.CacheDirectory, "release-check.json"), Version.Parse(ProductVersion));
         _settingsStore = new JsonSettingsStore(_paths.SettingsFile);
         _settings = _settingsStore.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
         _miniPanelPosition = _settings.Display.RememberPosition
@@ -101,6 +107,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         _localizer.Load(_settings.Language);
         Theme.Configure(_settings.Display.Theme, _settings.Display.Accent);
 
+        _releaseLink = new ReleaseTrayLink(OpenReleasePage);
         _notifyIcon = new NotifyIcon
         {
             Icon = IconFactory.Create(null),
@@ -108,6 +115,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildMenu(),
         };
+        _notifyIcon.BalloonTipClicked += (_, _) => _releaseLink.OpenBalloon();
         _notifyIcon.MouseClick += HandleTrayClick;
         _notifyIcon.MouseDoubleClick += (_, eventArgs) =>
         {
@@ -135,6 +143,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             Interval = 60_000,
             Enabled = true,
         };
+        _usageRefreshTimer.Tick += async (_, _) => await CheckReleaseAsync();
         _usageRefreshTimer.Tick += async (_, _) =>
         {
             try
@@ -165,6 +174,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged +=
             HandleDisplaySettingsChanged;
+        ConfigureReleaseNotifications();
         _ = InitializeAsync();
     }
 
@@ -244,6 +254,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             _localizer.Text("Menu.OpenChatGPT"),
             null,
             (_, _) => OpenUrl("https://chatgpt.com/"));
+        _releaseLink.AddMenuItem(menu, _localizer);
         menu.Items.Add(
             _localizer.Text("Settings.About"),
             null,
@@ -337,7 +348,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             {
                 SetSignedIn(false);
                 UpdateViews(null, false, _localizer.Text("Connection.CodexNotFound"));
-                _notifyIcon.ShowBalloonTip(
+                ShowBalloon(
                     5000,
                     "QuantaTray",
                     _localizer.Text("Connection.CodexNotFound"),
@@ -421,7 +432,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 if (_connectionFailureCount == 3 &&
                     _settings.Notifications.PersistentConnectionFailure)
                 {
-                    _notifyIcon.ShowBalloonTip(
+                    ShowBalloon(
                         5000,
                         "QuantaTray",
                         _localizer.Text("Notification.ConnectionFailure"),
@@ -540,7 +551,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         if (enabled)
         {
-            _notifyIcon.ShowBalloonTip(
+            ShowBalloon(
                 5000,
                 "QuantaTray",
                 resetEvent.Classification.ToString(),
@@ -943,6 +954,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         };
         form.SettingsSaved += async (_, _) =>
         {
+            ConfigureReleaseNotifications();
             try
             {
                 await _settingsPreviewGate.WaitAsync(_lifetime.Token);
@@ -1023,6 +1035,80 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             _settingsPreviewGate.Release();
         }
+    }
+
+    private void ConfigureReleaseNotifications()
+    {
+        if (_settings.Notifications.NotifyNewRelease == (_releaseChecks is not null))
+        {
+            return;
+        }
+        if (_settings.Notifications.NotifyNewRelease)
+        {
+            _releaseChecks = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _ = CheckReleaseAsync();
+            return;
+        }
+        _releaseChecks!.Cancel();
+        _releaseChecks.Dispose();
+        _releaseChecks = null;
+        _releaseLink.Available = null;
+        _releaseLink.BalloonTarget = null;
+        RebuildTrayMenu();
+    }
+
+    private async Task CheckReleaseAsync()
+    {
+        if (_releaseChecks is null || _checkingRelease || _exiting)
+        {
+            return;
+        }
+        var token = _releaseChecks.Token;
+        _checkingRelease = true;
+        try
+        {
+            var (available, announce) = await _releaseChecker.CheckAsync(DateTimeOffset.UtcNow, token);
+            token.ThrowIfCancellationRequested();
+            if (available != _releaseLink.Available)
+            {
+                _releaseLink.Available = available;
+                RebuildTrayMenu();
+            }
+            if (announce && available is not null)
+            {
+                ShowBalloon(5000, _localizer.Text("Update.Available", available),
+                    _localizer.Text("Update.OpenRelease"), ToolTipIcon.Info, available);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
+        catch (Exception error)
+        {
+            await _logger.WarningSafelyAsync($"Release check failed ({error.GetType().Name}).");
+        }
+        finally
+        {
+            _checkingRelease = false;
+        }
+    }
+
+    private void OpenReleasePage(string url)
+    {
+        try
+        {
+            OpenUrl(url);
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            _ = _logger.WarningSafelyAsync($"Opening release page failed ({error.GetType().Name}).");
+        }
+    }
+
+    private void ShowBalloon(int timeout, string title, string message, ToolTipIcon icon, Version? release = null)
+    {
+        _releaseLink.BalloonTarget = release;
+        _notifyIcon.ShowBalloonTip(timeout, title, message, icon);
     }
 
     private void QueueShowSettings()
@@ -1125,7 +1211,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
             var key = credit.ExpiresAtUtc.Value.ToUniversalTime().ToString("O");
             if (_notifiedCreditExpiries.Add(key))
             {
-                _notifyIcon.ShowBalloonTip(
+                ShowBalloon(
                     5000,
                     "QuantaTray",
                     _localizer.Text(
@@ -1138,7 +1224,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
 
     private void ShowQuotaNotification(int threshold)
     {
-        _notifyIcon.ShowBalloonTip(
+        ShowBalloon(
             5000,
             "QuantaTray",
             _localizer.Text("Notification.Remaining", threshold),
@@ -1648,7 +1734,7 @@ internal sealed class QuantaTrainContext : ApplicationContext
         {
             await HistoryExportService.ExportJsonAsync(
                 _paths.HistoryDirectory, dialog.FileName, _lifetime.Token);
-            _notifyIcon.ShowBalloonTip(3000, "QuantaTray",
+            ShowBalloon(3000, "QuantaTray",
                 _localizer.Text("History.ExportSucceeded"), ToolTipIcon.Info);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -1790,6 +1876,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -=
             HandleDisplaySettingsChanged;
         _lifetime.Cancel();
+        _releaseChecks?.Dispose();
+        _releaseChecker.Dispose();
         _activationTimer.Stop();
         _usageRefreshTimer.Stop();
         _notifyIcon.Visible = false;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.13 - 2026-11-27
+
+- Add opt-in Windows tray notifications for new stable releases. While running, QuantaTray checks the public GitHub latest-release API at most once every 24 hours.
+- Remember notified versions across restarts and keep the release page accessible from the tray menu. Downloads and installation remain manual.
+
 ## 0.2.12 - 2026-11-27
 
 - Show all reset-credit cards in the detailed overview, wrapping extra rows and grouping credits whose expiry details were omitted.

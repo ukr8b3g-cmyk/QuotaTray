@@ -64,6 +64,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
     private readonly ToggleSwitch _remaining10Notification = new();
     private readonly ToggleSwitch _unexpectedResetNotification = new();
     private readonly ToggleSwitch _creditExpiryNotification = new();
+    private readonly ToggleSwitch _releaseNotification = new();
     private readonly ToggleSwitch _connectionFailureNotification = new();
     private readonly ToggleSwitch _storeQuotaState = new();
     private readonly ToggleSwitch _detectRecovery = new();
@@ -227,6 +228,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         done.Click += (_, _) =>
         {
             ApplyControls();
+            _settings.Notifications.NotifyNewRelease = _releaseNotification.Checked;
             _saved = true;
             SettingsSaved?.Invoke(this, EventArgs.Empty);
             Close();
@@ -543,13 +545,10 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             _localizer.Text("Settings.ConnectionNotifications"),
             _connectionFailureNotification,
             252);
-        page.Controls.Add(
-            UiFactory.Label(
-                _localizer.Text("Settings.NotificationHint"),
-                new Point(0, 305),
-                8.5F,
-                FontStyle.Regular,
-                Theme.Muted));
+        var releaseLabel = _localizer.Text("Settings.NotifyNewRelease");
+        _releaseNotification.AccessibleName = releaseLabel;
+        AddToggleRow(page, releaseLabel, _releaseNotification, 292);
+        page.Controls.Add(Hint(_localizer.Text("Settings.ReleaseCheckHint"), 0, 331, 534));
         return page;
     }
 
@@ -1111,6 +1110,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             settings.Notifications.UnexpectedResetCandidate;
         _creditExpiryNotification.Checked =
             settings.Notifications.ResetCreditExpiring;
+        _releaseNotification.Checked = settings.Notifications.NotifyNewRelease;
         _connectionFailureNotification.Checked =
             settings.Notifications.PersistentConnectionFailure;
         _storeQuotaState.Checked = settings.ResetDetection.StoreQuotaState;
@@ -1324,9 +1324,15 @@ internal sealed class SettingsForm : FixedWidthResizableForm
 
     private void ResetAllSettings()
     {
-        var defaults = new AppSettings();
-        _settings.CopyFrom(defaults);
-        LoadControls(_settings);
+        LoadEditableSettings(new AppSettings());
+    }
+
+    private void LoadEditableSettings(AppSettings values)
+    {
+        _settings.CopyFrom(values);
+        // Opening or previewing a settings file cannot opt the user into network checks.
+        _settings.Notifications.NotifyNewRelease = _originalSettings.Notifications.NotifyNewRelease;
+        LoadControls(values);
     }
 
     private void NotifyPreviewChanged(SettingsPreviewKind kind)
@@ -1369,8 +1375,10 @@ internal sealed class SettingsForm : FixedWidthResizableForm
         {
             return;
         }
+        var export = _settings.Clone();
+        export.Notifications.NotifyNewRelease = _releaseNotification.Checked;
         var json = JsonSerializer.Serialize(
-            _settings,
+            export,
             new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(dialog.FileName, json);
     }
@@ -1395,8 +1403,7 @@ internal sealed class SettingsForm : FixedWidthResizableForm
             {
                 throw new JsonException("The settings file is empty.");
             }
-            _settings.CopyFrom(SettingsMigration.Upgrade(imported));
-            LoadControls(_settings);
+            LoadEditableSettings(SettingsMigration.Upgrade(imported));
             NotifyPreviewChanged(SettingsPreviewKind.Appearance);
         }
         catch (Exception exception) when (

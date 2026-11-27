@@ -39,7 +39,7 @@ QuantaTray
 
 QuantaTrayには開発者運営のAPI、テレメトリー送信先、広告サーバーはありません。Codex、ChatGPT、ドキュメント、GitHub Release等の外部リンクはユーザー操作時だけ既定ブラウザで開きます。
 
-将来、自動更新確認、クラッシュ送信、追加の外部通信を実装する場合は、実装前に本方針と設定画面を更新し、初期OFFまたは明示同意方式にします。
+「設定」→「通知」で「新しいバージョンを通知する」を有効にすると、起動中に最大1日1回、GitHubの公開API（api.github.com）へ匿名で最新の正式リリースを問い合わせます。GitHubには接続元IPアドレスとアプリ名が伝わります。Codexの認証情報や利用状況は送信しません。確認日時、取得した版、通知済みの版をローカルに保存します。配布ファイルは利用者が手動でダウンロードします。
 
 ## ローカル保存する情報
 
@@ -95,6 +95,8 @@ OpenAI、ChatGPT、Codexは各権利者の商標です。
 ## English summary
 
 QuantaTray is a local-first, read-only Windows utility. It has no developer-operated backend, telemetry, advertising, or externally transmitted analytics. It communicates with OpenAI only through the separately installed official Codex App Server.
+
+Release notifications are off by default. When enabled, QuantaTray checks GitHub’s public latest-release API at most once every 24 hours while running. GitHub receives the connection IP address and the app name. The check sends no Codex credentials or usage data. The last check time, latest version and last notified version are cached locally. Downloads and installation are manual.
 
 Optional local usage analysis is off by default. When explicitly enabled, it scans only known Codex session roots and stores aggregate model, reasoning, service-tier, token, elapsed-time, and turn-count metadata plus a path-hashed incremental index. It never stores message content, commands, diffs, repository paths, session identifiers, or account data, and sends no aggregate data to the developer.
 

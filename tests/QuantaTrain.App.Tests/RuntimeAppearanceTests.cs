@@ -1510,6 +1510,80 @@ public sealed class RuntimeAppearanceTests
         });
     }
 
+
+    [Theory]
+    [InlineData("ja-JP")]
+    [InlineData("en-US")]
+    public void ReleaseNotificationsRequireSavingTheOptIn(string locale)
+    {
+        RunSta(() =>
+        {
+            var settings = new AppSettings();
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings { Mode = "manual", Locale = locale });
+            using (var cancelled = new SettingsForm(settings, localizer, 2))
+            {
+                cancelled.Show();
+                var toggle = GetField<ToggleSwitch>(cancelled, "_releaseNotification");
+                Assert.True(toggle.Visible);
+                Assert.False(toggle.Checked);
+                Assert.Equal(localizer.Text("Settings.NotifyNewRelease"), toggle.AccessibleName);
+                toggle.Checked = true;
+                GetField<ComboBox>(cancelled, "_theme").SelectedItem = "light";
+                Assert.False(settings.Notifications.NotifyNewRelease);
+                cancelled.Close();
+            }
+            Assert.False(settings.Notifications.NotifyNewRelease);
+            using var saved = new SettingsForm(settings, localizer, 2);
+            saved.Show();
+            GetField<ToggleSwitch>(saved, "_releaseNotification").Checked = true;
+            ((Button)saved.AcceptButton!).PerformClick();
+            Assert.True(settings.Notifications.NotifyNewRelease);
+            using var reopened = new SettingsForm(settings, localizer, 2);
+            reopened.Show();
+            var enabled = GetField<ToggleSwitch>(reopened, "_releaseNotification");
+            Assert.True(enabled.Checked);
+            enabled.Checked = false;
+            ((Button)reopened.AcceptButton!).PerformClick();
+            Assert.False(settings.Notifications.NotifyNewRelease);
+        });
+    }
+
+    [Fact]
+    public void UpdateMenuAndOnlyTheCurrentUpdateBalloonOpenTheReleasePage()
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings { Mode = "manual", Locale = "ja-JP" });
+            var opened = new List<string>();
+            var link = new ReleaseTrayLink(opened.Add);
+            using var menu = new ContextMenuStrip();
+            link.AddMenuItem(menu, localizer);
+            Assert.Empty(menu.Items);
+
+            var version = new Version(3, 4, 5);
+            link.Available = version;
+            link.AddMenuItem(menu, localizer);
+            var item = Assert.Single(menu.Items.Cast<ToolStripItem>());
+            Assert.Contains(version.ToString(), item.Text);
+            item.PerformClick();
+            link.BalloonTarget = version;
+            link.OpenBalloon();
+            var page = "https://github.com/ukr8b3g-cmyk/QuotaTray/releases/tag/v3.4.5";
+            Assert.Equal(new[] { page, page }, opened);
+
+            link.OpenBalloon();
+            link.BalloonTarget = null;
+            link.OpenBalloon();
+            link.BalloonTarget = version;
+            link.Available = null;
+            link.OpenBalloon();
+            item.PerformClick();
+            Assert.Equal(2, opened.Count);
+        });
+    }
+
     private static string FindLocalesDirectory()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

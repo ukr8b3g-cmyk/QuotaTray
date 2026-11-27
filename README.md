@@ -1,6 +1,6 @@
 # QuantaTray
 
-[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
+[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/SHA256SUMS.txt)
 
 ## 日本語
 
@@ -12,17 +12,19 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 
 ### ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip)
-- [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-portable.zip)
+- [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/SHA256SUMS.txt)
 
-### v0.2.12の変更点
+### v0.2.13の変更点
 
-- 「詳細表示」→「概要」で、リセット券が4件以上あるとカードが次の行に折り返されます。表示件数に上限はありません。期限の詳細が一部しか届かない場合は、残りを「期限情報なし」としてまとめて表示します。
-- Codexから情報が届いた場合は、同じ「概要」で5時間枠の残量とリセット日時、利用上限に達した理由、支出上限への到達も確認できます。
-- 「使用分析」ではGPT-6.2 Astra／Solなどの推論レベル `xhigh` と `max` を個別に集計します。モデルごとに、総トークンのうちFast、Ultrafastで使った割合も表示します。サービス種別の記録が一切ないモデルでは「—」を表示します。
+新しい正式版が公開されたときに、Windowsのトレイ通知でお知らせできるようになりました。通知を使うには「設定」→「通知」で「新しいバージョンを通知する」をオンにして保存してください。初期設定はオフです。
 
-ローカル使用分析を有効にしている場合は、更新後の初回走査で既存ログを再集計します。Windowsの自動テスト262件が成功し、インストール版の実画面でもリセット券4件の表示を確認しました。
+- QuantaTrayの起動中に24時間に1回、GitHubの最新の正式リリースを確認します。下書きとプレリリースは対象外です。
+- 新しい版の通知は各バージョンにつき1回です。通知を見逃しても、トレイアイコンの右クリックメニューから同じリリースページを開けます。
+- ダウンロードとインストールは手動です。v0.2.12以前をお使いの場合は、まず上のリンクからv0.2.13に更新してください。
+
+Windowsの実機で、更新通知をクリックして対象のリリースページが開くことを確認しました。
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
 
@@ -31,13 +33,13 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 ### 主な機能
 
 - 週間利用枠の残量、使用済み割合、次回リセット日時、カウントダウン
-- リセット券の残数・有効期限と、購入クレジット残高（App Serverから取得できる場合）
+- リセット券は4件以上でも全件表示。購入クレジット残高、5時間枠の残量・リセット日時、上限に達した理由も取得できる場合に表示
 - 日別・累計トークン、ピーク、連続利用日数の公式アカウント使用量
 - 定期リセット、リセット券使用候補、予定外回復候補のローカル履歴（最近4件）
 - プラン、接続状態、最終更新、自動更新状態
 - ミニ、コンパクト、詳細の3表示と、それぞれ独立した画面位置記憶
 - 横幅を維持して高さを変更・縦スクロールできる詳細画面
-- モデル、推論レベル、サービスタイプ、トークン、使用時間、ターン数のローカル集計
+- モデル別のトークン、使用時間、ターン数、推論レベル（`xhigh`／`max`を個別集計）、Fast／Ultrafastのトークン割合
 - 初期値オフのプラグイン／ツール・Skill回数集計
 - 9カテゴリに整理した設定、3年既定の履歴・集計保持、JSON／CSV出力
 - 日本語、英語（自動選択ではWindowsが日本語なら日本語、それ以外は英語）
@@ -120,7 +122,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Installer版
 
-1. `QuantaTray-v0.2.12-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.13-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行します。
 3. インストール後、QuantaTrayがタスクトレイに常駐します。
 
@@ -132,7 +134,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Portable ZIP版
 
-1. `QuantaTray-v0.2.12-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.13-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -187,7 +189,6 @@ Portable版：
 - App Serverから週間枠が返らない場合、推測値は表示しません。
 - リセット券の詳細が返らない場合、件数だけ表示します。
 - リセット理由は返されないため、履歴分類は観測値に基づく推定です。
-- アプリ本体の自動アップデートは未実装です。
 - Windows x64以外は未検証です。
 
 ### 開発
@@ -216,29 +217,31 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ### Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip)
-- [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/QuantaTray-v0.2.13-win-x64-portable.zip)
+- [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.13/SHA256SUMS.txt)
 
-### What's new in v0.2.12
+### What's new in v0.2.13
 
-- In **Detail → Overview**, reset-credit cards wrap onto new rows so you can see four or more credits. If Codex reports a higher count than it provides entries for, the remaining credits share one card with no expiry information.
-- Overview also shows the remaining five-hour allowance and its reset time, the reason a limit was reached, and spending-limit notices when Codex supplies those details.
-- In **Usage analysis**, `xhigh` and `max` are counted separately for models such as GPT-6.2 Astra and Sol. Each model shows the percentage of its total tokens recorded as Fast and as Ultrafast. A dash means that no service tier was recorded for that model.
+QuantaTray can now notify you when a new stable version is available. To opt in, open **Settings → Notifications**, turn on **Notify me about new versions**, and save. Notifications are off by default.
 
-If local usage analysis is enabled, the first scan after the update rebuilds its cache from existing logs. All 262 automated Windows tests passed, and four credits were confirmed in the installed app.
+- While QuantaTray is running, it checks GitHub for the latest stable release once every 24 hours. Drafts and prereleases are excluded.
+- Each newer version is announced once. Click the notification to open its release page, or open the same page later from the tray icon’s right-click menu.
+- Downloads and installation are manual. If you use v0.2.12 or earlier, update to v0.2.13 using the links above to start receiving notifications.
+
+On Windows, clicking the update notification was verified to open the corresponding GitHub release page.
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the files against `SHA256SUMS.txt`.
 
 ### Features
 
 - Weekly remaining allowance, used share, reset time, and countdown
-- Reset-credit count, expiry dates, and purchased-credit balance when available
+- All reported reset credits and expiry dates, including four or more credits. Purchased-credit balance, five-hour allowance and limit reasons appear when available
 - Official account usage including daily and lifetime tokens, peak usage, and streaks
 - Local history of scheduled resets, possible reset-credit use, and unexpected recovery candidates, with four recent rows
 - Mini, compact, and detailed views with independently remembered positions
 - A height-resizable detailed view with vertical scrolling
-- Local-only aggregation of model, reasoning effort, service tier, tokens, elapsed time, and turns
+- Local per-model tokens, time, turns and reasoning effort (including separate `xhigh` and `max`), plus Fast and Ultrafast token shares
 - Opt-in local plugin/tool and skill counters
 - Nine consolidated settings categories, three-year default retention, and JSON/CSV exports
 - Automatic 60-second quota refresh and manual refresh
@@ -262,7 +265,7 @@ QuantaTray launches `codex app-server --stdio` in the background. The Codex desk
 
 ### Install
 
-For the installer, run `QuantaTray-v0.2.12-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
+For the installer, run `QuantaTray-v0.2.13-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
 
 ### Privacy and security
 

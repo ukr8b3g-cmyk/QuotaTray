@@ -112,6 +112,7 @@ public sealed class NotificationSettings
     public bool ScheduledReset { get; set; } = true;
     public bool UnexpectedResetCandidate { get; set; } = true;
     public bool ResetCreditExpiring { get; set; } = true;
+    public bool NotifyNewRelease { get; set; }
     public bool PersistentConnectionFailure { get; set; } = true;
 
     internal NotificationSettings Clone() => (NotificationSettings)MemberwiseClone();

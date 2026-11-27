@@ -1,5 +1,10 @@
 # Project state
 
+## QuantaTray 0.2.13 - 2026-11-27
+
+- A Windows user confirmed the update notification appeared and opened the corresponding GitHub release page when clicked. The live GitHub check also confirmed that restarting skips a duplicate notification.
+- The Windows x64 installer uses the locally tested build. The portable ZIP includes the same application binary and the updated bilingual README.
+
 ## QuantaTray 0.2.12 - 2026-11-27
 
 - The installed Windows x64 update displayed four reset-credit cards on a live account. All 262 automated Windows tests passed, including synthetic five-hour limits, limit reasons and service-tier data.
