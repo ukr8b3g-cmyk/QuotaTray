@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.12 - 2026-11-27
+
+- Show all reset-credit cards in the detailed overview, wrapping extra rows and grouping credits whose expiry details were omitted.
+- Show reported five-hour windows, reset times, limit-reached reasons and spending-limit notices in the overview.
+- Distinguish `xhigh` from `max` and Fast from Ultrafast in local usage analysis. Rebuild older scan caches on the first enabled scan.
+
 ## 0.2.11 - 2026-10-24
 
 - Close history-export streams before moving temporary files on Windows, clean temporary files on failure/cancellation, and report export outcomes without crashing the app.

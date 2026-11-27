@@ -82,7 +82,8 @@ public static class UsageAnalyticsAggregator
             "minimal" or "low" => "low",
             "medium" => "medium",
             "high" => "high",
-            "xhigh" or "max" or "maximum" => "maximum",
+            "xhigh" => "xhigh",
+            "max" or "maximum" => "maximum",
             "ultra" => "ultra",
             _ => "unknown",
         };
@@ -92,6 +93,7 @@ public static class UsageAnalyticsAggregator
         {
             "standard" or "default" => "standard",
             "fast" or "priority" => "fast",
+            "ultrafast" => "ultrafast",
             _ => "unknown",
         };
 

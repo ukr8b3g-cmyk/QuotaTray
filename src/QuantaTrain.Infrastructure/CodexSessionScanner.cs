@@ -9,7 +9,7 @@ namespace QuantaTrain.Infrastructure;
 
 public sealed class CodexSessionScanner
 {
-    private const int ParserVersion = 3;
+    private const int ParserVersion = 4;
     private const int SignatureBytes = 256;
     private const int MaximumMetadataLineBytes = 4 * 1024 * 1024;
     private const long MaximumDecompressedBytes = 512L * 1024 * 1024;

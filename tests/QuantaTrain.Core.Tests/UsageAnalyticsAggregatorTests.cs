@@ -122,7 +122,8 @@ public sealed class UsageAnalyticsAggregatorTests
 
     [Theory]
     [InlineData("low", "low")]
-    [InlineData("xhigh", "maximum")]
+    [InlineData("xhigh", "xhigh")]
+    [InlineData("max", "maximum")]
     [InlineData("Ultra", "ultra")]
     [InlineData("future-value", "unknown")]
     public void NormalizesReasoningEffort(string input, string expected)

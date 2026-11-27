@@ -48,6 +48,7 @@ public sealed class PollingCoordinator : IAsyncDisposable
     public event EventHandler<PollingStateChangedEventArgs>? StateChanged;
 
     public WeeklyQuotaState? Current { get; private set; }
+    public IReadOnlyList<AdditionalQuotaLimit> AdditionalLimits { get; private set; } = [];
     public DateTimeOffset? LastSuccessUtc { get; private set; }
     public long SuccessSequence { get; private set; }
     public long RefreshSequence => Interlocked.Read(ref _refreshSequence);
@@ -83,6 +84,7 @@ public sealed class PollingCoordinator : IAsyncDisposable
             var snapshot = await _readRateLimits(cancellationToken)
                 .ConfigureAwait(false);
             var weekly = WeeklyBucketSelector.BuildState(snapshot);
+            AdditionalLimits = snapshot.AdditionalLimits ?? [];
             if (weekly is null)
             {
                 StateChanged?.Invoke(
@@ -104,6 +106,7 @@ public sealed class PollingCoordinator : IAsyncDisposable
             exception is not OperationCanceledException ||
             !cancellationToken.IsCancellationRequested)
         {
+            AdditionalLimits = [];
             StateChanged?.Invoke(
                 this,
                 new PollingStateChangedEventArgs(

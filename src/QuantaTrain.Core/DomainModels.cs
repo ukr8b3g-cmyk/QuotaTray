@@ -16,6 +16,12 @@ public sealed record RateLimitBucket(
 
 public sealed record ResetCredit(DateTimeOffset? ExpiresAtUtc);
 
+public sealed record AdditionalQuotaLimit(
+    string? Name,
+    IReadOnlyList<RateLimitBucket> FiveHourWindows,
+    string? ReachedType,
+    bool SpendControlReached);
+
 public sealed record PurchasedCreditsSnapshot(
     string? Balance,
     bool HasCredits,
@@ -28,7 +34,8 @@ public sealed record RateLimitSnapshot(
     IReadOnlyList<ResetCredit>? ResetCredits,
     string? PlanType,
     string? CodexVersion,
-    PurchasedCreditsSnapshot? PurchasedCredits = null);
+    PurchasedCreditsSnapshot? PurchasedCredits = null,
+    IReadOnlyList<AdditionalQuotaLimit>? AdditionalLimits = null);
 
 public sealed record WeeklyQuotaState(
     string? LimitId,

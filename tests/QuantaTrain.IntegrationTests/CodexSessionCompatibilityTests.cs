@@ -215,6 +215,21 @@ public sealed class CodexSessionCompatibilityTests
     }
 
     [Fact]
+    public async Task ModelEffortAndSpeedAreIndependent()
+    {
+        using var fixture = new Fixture();
+        await fixture.WriteAsync(Start,
+            Row("turn_context", new { model = "gpt-6.2-astra", effort = "xhigh", service_tier = "ultrafast" }),
+            Snapshot(100, 100), Complete,
+            Start, Row("turn_context", new { model = "gpt-6.2-sol", effort = "max", service_tier = "priority" }),
+            Snapshot(50, 150), Complete);
+        var rows = (await fixture.ScanAsync()).Rows;
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.Key is { Model: "gpt-6.2-astra", ReasoningEffort: "xhigh", ServiceTier: "ultrafast" } && row.Tokens.TotalTokens == 100);
+        Assert.Contains(rows, row => row.Key is { Model: "gpt-6.2-sol", ReasoningEffort: "maximum", ServiceTier: "fast" } && row.Tokens.TotalTokens == 50);
+    }
+
+    [Fact]
     public async Task LegacyTurnContextTierRemainsSupported()
     {
         using var fixture = new Fixture();

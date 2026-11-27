@@ -150,6 +150,29 @@ public sealed class CodexNullableAccountParsingTests
     }
 
     [Fact]
+    public void KeepsShortWindowsAndExplicitReasonsWithTheirOwnLimit()
+    {
+        var snapshot = Parse("""
+            {"rateLimitsByLimitId": {
+              "a": {"limitName":"Example","primary":{"usedPercent":24,"windowDurationMins":300,"resetsAt":1800000000},
+                    "secondary":{"usedPercent":50,"windowDurationMins":10080},"spendControlReached":false},
+              "b": {"spendControlReached":true,"rateLimitReachedType":"workspace_member_usage_limit_reached"},
+              "c": {"spendControlReached":null,"primary":{"usedPercent":100,"windowDurationMins":60}}
+            }}
+            """);
+        Assert.Equal(50, WeeklyBucketSelector.BuildState(snapshot)!.RemainingPercent);
+        var details = snapshot.AdditionalLimits!;
+        Assert.Equal(2, details.Count);
+        var window = Assert.Single(details[0].FiveHourWindows);
+        Assert.Equal("Example", details[0].Name);
+        Assert.Equal(24, window.UsedPercent);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1800000000), window.ResetsAtUtc);
+        Assert.Equal("b", details[1].Name);
+        Assert.True(details[1].SpendControlReached);
+        Assert.Equal("workspace_member_usage_limit_reached", details[1].ReachedType);
+    }
+
+    [Fact]
     public void MalformedDailyUsageRowsDoNotDiscardValidRows()
     {
         using var document = JsonDocument.Parse("""

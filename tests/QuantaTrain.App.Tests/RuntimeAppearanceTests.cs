@@ -1030,6 +1030,92 @@ public sealed class RuntimeAppearanceTests
         });
     }
 
+    [Theory]
+    [InlineData("ja-JP")]
+    [InlineData("en-US")]
+    public void DetailOverviewWrapsAllResetCreditsAndKeepsTheHistoryReachable(string locale)
+    {
+        RunSta(() =>
+        {
+            var localizer = new LocalizationService(FindLocalesDirectory());
+            localizer.Load(new LanguageSettings
+            {
+                Mode = "manual",
+                Locale = locale,
+            });
+            using var detail = new DetailForm(localizer);
+            detail.Show();
+            var overview = GetField<Panel>(detail, "_overviewPage");
+            var credits = GetField<FlowLayoutPanel>(detail, "_credits");
+            var history = GetField<FlowLayoutPanel>(detail, "_history").Parent!;
+            var footer = GetField<Label>(detail, "_status").Parent!;
+            var baseline = history.Top;
+            var state = new WeeklyQuotaState(
+                "weekly", BucketRole.Primary, 40, 60, 10080, null,
+                null, null, null, DateTimeOffset.Now, null);
+            var vouchers = Enumerable.Range(1, 13)
+                .Select(day => new ResetCredit(state.ObservedAtUtc.AddDays(day)))
+                .ToArray();
+
+            var cards = ShowCredits(4, vouchers[..4]);
+            Assert.Equal(4, cards.Length);
+            Assert.Equal(cards[0].Top, cards[2].Top);
+            Assert.True(cards[3].Top >= cards[0].Bottom);
+            Assert.Equal(cards[0].Left, cards[3].Left);
+            Assert.Equal(vouchers[3].ExpiresAtUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd"),
+                cards[3].Controls[1].Text);
+            Assert.True(history.Top > baseline);
+            SaveSnapshotIfRequested(detail, $"dashboard-four-reset-credits-{locale}.png");
+
+            detail.Height = detail.MinimumSize.Height;
+            cards = ShowCredits(vouchers.Length, vouchers);
+            Assert.Equal(vouchers.Length, cards.Length);
+            Assert.True(overview.VerticalScroll.Visible);
+            Assert.False(overview.HorizontalScroll.Visible);
+            overview.ScrollControlIntoView(footer);
+            Assert.InRange(footer.Bottom, 1, overview.ClientSize.Height);
+
+            cards = ShowCredits(5, vouchers[..3]);
+            Assert.Equal(4, cards.Length);
+            Assert.Equal(localizer.Text("Credits.Available", 2), cards[^1].Controls[0].Text);
+            Assert.Equal(localizer.Text("Credits.DetailsUnavailable"), cards[^1].Controls[1].Text);
+
+            var countOnly = Assert.Single(ShowCredits(4, null));
+            Assert.Equal(localizer.Text("Credits.Available", 4), countOnly.Controls[0].Text);
+            Assert.Empty(ShowCredits(0, []));
+            Assert.Equal(localizer.Text("Credits.None"), Assert.Single(credits.Controls.OfType<Label>()).Text);
+            overview.AutoScrollPosition = Point.Empty;
+            Assert.Equal(baseline, history.Top);
+
+            var limitText = GetField<Label>(detail, "_additionalLimitDetails");
+            var reset = state.ObservedAtUtc.AddHours(3);
+            var window = new RateLimitBucket("sample", BucketRole.Primary, 28, 300, reset);
+            detail.UpdateState(null, false, "Weekly usage limit is unavailable.", [],
+                [new AdditionalQuotaLimit("Sample", [window], "workspace_member_usage_limit_reached", true)]);
+            Assert.True(limitText.Parent!.Visible);
+            Assert.Contains(localizer.Text("Quota.FiveHourRemaining", 72), limitText.Text);
+            Assert.Contains(localizer.Text("Quota.ResetTime", reset.ToLocalTime()), limitText.Text);
+            Assert.Contains(localizer.Text("Quota.SpendLimit"), limitText.Text);
+            Assert.Contains(localizer.Text("Quota.MemberLimit"), limitText.Text);
+            Assert.True(footer.Top >= limitText.Parent.Bottom);
+            detail.UpdateState(state, false, null, []);
+            Assert.False(limitText.Parent.Visible);
+
+            RoundedPanel[] ShowCredits(long count, IReadOnlyList<ResetCredit>? values)
+            {
+                detail.UpdateState(state with { ResetCreditCount = count, ResetCredits = values },
+                    false, null, []);
+                Application.DoEvents();
+
+                var rendered = credits.Controls.OfType<RoundedPanel>().ToArray();
+                Assert.All(rendered, card => Assert.True(credits.ClientRectangle.Contains(card.Bounds)));
+                Assert.True(credits.Parent!.Bottom <= history.Top);
+                Assert.True(history.Bottom <= footer.Top);
+                return rendered;
+            }
+        });
+    }
+
     [Fact]
     public void BlueFamilyDashboardUsesDistinctGreenForUsedQuota()
     {

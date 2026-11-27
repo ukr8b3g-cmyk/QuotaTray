@@ -1,5 +1,10 @@
 # Project state
 
+## QuantaTray 0.2.12 - 2026-11-27
+
+- The installed Windows x64 update displayed four reset-credit cards on a live account. All 262 automated Windows tests passed, including synthetic five-hour limits, limit reasons and service-tier data.
+- The release uses the locally tested installer and app binary. The portable ZIP includes the updated bilingual README.
+
 ## QuantaTray 0.2.11 published - 2026-10-24
 
 - Release version: `0.2.11`. All nine reviewed fixes and their regression tests are included.

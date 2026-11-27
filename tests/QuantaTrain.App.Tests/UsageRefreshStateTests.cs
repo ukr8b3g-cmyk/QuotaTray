@@ -39,6 +39,34 @@ public sealed class UsageRefreshStateTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void ModelRowShowsBothSpeedSharesAndEveryRecordedEffort()
+    {
+        RunSta(() =>
+        {
+            var localizer = Localizer("en-US");
+            using var form = new DetailForm(localizer);
+            var snapshot = Snapshot();
+            var template = snapshot.Rows[0];
+            UsageAggregate MakeRow(string effort, string speed, long tokens) => template with
+            {
+                Key = template.Key with { ReasoningEffort = effort, ServiceTier = speed },
+                Tokens = new UsageTokenTotals(tokens, 0, 0, 0, 0, tokens)
+            };
+            form.UpdateUsage(snapshot with
+            {
+                Rows = [MakeRow("xhigh", "fast", 25), MakeRow("maximum", "ultrafast", 15),
+                    MakeRow("ultra", "unknown", 60)]
+            }, new UsageAnalyticsSettings { Enabled = true }, false);
+            var labels = Labels(Field<Control>(form, "_modelRows").Controls[0])
+                .Select(label => label.Text).ToArray();
+            Assert.Contains("25%", labels);
+            Assert.Contains("15%", labels);
+            Assert.Contains(labels, text => text.Contains("XHigh 25%") &&
+                text.Contains("Maximum 15%") && text.Contains(localizer.Text("Usage.Effort.ultra")));
+        });
+    }
+
+    [Fact]
     public void TwoThousandRefreshesKeepNativeHandlesAndMemoryBounded()
     {
         RunSta(() =>

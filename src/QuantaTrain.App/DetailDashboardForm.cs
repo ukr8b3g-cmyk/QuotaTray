@@ -52,6 +52,7 @@ internal static class UsageScanStatus
 
 internal sealed class DetailForm : FixedWidthResizableForm
 {
+    private const int CreditRowHeight = 96;
     private readonly LocalizationService _localizer;
     private readonly Func<bool> _canDrag;
     private readonly Func<int> _refreshIntervalSeconds;
@@ -75,6 +76,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
     private readonly FlowLayoutPanel _credits = RowsPanel();
     private readonly FlowLayoutPanel _history = RowsPanel();
     private readonly Label _purchasedBalance = ValueLabel();
+    private readonly Label _additionalLimitDetails = ValueLabel();
     private readonly Label _status = ValueLabel();
     private readonly Label _usageStatus = ValueLabel();
     private readonly FlowLayoutPanel _modelRows = RowsPanel();
@@ -239,7 +241,8 @@ internal sealed class DetailForm : FixedWidthResizableForm
         WeeklyQuotaState? state,
         bool updating,
         string? error,
-        IReadOnlyList<string> history)
+        IReadOnlyList<string> history,
+        IReadOnlyList<AdditionalQuotaLimit>? additionalLimits = null)
     {
         _quotaRing.RemainingPercent = state?.RemainingPercent;
         var remainingPercent = state?.RemainingPercent ?? 0d;
@@ -309,6 +312,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 $"{_localizer.Text("Detail.ConnectionLabel")}: {_connection.Text}",
             ]);
         PopulateCreditCards(state);
+        PopulateAdditionalLimits(additionalLimits);
         PopulateRows(
             _history,
             history.Count == 0
@@ -457,6 +461,12 @@ internal sealed class DetailForm : FixedWidthResizableForm
             116);
         AddInlineKeyValue(info, "Detail.AppVersion", _version, 18, 108, 116);
 
+        var limits = Card(new Rectangle(16, info.Bottom + 10, 362, 80), "Quota.AdditionalLimits");
+        _additionalLimitDetails.Location = new Point(18, 42);
+        _additionalLimitDetails.MaximumSize = new Size(326, 0);
+        _additionalLimitDetails.UseMnemonic = false;
+        limits.Controls.Add(_additionalLimitDetails);
+
         var purchased = Card(
             new Rectangle(390, 10, 376, 92),
             "Credits.PurchasedTitle");
@@ -466,14 +476,15 @@ internal sealed class DetailForm : FixedWidthResizableForm
         purchased.Controls.Add(_purchasedBalance);
 
         var credits = Card(
-            new Rectangle(390, 112, 376, 134),
+            new Rectangle(390, 112, 376, 42 + CreditRowHeight + 10),
             "Credits.Title");
-        _credits.Bounds = new Rectangle(18, 42, 340, 82);
+        _credits.Bounds = new Rectangle(18, 42, 340, CreditRowHeight);
         _credits.FlowDirection = FlowDirection.LeftToRight;
+        _credits.WrapContents = true;
         credits.Controls.Add(_credits);
 
         var history = Card(
-            new Rectangle(390, 256, 376, 270),
+            new Rectangle(390, credits.Bottom + 10, 376, 270),
             "History.Recent");
         _history.Bounds = new Rectangle(18, 45, 340, 174);
         history.Controls.Add(_history);
@@ -485,7 +496,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
 
         var footer = new Panel
         {
-            Bounds = new Rectangle(16, 534, 750, 28),
+            Bounds = new Rectangle(16, history.Bottom + 8, 750, 28),
             Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
             BackColor = Theme.Window,
         };
@@ -494,7 +505,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         footer.Controls.Add(_status);
         page.Controls.AddRange(
         [
-            quota, info, purchased, credits, history, footer,
+            quota, info, limits, purchased, credits, history, footer,
         ]);
         return page;
     }
@@ -560,20 +571,21 @@ internal sealed class DetailForm : FixedWidthResizableForm
         var modelHeaderLabel = AddHeader(
             modelHeader, _localizer.Text("Usage.Model"), 0, 115);
         var shareHeader = AddHeader(
-            modelHeader, _localizer.Text("Usage.Share"), 270, 52);
+            modelHeader, _localizer.Text("Usage.Share"), 210, 52);
         var tokensHeader = AddHeader(
-            modelHeader, _localizer.Text("Usage.TotalTokens"), 326, 96);
+            modelHeader, _localizer.Text("Usage.TotalTokens"), 266, 96);
         var elapsedHeader = AddHeader(
-            modelHeader, _localizer.Text("Usage.ElapsedTime"), 428, 72);
+            modelHeader, _localizer.Text("Usage.ElapsedTime"), 368, 72);
         var turnsHeader = AddHeader(
-            modelHeader, _localizer.Text("Usage.TurnCount"), 504, 42);
+            modelHeader, _localizer.Text("Usage.TurnCount"), 444, 42);
         var reasoningHeader = AddHeader(
             modelHeader,
             _localizer.Text("Usage.ReasoningBreakdown"),
-            550,
-            132);
+            490,
+            118);
         var fastHeader = AddHeader(
-            modelHeader, _localizer.Text("Usage.FastRate"), 686, 32);
+            modelHeader, "Fast", 614, 42);
+        var ultraHeader = AddHeader(modelHeader, "Ultrafast", 662, 56);
         _help.SetToolTip(modelHeaderLabel, _localizer.Text("Help.Model"));
         _help.SetToolTip(shareHeader, _localizer.Text("Help.Share"));
         _help.SetToolTip(tokensHeader, _localizer.Text("Help.TotalTokens"));
@@ -581,6 +593,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
         _help.SetToolTip(turnsHeader, _localizer.Text("Help.TurnCount"));
         _help.SetToolTip(reasoningHeader, _localizer.Text("Help.Reasoning"));
         _help.SetToolTip(fastHeader, _localizer.Text("Help.FastRate"));
+        _help.SetToolTip(ultraHeader, _localizer.Text("Help.UltrafastRate"));
         _modelRows.Bounds = new Rectangle(16, 63, 718, 167);
         models.Controls.AddRange([modelHeader, _modelRows]);
 
@@ -597,18 +610,18 @@ internal sealed class DetailForm : FixedWidthResizableForm
         time.Controls.Add(_timeDetails);
 
         var reasoning = Card(
-            new Rectangle(506, 582, 260, 160),
+            new Rectangle(506, 582, 260, 192),
             "Usage.ReasoningBreakdown");
         _reasoningDonut.Bounds = new Rectangle(16, 45, 112, 112);
-        _reasoningLegend.Bounds = new Rectangle(138, 46, 106, 100);
+        _reasoningLegend.Bounds = new Rectangle(138, 46, 106, 140);
         reasoning.Controls.AddRange([_reasoningDonut, _reasoningLegend]);
         var tools = Card(
-            new Rectangle(16, 752, 370, 150),
+            new Rectangle(16, reasoning.Bottom + 10, 370, 150),
             "Usage.ToolCalls");
         _toolRows.Bounds = new Rectangle(16, 42, 338, 94);
         tools.Controls.Add(_toolRows);
         var skills = Card(
-            new Rectangle(396, 752, 370, 150),
+            new Rectangle(396, tools.Top, 370, 150),
             "Usage.SkillsUsed");
         _skillRows.Bounds = new Rectangle(16, 42, 338, 94);
         skills.Controls.Add(_skillRows);
@@ -654,10 +667,12 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 BackColor = Theme.Surface,
             };
             var model = Caption(summary.Model, 0, 2);
+            model.AutoSize = false;
+            model.AutoEllipsis = true;
             model.Size = new Size(115, 19);
             var barTrack = new Panel
             {
-                Bounds = new Rectangle(118, 6, 142, 10),
+                Bounds = new Rectangle(118, 6, 82, 10),
                 BackColor = Theme.SurfaceRaised,
             };
             var fill = new Panel
@@ -666,7 +681,7 @@ internal sealed class DetailForm : FixedWidthResizableForm
                     0,
                     0,
                     (int)Math.Round(
-                        142d *
+                        (double)barTrack.Width *
                         MetricValue(summary, settings.DefaultMetric) /
                         maximum),
                     10),
@@ -677,20 +692,20 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 $"{Percent(
                     MetricValue(summary, settings.DefaultMetric),
                     metricTotal):0}%",
-                270,
+                210,
                 2);
             share.Size = new Size(52, 19);
             var tokens = Caption(
                 $"{summary.Tokens.EffectiveTotalTokens:N0}",
-                326,
+                266,
                 2);
             tokens.Size = new Size(96, 19);
             var elapsed = Caption(
                 FormatDuration(summary.ElapsedMilliseconds),
-                428,
+                368,
                 2);
             elapsed.Size = new Size(72, 19);
-            var turns = Caption($"{summary.TurnCount:N0}", 504, 2);
+            var turns = Caption($"{summary.TurnCount:N0}", 444, 2);
             turns.Size = new Size(42, 19);
             var reasoning = Caption(
                 settings.ShowReasoningBreakdown
@@ -698,27 +713,25 @@ internal sealed class DetailForm : FixedWidthResizableForm
                         " / ",
                         summary.ReasoningTokens
                             .OrderByDescending(item => item.Value)
-                            .Take(2)
                             .Select(item =>
                                 $"{DisplayEffort(item.Key)} " +
                                 $"{Percent(item.Value, summary.Tokens.EffectiveTotalTokens):0}%"))
                     : "—",
-                550,
+                490,
                 2);
-            reasoning.Size = new Size(132, 19);
-            var fast = summary.ServiceTierTokens
-                .Where(item => item.Key == "fast")
-                .Sum(item => item.Value);
-            var tier = Caption(
-                settings.ShowServiceTierBreakdown
-                    ? $"{Percent(fast, summary.Tokens.EffectiveTotalTokens):0}%"
-                    : "—",
-                686,
-                2);
-            tier.Size = new Size(32, 19);
+            reasoning.AutoSize = false;
+            reasoning.AutoEllipsis = true;
+            reasoning.Size = new Size(118, 19);
+            var hasTier = settings.ShowServiceTierBreakdown &&
+                summary.ServiceTierTokens.Any(pair => pair.Key != "unknown" && pair.Value > 0);
+            string TierShare(string key) => hasTier
+                ? $"{Percent(summary.ServiceTierTokens.GetValueOrDefault(key), summary.Tokens.EffectiveTotalTokens):0}%"
+                : "—";
+            var fast = Caption(TierShare("fast"), 614, 2);
+            var ultrafast = Caption(TierShare("ultrafast"), 662, 2);
             row.Controls.AddRange(
             [
-                model, barTrack, share, tokens, elapsed, turns, reasoning, tier,
+                model, barTrack, share, tokens, elapsed, turns, reasoning, fast, ultrafast,
             ]);
             _modelRows.Controls.Add(row);
         }
@@ -742,23 +755,25 @@ internal sealed class DetailForm : FixedWidthResizableForm
                 totalLabel.Text = _localizer.Text("Usage.HiddenModels", summaries.Count, modelCount);
             }
             totalLabel.Font = Theme.Ui(8.2F, FontStyle.Bold);
-            totalLabel.Size = new Size(260, 19);
-            var share = Caption("100%", 270, 4);
+            totalLabel.AutoSize = false;
+            totalLabel.AutoEllipsis = true;
+            totalLabel.Size = new Size(202, 19);
+            var share = Caption("100%", 210, 4);
             share.Size = new Size(52, 19);
             var tokens = Caption(
                 $"{totals.Tokens.EffectiveTotalTokens:N0}",
-                326,
+                266,
                 4);
             tokens.Size = new Size(96, 19);
             var elapsed = Caption(
                 FormatDuration(
                     totals.ElapsedMilliseconds),
-                428,
+                368,
                 4);
             elapsed.Size = new Size(72, 19);
             var turns = Caption(
                 $"{totals.TurnCount:N0}",
-                504,
+                444,
                 4);
             turns.Size = new Size(42, 19);
             totalRow.Controls.AddRange(
@@ -1295,7 +1310,6 @@ internal sealed class DetailForm : FixedWidthResizableForm
         DisposeChildren(_reasoningLegend);
         var rows = reasoning
             .OrderByDescending(item => item.Value)
-            .Take(5)
             .ToArray();
         for (var index = 0; index < rows.Length; index++)
         {
@@ -1427,23 +1441,19 @@ internal sealed class DetailForm : FixedWidthResizableForm
     {
         _credits.SuspendLayout();
         DisposeChildren(_credits);
-        var details = state?.ResetCredits?.Take(3).ToArray() ?? [];
-        if (details.Length > 0)
+        var details = state?.ResetCredits ?? [];
+        foreach (var credit in details)
         {
-            foreach (var credit in details)
-            {
-                _credits.Controls.Add(
-                    CreditCard(
-                        1,
-                        credit.ExpiresAtUtc?.ToLocalTime()));
-            }
+            _credits.Controls.Add(CreditCard(1, credit.ExpiresAtUtc?.ToLocalTime()));
         }
-        else if (state?.ResetCreditCount is > 0)
+
+        // The server can return fewer detail rows than available credits.
+        var countWithoutDetails = (state?.ResetCreditCount ?? details.Count) - details.Count;
+        if (countWithoutDetails > 0)
         {
-            _credits.Controls.Add(
-                CreditCard(state.ResetCreditCount.Value, null));
+            _credits.Controls.Add(CreditCard(countWithoutDetails, null));
         }
-        else
+        if (_credits.Controls.Count == 0)
         {
             _credits.Controls.Add(new DashboardLabel
             {
@@ -1458,6 +1468,57 @@ internal sealed class DetailForm : FixedWidthResizableForm
             });
         }
         _credits.ResumeLayout();
+
+        var contentHeight = _credits.GetPreferredSize(new Size(_credits.Width, 0)).Height;
+        var height = Math.Max(LogicalToDeviceUnits(CreditRowHeight), contentHeight);
+        var heightChange = height - _credits.Height;
+        if (heightChange != 0)
+        {
+            _overviewPage.SuspendLayout();
+            _credits.Height = height;
+            _credits.Parent!.Height += heightChange;
+            _history.Parent!.Top += heightChange;
+            _overviewPage.ResumeLayout();
+        }
+    }
+
+    private void PopulateAdditionalLimits(IReadOnlyList<AdditionalQuotaLimit>? limits)
+    {
+        var groups = new List<string>();
+        foreach (var limit in limits ?? [])
+        {
+            var lines = new List<string>();
+            if (!string.IsNullOrWhiteSpace(limit.Name)) lines.Add(limit.Name);
+            foreach (var window in limit.FiveHourWindows)
+            {
+                lines.Add(_localizer.Text("Quota.FiveHourRemaining",
+                    RemainingCalculator.FromUsedPercent(window.UsedPercent)));
+                if (window.ResetsAtUtc is { } reset)
+                    lines.Add(_localizer.Text("Quota.ResetTime", reset.ToLocalTime()));
+            }
+            if (!string.IsNullOrWhiteSpace(limit.ReachedType))
+            {
+                var reason = limit.ReachedType switch
+                {
+                    "workspace_owner_credits_depleted" => "OwnerCredits",
+                    "workspace_member_credits_depleted" => "MemberCredits",
+                    "workspace_owner_usage_limit_reached" => "OwnerLimit",
+                    "workspace_member_usage_limit_reached" => "MemberLimit",
+                    _ => "Reached",
+                };
+                lines.Add(_localizer.Text($"Quota.{reason}"));
+            }
+            if (limit.SpendControlReached) lines.Add(_localizer.Text("Quota.SpendLimit"));
+            groups.Add(string.Join(Environment.NewLine, lines));
+        }
+        var card = _additionalLimitDetails.Parent!;
+        var hasDetails = groups.Count > 0;
+        _additionalLimitDetails.Text = string.Join(Environment.NewLine + Environment.NewLine, groups);
+        card.Height = _additionalLimitDetails.Bottom + LogicalToDeviceUnits(12);
+        card.Visible = hasDetails;
+        var bottom = _history.Parent!.Bottom;
+        _status.Parent!.Top = (hasDetails ? Math.Max(bottom, card.Bottom) : bottom)
+            + LogicalToDeviceUnits(8);
     }
 
     private RoundedPanel CreditCard(
@@ -1466,8 +1527,8 @@ internal sealed class DetailForm : FixedWidthResizableForm
     {
         var card = new RoundedPanel
         {
-            Size = new Size(106, 96),
-            Margin = new Padding(0, 0, 8, 0),
+            Size = new Size(106, CreditRowHeight - 8),
+            Margin = new Padding(0, 0, 6, 8),
             BackColor = Theme.SurfaceRaised,
         };
         var available = UiFactory.Label(

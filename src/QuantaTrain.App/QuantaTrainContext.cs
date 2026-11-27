@@ -729,7 +729,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
                 _displayState,
                 _viewUpdating,
                 _viewError,
-                _historyItems);
+                _historyItems,
+                _polling?.AdditionalLimits);
             _detailForm.UpdateUsage(
                 _usageSnapshot,
                 _accountUsageSnapshot,
@@ -1359,7 +1360,8 @@ internal sealed class QuantaTrainContext : ApplicationContext
             displayedState,
             updating,
             error,
-            _historyItems);
+            _historyItems,
+            _polling?.AdditionalLimits);
         _detailForm?.UpdateUsage(
             _usageSnapshot,
             _accountUsageSnapshot,

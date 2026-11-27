@@ -1,6 +1,6 @@
 # QuantaTray
 
-[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+[日本語](#日本語) · [English](#english) · [Windows Installer](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe) · [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip) · [SHA-256](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
 
 ## 日本語
 
@@ -12,19 +12,17 @@ OpenAI Codexの週間利用枠、次回リセット、リセット券、ロー�
 
 ### ダウンロード
 
-- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-portable.zip)
-- [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+- [Windows Installer（推奨）](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip)
+- [SHA-256チェックサム](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
 
-v0.2.11では、コードレビューで確認した9件を修正しました。
+### v0.2.12の変更点
 
-- Windowsでの履歴JSON保存と保存失敗時の案内
-- リセット再確認の成功・失敗の区別と、保存待ち中に届いた新しい通信結果の保護
-- 保持期限のキャッシュへの適用と、保持期間を延ばした場合の自動再解析
-- 「現在の期間」の判定、全モデルの合計・割合、総トークン数が欠けたログの合算
-- 詳細画面の再描画で不要になった部品とフォントの解放
+- 「詳細表示」→「概要」で、リセット券が4件以上あるとカードが次の行に折り返されます。表示件数に上限はありません。期限の詳細が一部しか届かない場合は、残りを「期限情報なし」としてまとめて表示します。
+- Codexから情報が届いた場合は、同じ「概要」で5時間枠の残量とリセット日時、利用上限に達した理由、支出上限への到達も確認できます。
+- 「使用分析」ではGPT-6.2 Astra／Solなどの推論レベル `xhigh` と `max` を個別に集計します。モデルごとに、総トークンのうちFast、Ultrafastで使った割合も表示します。サービス種別の記録が一切ないモデルでは「—」を表示します。
 
-旧走査キャッシュは、必要に応じて初回に再解析します。元のCodexログは変更しません。Windowsで256件のC#テストと2,000回の画面更新を検証しました。実アカウント接続・インストール操作・24時間以上の試験は未実施です。ローカル使用分析は参考集計で、請求額や正確な課金使用量を示すものではありません。
+ローカル使用分析を有効にしている場合は、更新後の初回走査で既存ログを再集計します。Windowsの自動テスト262件が成功し、インストール版の実画面でもリセット券4件の表示を確認しました。
 
 配布ファイルは現在コード署名されていません。Windows SmartScreenに「不明な発行元」と表示された場合は、GitHub ReleaseのSHA-256と照合してください。
 
@@ -122,7 +120,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Installer版
 
-1. `QuantaTray-v0.2.11-win-x64-setup.exe` をダウンロードします。
+1. `QuantaTray-v0.2.12-win-x64-setup.exe` をダウンロードします。
 2. セットアップを実行します。
 3. インストール後、QuantaTrayがタスクトレイに常駐します。
 
@@ -134,7 +132,7 @@ QuantaTrayはバックグラウンドで `codex app-server --stdio` を起動し
 
 #### Portable ZIP版
 
-1. `QuantaTray-v0.2.11-win-x64-portable.zip` をダウンロードします。
+1. `QuantaTray-v0.2.12-win-x64-portable.zip` をダウンロードします。
 2. ZIP全体を書き込み可能なフォルダーへ展開します。
 3. `QuantaTray.exe` を実行します。
 
@@ -218,19 +216,17 @@ QuantaTray is not an official OpenAI product and is not affiliated with, endorse
 
 ### Download
 
-- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-setup.exe)
-- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/QuantaTray-v0.2.11-win-x64-portable.zip)
-- [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/latest/download/SHA256SUMS.txt)
+- [Windows Installer (recommended)](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-setup.exe)
+- [Portable ZIP](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/QuantaTray-v0.2.12-win-x64-portable.zip)
+- [SHA-256 checksums](https://github.com/ukr8b3g-cmyk/QuotaTray/releases/download/v0.2.12/SHA256SUMS.txt)
 
-v0.2.11 addresses nine findings from code review.
+### What's new in v0.2.12
 
-- Fix Windows history JSON saves and report export failures safely
-- Require successful reset confirmation and preserve newer polling results during persistence
-- Enforce retention in scan caches and automatically reparse when the retention period is extended
-- Correct the current usage period, all-model totals/shares, and mixed inputs with missing token totals
-- Dispose replaced dashboard controls and their owned fonts
+- In **Detail → Overview**, reset-credit cards wrap onto new rows so you can see four or more credits. If Codex reports a higher count than it provides entries for, the remaining credits share one card with no expiry information.
+- Overview also shows the remaining five-hour allowance and its reset time, the reason a limit was reached, and spending-limit notices when Codex supplies those details.
+- In **Usage analysis**, `xhigh` and `max` are counted separately for models such as GPT-6.2 Astra and Sol. Each model shows the percentage of its total tokens recorded as Fast and as Ultrafast. A dash means that no service tier was recorded for that model.
 
-Older scan caches are reparsed on first use when necessary; original Codex logs are unchanged. Windows validation covered 256 C# tests and 2,000 dashboard updates. Real-account operation, installer execution and a 24-hour-or-longer soak were not performed. Local usage analysis remains a best-effort estimate, not a billing record.
+If local usage analysis is enabled, the first scan after the update rebuilds its cache from existing logs. All 262 automated Windows tests passed, and four credits were confirmed in the installed app.
 
 The current binaries are not code-signed. If Windows SmartScreen shows an unknown-publisher warning, verify the files against `SHA256SUMS.txt`.
 
@@ -266,7 +262,7 @@ QuantaTray launches `codex app-server --stdio` in the background. The Codex desk
 
 ### Install
 
-For the installer, run `QuantaTray-v0.2.11-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
+For the installer, run `QuantaTray-v0.2.12-win-x64-setup.exe`. For the portable edition, extract the entire ZIP to a writable folder and run `QuantaTray.exe`; portable data is stored in the adjacent `data` folder.
 
 ### Privacy and security
 

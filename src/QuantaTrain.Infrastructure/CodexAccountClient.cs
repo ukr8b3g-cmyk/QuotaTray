@@ -86,11 +86,12 @@ public sealed class CodexAccountClient
         string? codexVersion)
     {
         var buckets = new List<RateLimitBucket>();
+        var additionalLimits = new List<AdditionalQuotaLimit>();
         string? planType = null;
         PurchasedCreditsSnapshot? purchasedCredits = null;
 
         if (result.TryGetProperty("rateLimitsByLimitId", out var byId) &&
-            byId.ValueKind == JsonValueKind.Object)
+            byId.ValueKind == JsonValueKind.Object && byId.EnumerateObject().Any())
         {
             foreach (var property in byId.EnumerateObject())
             {
@@ -98,6 +99,7 @@ public sealed class CodexAccountClient
                     property.Value,
                     property.Name,
                     buckets,
+                    additionalLimits,
                     ref planType,
                     ref purchasedCredits);
             }
@@ -109,6 +111,7 @@ public sealed class CodexAccountClient
                 single,
                 null,
                 buckets,
+                additionalLimits,
                 ref planType,
                 ref purchasedCredits);
         }
@@ -143,7 +146,8 @@ public sealed class CodexAccountClient
             credits,
             planType,
             codexVersion,
-            purchasedCredits);
+            purchasedCredits,
+            additionalLimits);
     }
 
     public static AccountUsageSnapshot ParseUsage(
@@ -183,6 +187,7 @@ public sealed class CodexAccountClient
         JsonElement snapshot,
         string? dictionaryLimitId,
         ICollection<RateLimitBucket> buckets,
+        ICollection<AdditionalQuotaLimit> additionalLimits,
         ref string? planType,
         ref PurchasedCreditsSnapshot? purchasedCredits)
     {
@@ -202,8 +207,21 @@ public sealed class CodexAccountClient
                 TryGetBoolean(credits, "hasCredits") ?? false,
                 TryGetBoolean(credits, "unlimited") ?? false);
         }
-        ParseWindow(snapshot, "primary", limitId, BucketRole.Primary, buckets);
-        ParseWindow(snapshot, "secondary", limitId, BucketRole.Secondary, buckets);
+        var windows = new List<RateLimitBucket>(2);
+        ParseWindow(snapshot, "primary", limitId, BucketRole.Primary, windows);
+        ParseWindow(snapshot, "secondary", limitId, BucketRole.Secondary, windows);
+        foreach (var window in windows)
+        {
+            buckets.Add(window);
+        }
+        var fiveHour = windows.Where(window => window.WindowDurationMinutes == 5 * 60).ToArray();
+        var reachedType = TryGetString(snapshot, "rateLimitReachedType");
+        var spendReached = TryGetBoolean(snapshot, "spendControlReached") == true;
+        if (fiveHour.Length > 0 || !string.IsNullOrWhiteSpace(reachedType) || spendReached)
+        {
+            additionalLimits.Add(new AdditionalQuotaLimit(
+                TryGetString(snapshot, "limitName") ?? limitId, fiveHour, reachedType, spendReached));
+        }
     }
 
     private static void ParseWindow(
